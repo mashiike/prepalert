@@ -85,15 +85,18 @@ func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string,
 	}
 	log.Printf("[info][%s] wait redshift data query `%s` finish", reqID, stmtName)
 	for waiter.Continue(ctx) {
-		log.Printf("[debug][%s] wating redshift query `%s` elapsed_time=%s", reqID, stmtName, time.Since(queryStart))
+		elapsedTime := time.Since(queryStart)
+		log.Printf("[debug][%s] wating redshift query `%s` elapsed_time=%s", reqID, stmtName, elapsedTime)
 		describeOutput, err := r.client.DescribeStatement(ctx, &redshiftdata.DescribeStatementInput{
 			Id: executeOutput.Id,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("describe statement:%w", err)
 		}
-		if err := hctx.ExtendTimeout(ctx, time.Second); err != nil {
-			log.Println("[warn] failed extend timeout:", err)
+		if elapsedTime > 1*time.Second {
+			if err := hctx.ExtendTimeout(ctx, 5*time.Second); err != nil {
+				log.Println("[warn] failed extend timeout:", err)
+			}
 		}
 		if describeOutput.Status == types.StatusStringAborted {
 			return nil, fmt.Errorf("query aborted: %s", *describeOutput.Error)
