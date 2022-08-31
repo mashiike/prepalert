@@ -24,5 +24,3 @@ rules:
 
     memo:
       file: ./memo/xxxxxxxxxxx.txt
-      overwrite: true
-
