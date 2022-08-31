@@ -93,6 +93,18 @@ func main() {
 				EnvVars: []string{"PREPALERT_PREFIX"},
 				Value:   "/",
 			},
+			&cli.StringFlag{
+				Name:    "mode",
+				Usage:   "run mode",
+				EnvVars: []string{"PREPALERT_MODE"},
+				Value:   "webhook",
+			},
+			&cli.IntFlag{
+				Name:    "batch-size",
+				Usage:   "local sqs batch size",
+				EnvVars: []string{"PREPALERT_BATCH_SIZE"},
+				Value:   1,
+			},
 		},
 		EnableBashCompletion: true,
 		Version:              Version,
@@ -109,8 +121,12 @@ func main() {
 			if err != nil {
 				return err
 			}
-			app.RunWithContext(ctx.Context, ctx.String("address"), ctx.String("prefix"))
-			return nil
+			return app.Run(ctx.Context, prepalert.RunOptions{
+				Mode:      ctx.String("mode"),
+				Address:   ctx.String("address"),
+				Prefix:    ctx.String("prefix"),
+				BatchSize: ctx.Int("batch-size"),
+			})
 		},
 	}
 	sort.Sort(cli.FlagsByName(i.Flags))

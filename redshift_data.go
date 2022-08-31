@@ -57,9 +57,9 @@ func (r *RedshiftDataQueryRunner) Compile(cfg *QueryConfig) (CompiledQuery, erro
 
 func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string, query string) (*QueryResult, error) {
 	reqID := "-"
-	info, ok := GetHandleInfo(ctx)
+	hctx, ok := GetHandleContext(ctx)
 	if ok {
-		reqID = fmt.Sprintf("%d", info.ReqID)
+		reqID = fmt.Sprintf("%d", hctx.ReqID)
 	}
 	log.Printf("[info][%s] start redshift data query `%s`", reqID, stmtName)
 	log.Printf("[debug][%s] query: %s", reqID, query)
@@ -79,7 +79,7 @@ func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string,
 	waiter := &Waiter{
 		StartTime: queryStart,
 		MinDelay:  100 * time.Microsecond,
-		MaxDelay:  1 * time.Second,
+		MaxDelay:  5 * time.Second,
 		Timeout:   15 * time.Minute,
 		Jitter:    200 * time.Millisecond,
 	}
@@ -91,6 +91,9 @@ func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("describe statement:%w", err)
+		}
+		if err := hctx.ExtendTimeout(ctx, time.Second); err != nil {
+			log.Println("[warn] failed extend timeout:", err)
 		}
 		if describeOutput.Status == types.StatusStringAborted {
 			return nil, fmt.Errorf("query aborted: %s", *describeOutput.Error)

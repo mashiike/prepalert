@@ -16,6 +16,7 @@ import (
 type Config struct {
 	RequiredVersion string             `yaml:"required_version,omitempty"`
 	Service         string             `yaml:"service,omitempty"`
+	SQSQueueName    string             `yaml:"sqs_queue_name,omitempty"`
 	Auth            *AuthConfig        `yaml:"auth,omitempty"`
 	QueryRunners    QueryRunnerConfigs `yaml:"query_runners,omitempty"`
 	Rules           []*RuleConfig      `yaml:"rules,omitempty"`
@@ -127,7 +128,9 @@ func (cfg *Config) Restrict() error {
 	if cfg.Service == "" {
 		return errors.New("service is required")
 	}
-
+	if cfg.SQSQueueName == "" {
+		return errors.New("sqs_queue_name is required")
+	}
 	if cfg.Auth != nil {
 		if err := cfg.Auth.Restrict(); err != nil {
 			return fmt.Errorf("auth:%w", err)

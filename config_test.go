@@ -40,12 +40,12 @@ func TestConfigLoadNoError(t *testing.T) {
 								Name:   "access_data",
 								Runner: "default",
 								File:   "./queries/get_access_data.sql",
-								Query:  "SELECT\n    path, count(*) as cnt\nFROM access_log\nWHERE access_at\n    BETWEEN 'epoch'::TIMESTAMP + interval '{{ .alert.openedAt }} seconds'\n    AND 'epoch'::TIMESTAMP + interval '{{ .alert.closedAt }} seconds'\nGROUP BY 1\n",
+								Query:  "SELECT\n    path, count(*) as cnt\nFROM access_log\nWHERE access_at\n    BETWEEN 'epoch'::TIMESTAMP + interval '{{ .Alert.OpenedAt }} seconds'\n    AND 'epoch'::TIMESTAMP + interval '{{ .Alert.ClosedAt }} seconds'\nGROUP BY 1\n",
 							},
 						},
 						Memo: &prepalert.MemoConfig{
 							File: "./memo/xxxxxxxxxxx.txt",
-							Text: "access_log info\n{{ .access_data['access_data'] | to_table }}\n",
+							Text: "access_log info\n{{ index .QueryResults `access_data` | to_table }}\n",
 						},
 					},
 				}, cfg.Rules)

@@ -57,7 +57,7 @@ func (rule *Rule) Match(body *WebhookBody) bool {
 
 func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, error) {
 	reqID := "-"
-	info, ok := GetHandleInfo(ctx)
+	info, ok := GetHandleContext(ctx)
 	if ok {
 		reqID = fmt.Sprintf("%d", info.ReqID)
 	}
@@ -66,7 +66,7 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 	for _, query := range rule.queries {
 		_query := query
 		eg.Go(func() error {
-			log.Printf("[info][%s]start run query name=%s", reqID, _query.Name())
+			log.Printf("[info][%s] start run query name=%s", reqID, _query.Name())
 			result, err := _query.Run(egctx, body)
 			if err != nil {
 				log.Printf("[error][%s]failed run query name=%s", reqID, _query.Name())

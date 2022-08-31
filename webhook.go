@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/mackerelio/mackerel-client-go"
@@ -65,28 +64,9 @@ type Alert struct {
 	WarningThreshold  float64 `json:"warningThreshold"`
 }
 
-func (app *App) HandleWebhook(w http.ResponseWriter, r *http.Request, reqID uint64, body *WebhookBody) {
-	info := &HandleInfo{
-		ReqID: reqID,
-	}
-	ctx := WithHandleInfo(r.Context(), info)
-	for _, rule := range app.rules {
-		if !rule.Match(body) {
-			continue
-		}
-		if err := app.ProcessRule(ctx, rule, body); err != nil {
-			log.Printf("[error][%d] process body=%v, status=%d", reqID, err, http.StatusInternalServerError)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		break
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
 	reqID := "-"
-	info, ok := GetHandleInfo(ctx)
+	info, ok := GetHandleContext(ctx)
 	if ok {
 		reqID = fmt.Sprintf("%d", info.ReqID)
 	}

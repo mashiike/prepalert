@@ -4,19 +4,30 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/fujiwara/ridge"
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
+	"github.com/mashiike/grat"
 )
 
 type App struct {
-	client  *mackerel.Client
-	auth    *AuthConfig
-	rules   []*Rule
-	service string
+	client    *mackerel.Client
+	auth      *AuthConfig
+	rules     []*Rule
+	service   string
+	queueUrl  string
+	sqsClient *sqs.Client
 }
 
 func New(apikey string, cfg *Config) (*App, error) {
@@ -33,24 +44,48 @@ func New(apikey string, cfg *Config) (*App, error) {
 		}
 		rules = append(rules, rule)
 	}
+	awsCfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("load aws default config:%w", err)
+	}
+	sqsClient := sqs.NewFromConfig(awsCfg)
+	output, err := sqsClient.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
+		QueueName: aws.String(cfg.SQSQueueName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("can not get sqs queu url:%w", err)
+	}
 	app := &App{
-		client:  client,
-		auth:    cfg.Auth,
-		rules:   rules,
-		service: cfg.Service,
+		client:    client,
+		auth:      cfg.Auth,
+		rules:     rules,
+		service:   cfg.Service,
+		sqsClient: sqsClient,
+		queueUrl:  *output.QueueUrl,
 	}
 	return app, nil
 }
 
-func (app *App) Run(address string, prefix string) {
-	app.RunWithContext(context.Background(), address, prefix)
+type RunOptions struct {
+	Mode      string
+	Address   string
+	Prefix    string
+	BatchSize int
 }
 
-func (app *App) RunWithContext(ctx context.Context, address string, prefix string) {
-	if app.EnableBasicAuth() {
-		log.Printf("[info] with basic auth: client_id=%s", app.auth.ClientID)
+func (app *App) Run(ctx context.Context, opts RunOptions) error {
+	switch strings.ToLower(opts.Mode) {
+	case "webhook":
+		log.Println("[info] Run as webhook")
+		if app.EnableBasicAuth() {
+			log.Printf("[info] with basic auth: client_id=%s", app.auth.ClientID)
+		}
+		ridge.RunWithContext(ctx, opts.Address, opts.Prefix, app)
+	case "worker":
+		log.Println("[info] Run as worker")
+		return grat.RunWithContext(ctx, app.queueUrl, opts.BatchSize, app.HandleSQS)
 	}
-	ridge.RunWithContext(ctx, address, prefix, app)
+	return nil
 }
 
 func must[T any](t T, err error) T {
@@ -61,6 +96,8 @@ func must[T any](t T, err error) T {
 }
 
 var generator = must(katsubushi.NewGenerator(1))
+
+const requestIDAttributeKey = "RequestID"
 
 func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
@@ -83,19 +120,91 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	decoder := json.NewDecoder(r.Body)
-	var body WebhookBody
-	if err := decoder.Decode(&body); err != nil {
-		log.Printf("[error][%d] decode body=%v, status=%d", reqID, err, http.StatusBadRequest)
+	bs, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("[info][%d] can not read body:%v", reqID, err)
+		log.Printf("[info][%d] status=%d", reqID, http.StatusBadRequest)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
+	}
+	output, err := app.sqsClient.SendMessage(r.Context(), &sqs.SendMessageInput{
+		MessageBody: aws.String(string(bs)),
+		QueueUrl:    aws.String(app.queueUrl),
+		MessageAttributes: map[string]types.MessageAttributeValue{
+			requestIDAttributeKey: {
+				DataType:    aws.String("Number"),
+				StringValue: aws.String(fmt.Sprintf("%d", reqID)),
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("[info][%d] can send sqs message:%v", reqID, err)
+		log.Printf("[info][%d] status=%d", reqID, http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("[info][%d] send sqs message: message id is %s", reqID, *output.MessageId)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, http.StatusText(http.StatusOK))
+}
+
+func (app *App) HandleSQS(ctx context.Context, event *events.SQSEvent) (*grat.BatchItemFailureResponse, error) {
+	resp := &grat.BatchItemFailureResponse{}
+	for _, message := range event.Records {
+		if err := app.handleSQSMessage(ctx, &message); err != nil {
+			if len(event.Records) == 1 {
+				return nil, err
+			}
+			log.Printf("[warn] handle message failed, messageID=%s, reqID=%d", message.MessageId, getRequestIDFromSQSMessage(&message))
+			resp.BatchItemFailures = append(resp.BatchItemFailures, grat.BatchItemFailureItem{
+				ItemIdentifier: message.MessageId,
+			})
+		}
+	}
+	return resp, nil
+}
+
+func getRequestIDFromSQSMessage(message *events.SQSMessage) uint64 {
+	if message.MessageAttributes != nil {
+		if attr, ok := message.MessageAttributes[requestIDAttributeKey]; ok {
+			if strings.EqualFold(attr.DataType, "number") && attr.StringValue != nil {
+				reqID, err := strconv.ParseUint(*attr.StringValue, 10, 64)
+				if err != nil {
+					log.Printf("[warn] message attribute parse faield id=%s :%v", message.MessageId, err)
+				}
+				return reqID
+			}
+		}
+	}
+	return 0
+}
+func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage) error {
+	reqID := getRequestIDFromSQSMessage(message)
+	log.Printf("[info][%d] handle message id=%s", reqID, message.MessageId)
+	decoder := json.NewDecoder(strings.NewReader(message.Body))
+	var body WebhookBody
+	if err := decoder.Decode(&body); err != nil {
+		log.Printf("[error][%d] sqs message can not parse as Mackerel webhook body: %v", reqID, err)
+		return err
 	}
 	log.Printf("[info][%d] hendle webhook id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
 	if body.Alert.IsOpen {
 		log.Printf("[info][%d] alert is not closed, skip nothing todo id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
-		return
+		return nil
 	}
-	app.HandleWebhook(w, r, reqID, &body)
+	info := app.NewHandleContext(reqID, message)
+	ctx = WithHandleContext(ctx, info)
+	for _, rule := range app.rules {
+		if !rule.Match(&body) {
+			continue
+		}
+		if err := app.ProcessRule(ctx, rule, &body); err != nil {
+			log.Printf("[error][%d] failed process Mackerel webhook body: %v", reqID, err)
+			return err
+		}
+		break
+	}
+	return nil
 }
 
 func (app *App) EnableBasicAuth() bool {
