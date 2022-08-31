@@ -1,0 +1,25 @@
+required_version: ">=v0.0.0"
+
+auth:
+  client_id: hoge
+  client_secret: hoge
+
+query_runners:
+  - name: default
+    type: RedshiftData
+    cluster_identifier: warehouse
+    database: "dev"
+    db_user: "warehouse"
+
+rules:
+  - monitor:
+      id: xxxxxxxxxxx
+    queries:
+      - name: access_data
+        runner: default
+        file: ./queries/get_access_data.sql
+
+    memo:
+      file: ./memo/xxxxxxxxxxx.txt
+      overwrite: true
+

@@ -1,0 +1,2 @@
+access_log info
+{{ index .QueryResults `access_data` | to_table }}
