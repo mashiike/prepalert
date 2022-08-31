@@ -49,6 +49,7 @@ func New(apikey string, cfg *Config) (*App, error) {
 		return nil, fmt.Errorf("load aws default config:%w", err)
 	}
 	sqsClient := sqs.NewFromConfig(awsCfg)
+	log.Printf("[info] try get sqs queue url: %s", cfg.SQSQueueName)
 	output, err := sqsClient.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
 		QueueName: aws.String(cfg.SQSQueueName),
 	})
