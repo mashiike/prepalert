@@ -20,7 +20,7 @@ require (
 	github.com/mashiike/grat v0.0.0-20220831064250-862eda97af3c
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.27.1
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.2.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 )
