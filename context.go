@@ -13,29 +13,27 @@ import (
 type HandleContext struct {
 	ReqID uint64
 
-	sqsClient         *sqs.Client
-	queueURL          string
-	message           *events.SQSMessage
-	visibilityTimeout time.Duration
+	sqsClient *sqs.Client
+	queueURL  string
+	message   *events.SQSMessage
 }
 
 func (app *App) NewHandleContext(reqID uint64, message *events.SQSMessage) *HandleContext {
 	return &HandleContext{
-		ReqID:             reqID,
-		message:           message,
-		queueURL:          app.queueUrl,
-		sqsClient:         app.sqsClient,
-		visibilityTimeout: 30 * time.Second,
+		ReqID:     reqID,
+		message:   message,
+		queueURL:  app.queueUrl,
+		sqsClient: app.sqsClient,
 	}
 }
 
 func (hctx *HandleContext) ExtendTimeout(ctx context.Context, d time.Duration) error {
-	hctx.visibilityTimeout += d
-	log.Printf("[debug][%d] change message visivirity message id=%s, timeout=%s", hctx.ReqID, hctx.message.MessageId, hctx.visibilityTimeout)
+	visibilityTimeout := (d + 30*time.Second)
+	log.Printf("[debug][%d] change message visivirity message id=%s, timeout=%s", hctx.ReqID, hctx.message.MessageId, visibilityTimeout)
 	_, err := hctx.sqsClient.ChangeMessageVisibility(ctx, &sqs.ChangeMessageVisibilityInput{
 		QueueUrl:          aws.String(hctx.queueURL),
 		ReceiptHandle:     aws.String(hctx.message.ReceiptHandle),
-		VisibilityTimeout: int32(d.Seconds()),
+		VisibilityTimeout: int32(visibilityTimeout.Seconds()),
 	})
 	if err != nil {
 		return err

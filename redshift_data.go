@@ -93,8 +93,8 @@ func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string,
 		if err != nil {
 			return nil, fmt.Errorf("describe statement:%w", err)
 		}
-		if elapsedTime > 1*time.Second {
-			if err := hctx.ExtendTimeout(ctx, 5*time.Second); err != nil {
+		if elapsedTime > 10*time.Second {
+			if err := hctx.ExtendTimeout(ctx, elapsedTime.Truncate(time.Second)+time.Second); err != nil {
 				log.Println("[warn] failed extend timeout:", err)
 			}
 		}
