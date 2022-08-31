@@ -21,12 +21,12 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.27.1
 	github.com/stretchr/testify v1.7.2
-	github.com/urfave/cli/v2 v2.2.0
+	github.com/urfave/cli/v2 v2.11.2
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 )
 
 require (
-	github.com/BurntSushi/toml v0.3.1 // indirect
+	github.com/BurntSushi/toml v1.1.0 // indirect
 	github.com/Songmu/retry v0.0.1 // indirect
 	github.com/aws/aws-sdk-go v1.38.71 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.12.15 // indirect
@@ -39,7 +39,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.14 // indirect
 	github.com/aws/smithy-go v1.13.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
@@ -48,8 +48,8 @@ require (
 	github.com/pires/go-proxyproto v0.6.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/russross/blackfriday/v2 v2.0.1 // indirect
-	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/atomic v1.3.1 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.7.1 // indirect
