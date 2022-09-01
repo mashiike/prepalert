@@ -94,8 +94,8 @@ func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string,
 			return nil, fmt.Errorf("describe statement:%w", err)
 		}
 		if elapsedTime > 10*time.Second {
-			if err := hctx.ExtendTimeout(ctx, elapsedTime.Truncate(time.Second)+time.Second); err != nil {
-				log.Println("[warn] failed extend timeout:", err)
+			if err := hctx.ChangeSQSMessageVisibilityTimeout(ctx, 10*time.Second); err != nil {
+				log.Println("[warn] failed change sqs message visibility timeout:", err)
 			}
 		}
 		if describeOutput.Status == types.StatusStringAborted {

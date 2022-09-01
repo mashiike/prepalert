@@ -27,8 +27,7 @@ func (app *App) NewHandleContext(reqID uint64, message *events.SQSMessage) *Hand
 	}
 }
 
-func (hctx *HandleContext) ExtendTimeout(ctx context.Context, d time.Duration) error {
-	visibilityTimeout := (d + 30*time.Second)
+func (hctx *HandleContext) ChangeSQSMessageVisibilityTimeout(ctx context.Context, visibilityTimeout time.Duration) error {
 	log.Printf("[debug][%d] change message visivirity message id=%s, timeout=%s", hctx.ReqID, hctx.message.MessageId, visibilityTimeout)
 	_, err := hctx.sqsClient.ChangeMessageVisibility(ctx, &sqs.ChangeMessageVisibilityInput{
 		QueueUrl:          aws.String(hctx.queueURL),
