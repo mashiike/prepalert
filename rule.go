@@ -16,6 +16,7 @@ type Rule struct {
 	monitorName  string
 	queries      []CompiledQuery
 	memoTamplate *template.Template
+	variables    map[string]interface{}
 }
 
 func NewRule(client *mackerel.Client, cfg *RuleConfig, runners QueryRunners) (*Rule, error) {
@@ -47,6 +48,7 @@ func NewRule(client *mackerel.Client, cfg *RuleConfig, runners QueryRunners) (*R
 		monitorName:  name,
 		queries:      queries,
 		memoTamplate: memoTemplate,
+		variables:    cfg.Variables,
 	}
 	return rule, nil
 }
@@ -62,12 +64,16 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 		reqID = fmt.Sprintf("%d", info.ReqID)
 	}
 	eg, egctx := errgroup.WithContext(ctx)
+	queryData := &QueryData{
+		WebhookBody: body,
+		Variables:   rule.variables,
+	}
 	var queryResults sync.Map
 	for _, query := range rule.queries {
 		_query := query
 		eg.Go(func() error {
 			log.Printf("[info][%s] start run query name=%s", reqID, _query.Name())
-			result, err := _query.Run(egctx, body)
+			result, err := _query.Run(egctx, queryData)
 			if err != nil {
 				log.Printf("[error][%s]failed run query name=%s", reqID, _query.Name())
 				return fmt.Errorf("query `%s`:%w", _query.Name(), err)
@@ -83,6 +89,7 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 	data := &RenderMemoData{
 		WebhookBody:  body,
 		QueryResults: make(map[string]*QueryResult, len(rule.queries)),
+		Variables:    rule.variables,
 	}
 	queryResults.Range(func(key any, value any) bool {
 		name, ok := key.(string)
@@ -104,6 +111,7 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 type RenderMemoData struct {
 	*WebhookBody
 	QueryResults map[string]*QueryResult
+	Variables    map[string]interface{}
 }
 
 func (rule *Rule) RenderMemo(ctx context.Context, data *RenderMemoData) (string, error) {

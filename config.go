@@ -69,9 +69,10 @@ type QueryRunnerConfig struct {
 }
 
 type RuleConfig struct {
-	Monitor *MonitorConfig `yaml:"monitor,omitempty"`
-	Queries []*QueryConfig `yaml:"queries,omitempty"`
-	Memo    *MemoConfig    `yaml:"memo,omitempty"`
+	Monitor   *MonitorConfig         `yaml:"monitor,omitempty"`
+	Queries   []*QueryConfig         `yaml:"queries,omitempty"`
+	Variables map[string]interface{} `yaml:"variables,omitempty"`
+	Memo      *MemoConfig            `yaml:"memo,omitempty"`
 }
 
 type MonitorConfig struct {
@@ -205,6 +206,9 @@ func (cfg *RuleConfig) Restrict(baseDir string, queryRunners QueryRunnerConfigs)
 		if err := query.Restrict(baseDir, queryRunners); err != nil {
 			return fmt.Errorf("queries[%d].%w", i, err)
 		}
+	}
+	if cfg.Variables == nil {
+		cfg.Variables = make(map[string]interface{})
 	}
 	if cfg.Memo == nil {
 		return errors.New("memo is required")

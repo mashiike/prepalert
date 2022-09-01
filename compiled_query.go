@@ -9,9 +9,14 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
+type QueryData struct {
+	*WebhookBody
+	Variables map[string]interface{}
+}
+
 type CompiledQuery interface {
 	Name() string
-	Run(context.Context, *WebhookBody) (*QueryResult, error)
+	Run(context.Context, *QueryData) (*QueryResult, error)
 }
 
 type QueryResult struct {

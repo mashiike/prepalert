@@ -175,9 +175,9 @@ func (q *RedshiftDataCompiledQuery) Name() string {
 	return q.name
 }
 
-func (q *RedshiftDataCompiledQuery) Run(ctx context.Context, body *WebhookBody) (*QueryResult, error) {
+func (q *RedshiftDataCompiledQuery) Run(ctx context.Context, data *QueryData) (*QueryResult, error) {
 	var buf bytes.Buffer
-	if err := q.queryTemplate.Execute(&buf, body); err != nil {
+	if err := q.queryTemplate.Execute(&buf, data); err != nil {
 		return nil, fmt.Errorf("execute query template:%w", err)
 	}
 	return q.runner.RunQuery(ctx, "prepalert-"+q.name, buf.String())
