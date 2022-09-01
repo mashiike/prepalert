@@ -72,7 +72,7 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 				log.Printf("[error][%s]failed run query name=%s", reqID, _query.Name())
 				return fmt.Errorf("query `%s`:%w", _query.Name(), err)
 			}
-			log.Printf("[info][%s]end run query name=%s", reqID, _query.Name())
+			log.Printf("[info][%s] end run query name=%s", reqID, _query.Name())
 			queryResults.Store(_query.Name(), result)
 			return nil
 		})
