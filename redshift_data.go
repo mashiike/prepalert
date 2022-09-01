@@ -84,6 +84,9 @@ func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string,
 		Jitter:    200 * time.Millisecond,
 	}
 	log.Printf("[info][%s] wait redshift data query `%s` finish", reqID, stmtName)
+	if err := hctx.ChangeSQSMessageVisibilityTimeout(ctx, 30*time.Second); err != nil {
+		log.Println("[warn] failed change sqs message visibility timeout:", err)
+	}
 	for waiter.Continue(ctx) {
 		elapsedTime := time.Since(queryStart)
 		log.Printf("[debug][%s] wating redshift query `%s` elapsed_time=%s", reqID, stmtName, elapsedTime)
@@ -94,7 +97,7 @@ func (r *RedshiftDataQueryRunner) RunQuery(ctx context.Context, stmtName string,
 			return nil, fmt.Errorf("describe statement:%w", err)
 		}
 		if elapsedTime > 10*time.Second {
-			if err := hctx.ChangeSQSMessageVisibilityTimeout(ctx, 10*time.Second); err != nil {
+			if err := hctx.ChangeSQSMessageVisibilityTimeout(ctx, 30*time.Second); err != nil {
 				log.Println("[warn] failed change sqs message visibility timeout:", err)
 			}
 		}
