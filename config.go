@@ -252,6 +252,9 @@ func (cfg *QueryConfig) Restrict(baseDir string, queryRunners QueryRunnerConfigs
 		return fmt.Errorf("file read:%w", err)
 	}
 	cfg.Query = string(bs)
+	if cfg.Query == "" {
+		return errors.New("query is empty")
+	}
 	return nil
 }
 

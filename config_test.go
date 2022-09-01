@@ -64,3 +64,23 @@ func TestConfigLoadNoError(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigLoadInvalid(t *testing.T) {
+	cases := []struct {
+		casename string
+		path     string
+	}{
+		{
+			casename: "empty query config",
+			path:     "testdata/empty_query.yaml",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.casename, func(t *testing.T) {
+			cfg := prepalert.DefaultConfig()
+			err := cfg.Load(c.path)
+			require.Error(t, err)
+		})
+	}
+}
