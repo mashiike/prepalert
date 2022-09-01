@@ -43,6 +43,7 @@ func TestConfigLoadNoError(t *testing.T) {
 								Query:  "SELECT\n    path, count(*) as cnt\nFROM access_log\nWHERE access_at\n    BETWEEN 'epoch'::TIMESTAMP + interval '{{ .Alert.OpenedAt }} seconds'\n    AND 'epoch'::TIMESTAMP + interval '{{ .Alert.ClosedAt }} seconds'\nGROUP BY 1\n",
 							},
 						},
+						Variables: make(map[string]interface{}),
 						Memo: &prepalert.MemoConfig{
 							File: "./memo/xxxxxxxxxxx.txt",
 							Text: "access_log info\n{{ index .QueryResults `access_data` | to_table }}\n",
