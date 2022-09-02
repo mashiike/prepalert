@@ -56,7 +56,7 @@ func main() {
 			log.Fatalf("[error] %v", err)
 		}
 	}
-	i := &cli.App{
+	a := &cli.App{
 		Name:      "prepalert",
 		Usage:     "A webhook server for prepare alert memo",
 		UsageText: "prepalert -config <config file> [command options]",
@@ -89,7 +89,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:    "prefix",
-				Usage:   "server prefix",
+				Usage:   "run server prefix",
 				EnvVars: []string{"PREPALERT_PREFIX"},
 				Value:   "/",
 			},
@@ -101,17 +101,19 @@ func main() {
 			},
 			&cli.IntFlag{
 				Name:    "batch-size",
-				Usage:   "local sqs batch size",
+				Usage:   "run local sqs batch size",
 				EnvVars: []string{"PREPALERT_BATCH_SIZE"},
 				Value:   1,
 			},
 		},
 		EnableBashCompletion: true,
 		Version:              Version,
-		Before: func(ctx *cli.Context) error {
-			filter.SetMinLevel(logutils.LogLevel(strings.ToLower(ctx.String("log-level"))))
-			return nil
-		},
+		Commands:             make([]*cli.Command, 0),
+	}
+	runCommand := &cli.Command{
+		Name:      "run",
+		Usage:     "run server (default command)",
+		UsageText: "prepalert [global options] run [command options]",
 		Action: func(ctx *cli.Context) error {
 			cfg := prepalert.DefaultConfig()
 			if err := cfg.Load(ctx.String("config")); err != nil {
@@ -129,11 +131,44 @@ func main() {
 			})
 		},
 	}
-	sort.Sort(cli.FlagsByName(i.Flags))
-
+	a.Action = func(ctx *cli.Context) error {
+		return runCommand.Run(ctx)
+	}
+	a.Before = func(ctx *cli.Context) error {
+		filter.SetMinLevel(logutils.LogLevel(strings.ToLower(ctx.String("log-level"))))
+		runCommand.Flags = []cli.Flag{
+			&cli.StringFlag{
+				Name:  "address",
+				Usage: "run address",
+				Value: ctx.String("address"),
+			},
+			&cli.StringFlag{
+				Name:  "prefix",
+				Usage: "run server prefix",
+				Value: ctx.String("prefix"),
+			},
+			&cli.StringFlag{
+				Name:  "mode",
+				Usage: "run mode",
+				Value: ctx.String("mode"),
+			},
+			&cli.IntFlag{
+				Name:  "batch-size",
+				Usage: "run local sqs batch size",
+				Value: ctx.Int("batch-size"),
+			},
+		}
+		return nil
+	}
+	a.Commands = append(a.Commands, runCommand)
+	sort.Sort(cli.FlagsByName(a.Flags))
+	sort.Sort(cli.CommandsByName(a.Commands))
+	for _, cmd := range a.Commands {
+		sort.Sort(cli.FlagsByName(cmd.Flags))
+	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	defer cancel()
-	if err := i.RunContext(ctx, os.Args); err != nil {
+	if err := a.RunContext(ctx, os.Args); err != nil {
 		log.Fatalf("[error] %v", err)
 	}
 }
