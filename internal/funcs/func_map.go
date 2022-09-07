@@ -1,4 +1,4 @@
-package prepalert
+package funcs
 
 import (
 	"strings"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lestrrat-go/strftime"
+	"github.com/mashiike/prepalert/queryrunner"
 )
 
 func StrftimeInZone(layout string, zone string, t time.Time) string {
@@ -41,21 +42,21 @@ var commonTemplateFuncMap = template.FuncMap{
 	},
 	"strftime_in_zone": StrftimeInZone,
 }
-var queryTemplateFuncMap template.FuncMap
-var memoTemplateFuncMap template.FuncMap
+var QueryTemplateFuncMap template.FuncMap
+var InfomationTemplateFuncMap template.FuncMap
 
 func init() {
-	memoTemplateFuncMap = template.FuncMap{
-		"to_table": func(qr *QueryResult) string {
+	InfomationTemplateFuncMap = template.FuncMap{
+		"to_table": func(qr *queryrunner.QueryResult) string {
 			return qr.ToTable()
 		},
-		"to_vertical": func(qr *QueryResult) string {
+		"to_vertical": func(qr *queryrunner.QueryResult) string {
 			return qr.ToVertical()
 		},
 	}
-	queryTemplateFuncMap = template.FuncMap{}
+	QueryTemplateFuncMap = template.FuncMap{}
 	for name, f := range commonTemplateFuncMap {
-		queryTemplateFuncMap[name] = f
-		memoTemplateFuncMap[name] = f
+		QueryTemplateFuncMap[name] = f
+		InfomationTemplateFuncMap[name] = f
 	}
 }

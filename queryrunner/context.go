@@ -1,4 +1,4 @@
-package prepalert
+package queryrunner
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
-type HandleContext struct {
+type QueryRunningContext struct {
 	ReqID uint64
 
 	sqsClient *sqs.Client
@@ -18,16 +18,16 @@ type HandleContext struct {
 	message   *events.SQSMessage
 }
 
-func (app *App) NewHandleContext(reqID uint64, message *events.SQSMessage) *HandleContext {
-	return &HandleContext{
+func NewQueryRunningContext(sqsClient *sqs.Client, queueURL string, reqID uint64, message *events.SQSMessage) *QueryRunningContext {
+	return &QueryRunningContext{
 		ReqID:     reqID,
 		message:   message,
-		queueURL:  app.queueUrl,
-		sqsClient: app.sqsClient,
+		queueURL:  queueURL,
+		sqsClient: sqsClient,
 	}
 }
 
-func (hctx *HandleContext) ChangeSQSMessageVisibilityTimeout(ctx context.Context, visibilityTimeout time.Duration) error {
+func (hctx *QueryRunningContext) ChangeSQSMessageVisibilityTimeout(ctx context.Context, visibilityTimeout time.Duration) error {
 	log.Printf("[debug][%d] change message visivirity message id=%s, timeout=%s", hctx.ReqID, hctx.message.MessageId, visibilityTimeout)
 	_, err := hctx.sqsClient.ChangeMessageVisibility(ctx, &sqs.ChangeMessageVisibilityInput{
 		QueueUrl:          aws.String(hctx.queueURL),
@@ -42,13 +42,13 @@ func (hctx *HandleContext) ChangeSQSMessageVisibilityTimeout(ctx context.Context
 
 type contextKey string
 
-var handleContextKey contextKey = "__handle_context"
+var QueryRunningContextKey contextKey = "__handle_context"
 
-func WithHandleContext(ctx context.Context, info *HandleContext) context.Context {
-	return context.WithValue(ctx, handleContextKey, info)
+func WithQueryRunningContext(ctx context.Context, info *QueryRunningContext) context.Context {
+	return context.WithValue(ctx, QueryRunningContextKey, info)
 }
 
-func GetHandleContext(ctx context.Context) (*HandleContext, bool) {
-	info, ok := ctx.Value(handleContextKey).(*HandleContext)
+func GetQueryRunningContext(ctx context.Context) (*QueryRunningContext, bool) {
+	info, ok := ctx.Value(QueryRunningContextKey).(*QueryRunningContext)
 	return info, ok
 }

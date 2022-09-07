@@ -1,4 +1,4 @@
-package prepalert
+package queryrunner
 
 import (
 	"context"

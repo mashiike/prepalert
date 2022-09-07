@@ -10,6 +10,7 @@ import (
 
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/hclconfig"
+	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/queryrunner"
 	"golang.org/x/sync/errgroup"
 )
@@ -42,7 +43,7 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 	for _, query := range cfg.Queries {
 		queries = append(queries, query.Impl)
 	}
-	infoTemplate, err := template.New("info_template").Funcs(memoTemplateFuncMap).Parse(cfg.Infomation)
+	infoTemplate, err := template.New("info_template").Funcs(funcs.InfomationTemplateFuncMap).Parse(cfg.Infomation)
 	if err != nil {
 		return nil, fmt.Errorf("parse info template:%w", err)
 	}
@@ -70,13 +71,13 @@ type QueryData struct {
 
 type RenderInfomationData struct {
 	*WebhookBody
-	QueryResults map[string]*QueryResult
+	QueryResults map[string]*queryrunner.QueryResult
 	Params       interface{}
 }
 
 func (rule *Rule) BuildInfomation(ctx context.Context, body *WebhookBody) (string, error) {
 	reqID := "-"
-	info, ok := GetHandleContext(ctx)
+	info, ok := queryrunner.GetQueryRunningContext(ctx)
 	if ok {
 		reqID = fmt.Sprintf("%d", info.ReqID)
 	}
@@ -105,7 +106,7 @@ func (rule *Rule) BuildInfomation(ctx context.Context, body *WebhookBody) (strin
 	}
 	data := &RenderInfomationData{
 		WebhookBody:  body,
-		QueryResults: make(map[string]*QueryResult, len(rule.queries)),
+		QueryResults: make(map[string]*queryrunner.QueryResult, len(rule.queries)),
 		Params:       rule.params,
 	}
 	queryResults.Range(func(key any, value any) bool {
@@ -114,7 +115,7 @@ func (rule *Rule) BuildInfomation(ctx context.Context, body *WebhookBody) (strin
 			log.Printf("[warn][%s] key=%v is not string", reqID, key)
 			return false
 		}
-		queryResult, ok := value.(*QueryResult)
+		queryResult, ok := value.(*queryrunner.QueryResult)
 		if !ok {
 			log.Printf("[warn][%s] value=%v is not *QueryResult", reqID, value)
 			return false

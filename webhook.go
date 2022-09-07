@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mackerelio/mackerel-client-go"
+	"github.com/mashiike/prepalert/queryrunner"
 )
 
 type WebhookBody struct {
@@ -66,7 +67,7 @@ type Alert struct {
 
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
 	reqID := "-"
-	hctx, ok := GetHandleContext(ctx)
+	hctx, ok := queryrunner.GetQueryRunningContext(ctx)
 	if ok {
 		reqID = fmt.Sprintf("%d", hctx.ReqID)
 	}

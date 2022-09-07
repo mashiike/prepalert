@@ -7,13 +7,13 @@ import (
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
+	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRuleRenderMemo(t *testing.T) {
 	cases := []struct {
 		name          string
-		runners       prepalert.QueryRunners
 		cfg           *hclconfig.RuleBlock
 		data          *prepalert.RenderInfomationData
 		expectedError bool
@@ -29,7 +29,7 @@ func TestRuleRenderMemo(t *testing.T) {
 			},
 			data: &prepalert.RenderInfomationData{
 				WebhookBody:  LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: make(map[string]*prepalert.QueryResult),
+				QueryResults: make(map[string]*queryrunner.QueryResult),
 			},
 			expectedMemo: "2016-09-06 11:45:12",
 		},
@@ -43,7 +43,7 @@ func TestRuleRenderMemo(t *testing.T) {
 			},
 			data: &prepalert.RenderInfomationData{
 				WebhookBody:  LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: make(map[string]*prepalert.QueryResult),
+				QueryResults: make(map[string]*queryrunner.QueryResult),
 			},
 			expectedError: true,
 		},
@@ -57,8 +57,8 @@ func TestRuleRenderMemo(t *testing.T) {
 			},
 			data: &prepalert.RenderInfomationData{
 				WebhookBody: LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: map[string]*prepalert.QueryResult{
-					"hoge_result": prepalert.NewQueryResult(
+				QueryResults: map[string]*queryrunner.QueryResult{
+					"hoge_result": queryrunner.NewQueryResult(
 						"hoge_result",
 						"dummy",
 						[]string{"Name", "Sign", "Rating"},

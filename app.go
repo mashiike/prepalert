@@ -20,6 +20,7 @@ import (
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/grat"
 	"github.com/mashiike/prepalert/hclconfig"
+	"github.com/mashiike/prepalert/queryrunner"
 )
 
 type App struct {
@@ -190,8 +191,7 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 		log.Printf("[info][%d] alert is not closed, skip nothing todo id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
 		return nil
 	}
-	info := app.NewHandleContext(reqID, message)
-	ctx = WithHandleContext(ctx, info)
+	ctx = app.WithQueryRunningContext(ctx, reqID, message)
 	for _, rule := range app.rules {
 		if !rule.Match(&body) {
 			continue
@@ -215,4 +215,9 @@ func (app *App) CheckBasicAuth(r *http.Request) bool {
 		return false
 	}
 	return clientID == app.auth.ClientID && clientSecret == app.auth.ClientSecret
+}
+
+func (app *App) WithQueryRunningContext(ctx context.Context, reqID uint64, message *events.SQSMessage) context.Context {
+	hctx := queryrunner.NewQueryRunningContext(app.sqsClient, app.queueUrl, reqID, message)
+	return queryrunner.WithQueryRunningContext(ctx, hctx)
 }
