@@ -60,7 +60,7 @@ func Run(ctx context.Context, version string, apikey string, outputPath string) 
 	fmt.Printf("$ prepalert --config %s %srun --mode worker\n", outputPath, f)
 	fmt.Println("\nWhen performing a local operating environment, request the following")
 	fmt.Printf("\n"+`$ cat %s | curl -d @- -H "Content-Type: application/json" http://localhost:8080`, filepath.Join(outputPath, "event.json"))
-	fmt.Println("\nHave fun then.")
+	fmt.Println("\n\nHave fun prepalert.")
 	return err
 }
 
