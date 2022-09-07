@@ -11,9 +11,29 @@ Toil reduction tool to prepare before responding to Mackerel alerts
 
 ## Install 
 
+#### Homebrew (macOS and Linux)
+
+```console
+$ brew install mashiike/tap/prepalert
+```
+
 ### Binary packages
 
 [Releases](https://github.com/mashiike/prepalert/releases)
+
+## QuickStart 
+
+Set your Mackerel API key to the environment variable `MACKEREL_APIKEY`.  
+and Execute the following command:
+
+```shell
+$ prepalert init 
+```
+
+Or the following command:
+```shell 
+$ prepalert --coinfig <output config path> init
+```
 
 ## Usage with AWS Lambda (serverless)
 

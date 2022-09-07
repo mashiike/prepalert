@@ -15,10 +15,6 @@ import (
 	"golang.org/x/term"
 )
 
-func defaultConfig() *Config {
-	return &Config{}
-}
-
 func Load(path string, version string) (*Config, error) {
 	cfg, files, diags := load(path, version)
 	if len(diags) > 0 {
@@ -47,7 +43,7 @@ func load(path string, version string) (*Config, map[string]*hcl.File, hcl.Diagn
 		log.Printf("[debug] load `%s` failed on restrict", path)
 		return nil, files, diags
 	}
-	cfg := defaultConfig()
+	cfg := &Config{}
 	ctx := newEvalContext(path, version)
 	decodeDiags := gohcl.DecodeBody(body, ctx, cfg)
 	diags = append(diags, decodeDiags...)
