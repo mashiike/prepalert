@@ -101,5 +101,5 @@ resource "aws_ssm_parameter" "mackerel_apikey" {
   name        = "/dev/MACKEREL_APIKEY"
   description = "Mackerel API Key for dev"
   type        = "SecureString"
-  value       = locals.MACKEREL_APIKEY
+  value       = local.MACKEREL_APIKEY
 }
