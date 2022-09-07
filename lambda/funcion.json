@@ -3,7 +3,8 @@
   "Environment": {
       "Variables": {
           "PREPALERT_LOG_LEVEL": "{{ env `PREPALERT_LOG_LEVEL` `info`}}",
-          "PREPALERT_MODE": "{{ env `PREPALERT_MODE` `webhook` }}"
+          "PREPALERT_MODE": "{{ env `PREPALERT_MODE` `webhook` }}",
+          "SSMWRAP_PATHS": "/dev/MACKEREL_APIKEY"
       }
   },
   "FunctionName": "prepalert-{{ env `PREPALERT_MODE` `webhook` }}",

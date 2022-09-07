@@ -96,3 +96,10 @@ resource "aws_lambda_event_source_mapping" "prepalert_worker_invoke_from_sqs" {
   enabled          = true
   function_name    = data.aws_lambda_alias.prepalert_worker.arn
 }
+
+resource "aws_ssm_parameter" "mackerel_apikey" {
+  name        = "/dev/MACKEREL_APIKEY"
+  description = "Mackerel API Key for dev"
+  type        = "SecureString"
+  value       = locals.MACKEREL_APIKEY
+}
