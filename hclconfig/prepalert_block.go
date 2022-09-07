@@ -15,7 +15,9 @@ type PrepalertBlock struct {
 	RequiredVersionExpr hcl.Expression `hcl:"required_version"`
 	versionConstraints  gv.Constraints
 
-	SQSQueueName string `hcl:"sqs_queue_name"`
+	SQSQueueName string     `hcl:"sqs_queue_name"`
+	Service      string     `hcl:"service"`
+	Auth         *AuthBlock `hcl:"auth,block"`
 }
 
 func restrictPrepalertBlock(body hcl.Body) hcl.Diagnostics {
@@ -27,6 +29,15 @@ func restrictPrepalertBlock(body hcl.Body) hcl.Diagnostics {
 			{
 				Name:     "sqs_queue_name",
 				Required: true,
+			},
+			{
+				Name:     "service",
+				Required: true,
+			},
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type: "auth",
 			},
 		},
 	}
@@ -100,4 +111,16 @@ func (b *PrepalertBlock) ValidateVersion(version string) error {
 		return fmt.Errorf("version %s does not satisfy constraints required_version: %s", version, b.versionConstraints)
 	}
 	return nil
+}
+
+type AuthBlock struct {
+	ClientID     string `hcl:"client_id"`
+	ClientSecret string `hcl:"client_secret"`
+}
+
+func (b *AuthBlock) IsEmpty() bool {
+	if b == nil {
+		return true
+	}
+	return b.ClientID == "" || b.ClientSecret == ""
 }

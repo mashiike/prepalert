@@ -52,6 +52,7 @@ func TestLoadNoError(t *testing.T) {
 					&Config{
 						Prepalert: PrepalertBlock{
 							SQSQueueName: "prepalert",
+							Service:      "prod",
 						},
 						Rules: []*RuleBlock{
 							{
@@ -76,6 +77,7 @@ func TestLoadNoError(t *testing.T) {
 					&Config{
 						Prepalert: PrepalertBlock{
 							SQSQueueName: "prepalert",
+							Service:      "prod",
 						},
 						QueryRunners: []*QueryRunnerBlock{
 							{
@@ -122,6 +124,8 @@ func TestLoadNoError(t *testing.T) {
 					&Config{
 						Prepalert: PrepalertBlock{
 							SQSQueueName: "prepalert-current",
+							Service:      os.Getenv("TEST_ENV"),
+							Auth:         &AuthBlock{},
 						},
 						QueryRunners: []*QueryRunnerBlock{
 							{
@@ -196,6 +200,7 @@ func TestLoadError(t *testing.T) {
 			casename: "invalid schema",
 			path:     "testdata/invalid_schema",
 			expected: []string{
+				"testdata/invalid_schema/config.hcl:1,11-11: Missing required argument; The argument \"service\" is required, but no definition was found.",
 				"testdata/invalid_schema/variable.hcl:1,1-9: Unsupported block type; Blocks of type \"variable\" are not expected here.",
 				"testdata/invalid_schema/config.hcl:1,11-11: Missing required argument; The argument \"sqs_queue_name\" is required, but no definition was found.",
 				"testdata/invalid_schema/config.hcl:3,5-22: Unsupported argument; An argument named \"invalid_attribute\" is not expected here.",
@@ -209,8 +214,8 @@ func TestLoadError(t *testing.T) {
 			casename: "duplicate blocks",
 			path:     "testdata/duplicate",
 			expected: []string{
-				"testdata/duplicate/config.hcl:11,1-39: Duplicate \"query_runner\" name; A query runner named \"default\" was already declared at testdata/duplicate/config.hcl:6,1-39. Query runner names must unique",
-				"testdata/duplicate/config.hcl:24,1-28: Duplicate \"query\" name; A query named \"alb_target_5xx_info\" was already declared at testdata/duplicate/config.hcl:15,1-28. Query names must unique",
+				"testdata/duplicate/config.hcl:12,1-39: Duplicate \"query_runner\" name; A query runner named \"default\" was already declared at testdata/duplicate/config.hcl:7,1-39. Query runner names must unique",
+				"testdata/duplicate/config.hcl:25,1-28: Duplicate \"query\" name; A query named \"alb_target_5xx_info\" was already declared at testdata/duplicate/config.hcl:16,1-28. Query names must unique",
 			},
 		},
 	}

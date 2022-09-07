@@ -1,6 +1,12 @@
 prepalert {
     required_version = ">=v0.2.0"
     sqs_queue_name   = "prepalert-${var.version}"
+    service          = must_env("TEST_ENV")
+
+    auth {
+        client_id     = env("BASIC_CLIENT_ID")
+        client_secret = env("BASIC_CLIENT_SECRETS")
+    }
 }
 
 query_runner "redshift_data" "default" {

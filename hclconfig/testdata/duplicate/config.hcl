@@ -1,6 +1,7 @@
 prepalert {
     required_version = ">=v0.2.0"
     sqs_queue_name   = "prepalert"
+    service = "prod"
 }
 
 query_runner "redshift_data" "default" {

@@ -1,6 +1,7 @@
 prepalert {
     required_version = ">=v0.2.0"
     sqs_queue_name   = "prepalert"
+    service          = "prod"
 }
 
 rule "simple" {
