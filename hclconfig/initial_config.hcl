@@ -3,6 +3,13 @@ prepalert {
   required_version = ">={{ .Version }}"
   sqs_queue_name   = "{{ .SQSQueueName }}" # Where to post the contents of the received webhook
   service          = "{{ .Service }}"      # The Mackerel service to which you want to post graph annotations
+
+  //   //Comment out the following if you want to set up Basic Authentication for webhooks
+  //   auth {
+  //     // The actual setting values are read from environment variables
+  //     client_id     = must_env("PREPALERT_BASIC_USER")
+  //     client_secret = env("PREPALERT_BASIC_PASS")
+  //   }
 }
 
 // Setup to post graph annotations describing fixed content no matter what alerts come in.
@@ -13,7 +20,7 @@ rule "simple" {
   infomation = "How do you respond to alerts?"
 }
 
-// // Extensive configuration
+// // Advanced configuration
 // // Query Redshift and embed the results in graph annotations.
 //
 // query_runner "redshift_data" "default" {
