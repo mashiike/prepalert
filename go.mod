@@ -3,6 +3,7 @@ module github.com/mashiike/prepalert
 go 1.19
 
 require (
+	github.com/agext/levenshtein v1.2.1
 	github.com/aws/aws-lambda-go v1.34.1
 	github.com/aws/aws-sdk-go-v2 v1.16.13
 	github.com/aws/aws-sdk-go-v2/config v1.17.4
@@ -11,8 +12,10 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/fujiwara/logutils v1.1.0
 	github.com/fujiwara/ridge v0.6.1
+	github.com/google/go-cmp v0.5.8
 	github.com/handlename/ssmwrap v1.2.0
 	github.com/hashicorp/go-version v1.6.0
+	github.com/hashicorp/hcl/v2 v2.14.0
 	github.com/kayac/go-config v0.6.0
 	github.com/kayac/go-katsubushi v1.7.0
 	github.com/lestrrat-go/strftime v1.0.6
@@ -22,12 +25,14 @@ require (
 	github.com/samber/lo v1.27.1
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.2.0
+	github.com/zclconf/go-cty v1.8.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 )
 
 require (
 	github.com/BurntSushi/toml v1.2.0 // indirect
 	github.com/Songmu/retry v0.1.0 // indirect
+	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.38.71 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.12.17 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.14 // indirect
@@ -45,10 +50,12 @@ require (
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
 	github.com/pires/go-proxyproto v0.6.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.3.4 // indirect
+	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
@@ -57,6 +64,7 @@ require (
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
+	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
