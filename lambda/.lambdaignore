@@ -1,0 +1,5 @@
+.gitignore
+.lambdaignore
+Makefile
+function.json
+example.tf
