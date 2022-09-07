@@ -18,7 +18,7 @@ import (
 
 func Run(ctx context.Context, version string, apikey string, outputPath string) error {
 	if _, err := os.Stat(outputPath); err != nil {
-		if err := os.MkdirAll(outputPath, 0644); err != nil {
+		if err := os.MkdirAll(outputPath, 0766); err != nil {
 			return fmt.Errorf("can not make output dir:%w", err)
 		}
 	}
