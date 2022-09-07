@@ -6,12 +6,9 @@ import (
 
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
+	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/stretchr/testify/require"
 )
-
-func ptr[T any](t T) *T {
-	return &t
-}
 
 func TestRuleRenderMemo(t *testing.T) {
 	cases := []struct {
@@ -26,7 +23,7 @@ func TestRuleRenderMemo(t *testing.T) {
 			name: "empty query event data only",
 			cfg: &hclconfig.RuleBlock{
 				Alert: hclconfig.AlertBlock{
-					MonitorName: ptr("hoge"),
+					MonitorName: generics.Ptr("hoge"),
 				},
 				Infomation: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%Y-%m-%d %H:%M:%S` `Asia/Tokyo`}}",
 			},
@@ -40,7 +37,7 @@ func TestRuleRenderMemo(t *testing.T) {
 			name: "invalid template",
 			cfg: &hclconfig.RuleBlock{
 				Alert: hclconfig.AlertBlock{
-					MonitorName: ptr("hoge"),
+					MonitorName: generics.Ptr("hoge"),
 				},
 				Infomation: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%O%E%Q%1` `Asia/Tokyo`}}",
 			},
@@ -54,7 +51,7 @@ func TestRuleRenderMemo(t *testing.T) {
 			name: "render query_result",
 			cfg: &hclconfig.RuleBlock{
 				Alert: hclconfig.AlertBlock{
-					MonitorName: ptr("hoge"),
+					MonitorName: generics.Ptr("hoge"),
 				},
 				Infomation: "{{ index .QueryResults `hoge_result` | to_table }}",
 			},

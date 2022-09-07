@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/redshiftdata"
 	"github.com/aws/aws-sdk-go-v2/service/redshiftdata/types"
+	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/samber/lo"
 )
 
@@ -35,11 +36,11 @@ func newRedshiftDataQueryRunner(cfg *QueryRunnerConfig) (QueryRunner, error) {
 		client: client,
 	}
 
-	runner.clusterIdentifier = nullif(cfg.ClusterIdentifier, "")
-	runner.database = nullif(cfg.Database, "")
-	runner.dbUser = nullif(cfg.DBUser, "")
-	runner.workgroupName = nullif(cfg.WorkgroupName, "")
-	runner.secretsARN = nullif(cfg.SecretsARN, "")
+	runner.clusterIdentifier = generics.Nullif(cfg.ClusterIdentifier, "")
+	runner.database = generics.Nullif(cfg.Database, "")
+	runner.dbUser = generics.Nullif(cfg.DBUser, "")
+	runner.workgroupName = generics.Nullif(cfg.WorkgroupName, "")
+	runner.secretsARN = generics.Nullif(cfg.SecretsARN, "")
 	return runner, nil
 }
 
