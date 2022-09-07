@@ -35,6 +35,37 @@ Or the following command:
 $ prepalert --coinfig <output config path> init
 ```
 
+## Usage 
+
+```
+NAME:
+   prepalert - A webhook server for prepare alert memo
+
+USAGE:
+   prepalert -config <config file> [command options]
+
+VERSION:
+   current
+
+COMMANDS:
+   init     create inital config
+   run      run server (default command)
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --address value                    run address (default: ":8080") [$PREPALERT_ADDRESS]
+   --batch-size value                 run local sqs batch size (default: 1) [$PREPALERT_BATCH_SIZE]
+   --config value, -c value           config path (default: ".") [$CONFIG, $PREPALERT_CONFIG]
+   --help, -h                         show help (default: false)
+   --log-level value                  output log-level (default: "info") [$PREPALERT_LOG_LEVEL]
+   --mackerel-apikey value, -k value  for access mackerel API (default: *********) [$MACKEREL_APIKEY, $PREPALERT_MACKEREL_APIKEY]
+   --mode value                       run mode (default: "webhook") [$PREPALERT_MODE]
+   --prefix value                     run server prefix (default: "/") [$PREPALERT_PREFIX]
+   --version, -v                      print the version (default: false)
+```
+
+If the command is omitted, the run command is executed.
+
 ## Usage with AWS Lambda (serverless)
 
 prepalert works with AWS Lambda and Amazon SQS.
