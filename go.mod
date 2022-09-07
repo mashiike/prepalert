@@ -22,7 +22,7 @@ require (
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
 	github.com/mattn/go-isatty v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/samber/lo v1.27.1
+	github.com/samber/lo v1.28.0
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.14.1
 	github.com/zclconf/go-cty v1.8.0
