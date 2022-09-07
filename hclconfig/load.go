@@ -4,12 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
+	"github.com/mattn/go-isatty"
 	"github.com/samber/lo"
+	"golang.org/x/term"
 )
 
 func defaultConfig() *Config {
@@ -17,16 +20,14 @@ func defaultConfig() *Config {
 }
 
 func Load(path string, version string) (*Config, error) {
-	cfg, diags := load(path, version)
-	for _, diag := range diags {
-		switch diag.Severity {
-		case hcl.DiagError:
-			log.Println("[error]", diagnosticToString(diag))
-		case hcl.DiagWarning:
-			log.Println("[warn]", diagnosticToString(diag))
-		default:
-			log.Println("[info]", diagnosticToString(diag))
+	cfg, files, diags := load(path, version)
+	if len(diags) > 0 {
+		width, _, err := term.GetSize(0)
+		if err != nil {
+			width = 400
 		}
+		w := hcl.NewDiagnosticTextWriter(os.Stderr, files, uint(width), isatty.IsTerminal(os.Stdout.Fd()))
+		w.WriteDiagnostics(diags)
 	}
 	if diags.HasErrors() {
 		return nil, errors.New("config load failed")
@@ -34,24 +35,17 @@ func Load(path string, version string) (*Config, error) {
 	return cfg, cfg.ValidateVersion(version)
 }
 
-func diagnosticToString(diag *hcl.Diagnostic) string {
-	if diag.Subject == nil {
-		return fmt.Sprintf("%s; %s", diag.Summary, diag.Detail)
-	}
-	return fmt.Sprintf("%s: %s; %s", diag.Subject, diag.Summary, diag.Detail)
-}
-
-func load(path string, version string) (*Config, hcl.Diagnostics) {
-	body, diags := parseFiles(path)
+func load(path string, version string) (*Config, map[string]*hcl.File, hcl.Diagnostics) {
+	body, files, diags := parseFiles(path)
 	if diags.HasErrors() {
 		log.Printf("[debug] load `%s` failed on parse fiels", path)
-		return nil, diags
+		return nil, files, diags
 	}
 	restrictDiags := restrict(body)
 	diags = append(diags, restrictDiags...)
 	if diags.HasErrors() {
 		log.Printf("[debug] load `%s` failed on restrict", path)
-		return nil, diags
+		return nil, files, diags
 	}
 	cfg := defaultConfig()
 	ctx := newEvalContext(path, version)
@@ -59,19 +53,27 @@ func load(path string, version string) (*Config, hcl.Diagnostics) {
 	diags = append(diags, decodeDiags...)
 	if diags.HasErrors() {
 		log.Printf("[debug] load `%s` failed on decode", path)
-		return nil, diags
+		return nil, files, diags
 	}
 	buildDiags := cfg.build(ctx)
 	diags = append(diags, buildDiags...)
 	if diags.HasErrors() {
 		log.Printf("[debug] load `%s` failed on build", path)
-		return nil, diags
+		return nil, files, diags
 	}
-	return cfg, diags
+	return cfg, files, diags
 }
 
-func parseFiles(path string) (hcl.Body, hcl.Diagnostics) {
+func parseFiles(path string) (hcl.Body, map[string]*hcl.File, hcl.Diagnostics) {
 	var diags hcl.Diagnostics
+	if _, err := os.Stat(path); err != nil {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "path not found",
+			Detail:   fmt.Sprintf("%s: %v", path, err),
+		})
+		return nil, nil, diags
+	}
 	parser := hclparse.NewParser()
 	globPath := filepath.Join(path, "*.hcl")
 	files, err := filepath.Glob(globPath)
@@ -80,9 +82,8 @@ func parseFiles(path string) (hcl.Body, hcl.Diagnostics) {
 			Severity: hcl.DiagError,
 			Summary:  "glob *.hcl failed",
 			Detail:   err.Error(),
-			Subject:  &hcl.Range{Filename: globPath},
 		})
-		return nil, diags
+		return nil, parser.Files(), diags
 	}
 	for _, file := range files {
 		_, parseDiags := parser.ParseHCLFile(file)
@@ -95,14 +96,13 @@ func parseFiles(path string) (hcl.Body, hcl.Diagnostics) {
 			Severity: hcl.DiagError,
 			Summary:  "glob *.hcl.json failed",
 			Detail:   err.Error(),
-			Subject:  &hcl.Range{Filename: globPath},
 		})
-		return nil, diags
+		return nil, parser.Files(), diags
 	}
 	for _, file := range files {
 		_, parseDiags := parser.ParseJSONFile(file)
 		diags = append(diags, parseDiags...)
 	}
 	body := hcl.MergeFiles(lo.Values(parser.Files()))
-	return body, diags
+	return body, parser.Files(), diags
 }

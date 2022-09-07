@@ -1,6 +1,7 @@
 package hclconfig
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -28,6 +29,13 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 	if diff != "" {
 		require.FailNow(t, diff)
 	}
+}
+
+func diagnosticToString(diag *hcl.Diagnostic) string {
+	if diag.Subject == nil {
+		return fmt.Sprintf("%s; %s", diag.Summary, diag.Detail)
+	}
+	return fmt.Sprintf("%s: %s; %s", diag.Subject, diag.Summary, diag.Detail)
 }
 
 func TestLoadNoError(t *testing.T) {
@@ -166,7 +174,7 @@ func TestLoadNoError(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.casename, func(t *testing.T) {
-			cfg, diags := load(c.path, "current")
+			cfg, _, diags := load(c.path, "current")
 			if diags.HasErrors() {
 				for _, diag := range diags {
 					t.Log(diagnosticToString(diag))
@@ -219,7 +227,7 @@ func TestLoadError(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.casename, func(t *testing.T) {
-			_, diags := load(c.path, "current")
+			_, _, diags := load(c.path, "current")
 			require.True(t, diags.HasErrors())
 			require.ElementsMatch(t, c.expected, lo.Map(diags, func(diag *hcl.Diagnostic, _ int) string {
 				return diagnosticToString(diag)
