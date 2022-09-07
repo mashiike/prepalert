@@ -3,6 +3,13 @@ prepalert {
   required_version = ">=v0.2.0"
   sqs_queue_name   = "test-sqs"     # Where to post the contents of the received webhook
   service          = "test-service" # The Mackerel service to which you want to post graph annotations
+
+  //   //Comment out the following if you want to set up Basic Authentication for webhooks
+  //   auth {
+  //     // The actual setting values are read from environment variables
+  //     client_id     = must_env("PREPALERT_BASIC_USER")
+  //     client_secret = env("PREPALERT_BASIC_PASS")
+  //   }
 }
 
 // Setup to post graph annotations describing fixed content no matter what alerts come in.
