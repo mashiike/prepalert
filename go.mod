@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-lambda-go v1.34.1
 	github.com/aws/aws-sdk-go-v2 v1.16.14
 	github.com/aws/aws-sdk-go-v2/config v1.17.4
-	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.8
+	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.9
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.19.8
 	github.com/fatih/color v1.13.0
 	github.com/fujiwara/logutils v1.1.0
