@@ -66,27 +66,9 @@ GLOBAL OPTIONS:
 
 If the command is omitted, the run command is executed.
 
-## Usage with AWS Lambda (serverless)
+## Configurations
 
-prepalert works with AWS Lambda and Amazon SQS.
-
-Lambda Function requires a webhook and a worker
-
-
-```mermaid
-sequenceDiagram
-  autonumber
-  Mackerel->>+webhook lambda function : POST /
-  webhook lambda function ->>+Amazon SQS: SendMessage
-  Amazon SQS-->- webhook lambda function: 200 Ok
-  webhook lambda function-->- Mackerel: 200 Ok
-  Amazon SQS ->>+ worker lambda function: trigger by AWS Lambda
-  worker lambda function ->>+ Data Source: query
-  Data Source -->- worker lambda function: query results
-  worker lambda function  ->>+ Mackerel: Create Graph Annotation
-  Mackerel-->- worker lambda function : 200 Ok
-  worker lambda function ->>-  Amazon SQS: Success Delete message
-```
+Configuration file is HCL (HashiCorp Configuration Language) format. `prepalert init` can generate a initial configuration file.
 
 The most small configuration file is as follows:
 ```hcl
@@ -109,12 +91,35 @@ EOF
 }
 ```
 
-Let's solidify the Lambda package with the following configuration (runtime `provided.al2`)
+## Usage with AWS Lambda (serverless)
+
+prepalert works with AWS Lambda and Amazon SQS.
+
+Lambda Function requires a webhook and a worker
+
+
+```mermaid
+sequenceDiagram
+  autonumber
+  Mackerel->>+webhook lambda function : POST /
+  webhook lambda function ->>+Amazon SQS: SendMessage
+  Amazon SQS-->- webhook lambda function: 200 Ok
+  webhook lambda function-->- Mackerel: 200 Ok
+  Amazon SQS ->>+ worker lambda function: trigger by AWS Lambda
+  worker lambda function ->>+ Data Source: query
+  Data Source -->- worker lambda function: query results
+  worker lambda function  ->>+ Mackerel: Create Graph Annotation
+  Mackerel-->- worker lambda function : 200 Ok
+  worker lambda function ->>-  Amazon SQS: Success Delete message
+```
+
+
+Let's solidify the Lambda package with the following zip arcive (runtime `provided.al2`)
 
 ```
 lambda.zip
 ├── bootstrap    # build binary
-└── config.yaml  # configuration file
+└── config.hcl   # configuration file
 ```
 
 A related document is [https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html)
