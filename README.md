@@ -37,58 +37,25 @@ sequenceDiagram
   worker lambda function ->>-  Amazon SQS: Success Delete message
 ```
 
-The basic configuration file is as follows:
-```yaml
-required_version: ">=v0.0.0"
+The most small configuration file is as follows:
+```hcl
+prepalert {
+    required_version = ">=v0.2.0"
+    sqs_queue_name   = "prepalert"
+    service          = "prod"
+}
 
-# Basic Authentication information to be set in the webhook
-# If not set, Basic Authentication is not performed.
-auth:
-  client_id: hoge
-  client_secret: hoge
+rule "any_alert" {
+    alert {
+        any = true
+    }
 
-service: prod # Where to submit Mackerel graph annotations
-sqs_queue_name: prepalert # Name of the SQS queue to be used by prepalert
-
-# The query runner is a setting for executing a query with each rule described later.
-query_runners:
-  - name: default
-    type: RedshiftData
-    cluster_identifier: warehouse
-    database: "dev"
-    db_user: "warehouse"
-
-# Alert handling rules to create graph annotations
-rules:
-  - monitor:
-      id: xxxxxxxxxxx # ID of the rule you are responding to.
-    queries:
-      - name: access_data
-        runner: default # Setting which query runner to use
-        file: ./queries/get_access_data.sql # Path to the query file 
-                                            # It is also possible to use a `query` instead of a file.
-
-    memo:
-      file: ./memo/xxxxxxxxxxx.txt  # Path to file to memo template
-                                    # It is also possible to use a `text` instead of a file. 
-```
-
-example query file:
-```sql
-SELECT
-    path, count(*) as cnt
-FROM access_log
-WHERE access_at
-    BETWEEN 'epoch'::TIMESTAMP + interval '{{ .Alert.OpenedAt }} seconds'
-    AND 'epoch'::TIMESTAMP + interval '{{ .Alert.ClosedAt }} seconds'
-GROUP BY 1
-```
-Alert information can be filled in using Tamplate as shown above.
-
-example memo file;
-```
-access_log info
-{{ index .QueryResults `access_data` | to_table }}
+    infomation = <<EOF
+How do you respond to alerts?
+Describe information about your alert response here.
+(This area can use Go's template notation.)
+EOF
+}
 ```
 
 Let's solidify the Lambda package with the following configuration (runtime `provided.al2`)
