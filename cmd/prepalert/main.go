@@ -15,6 +15,7 @@ import (
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
 	_ "github.com/mashiike/prepalert/queryrunner/redshiftdata"
+	"github.com/mashiike/prepalert/wizard"
 	"github.com/urfave/cli/v2"
 )
 
@@ -110,7 +111,16 @@ func main() {
 		},
 		EnableBashCompletion: true,
 		Version:              Version,
-		Commands:             make([]*cli.Command, 0),
+		Commands: []*cli.Command{
+			{
+				Name:      "init",
+				Usage:     "create inital config",
+				UsageText: "prepalert init\nprepalert [global options] init",
+				Action: func(ctx *cli.Context) error {
+					return wizard.Run(ctx.Context, Version, ctx.String("mackerel-apikey"), ctx.String("config"))
+				},
+			},
+		},
 	}
 	runCommand := &cli.Command{
 		Name:      "run",
