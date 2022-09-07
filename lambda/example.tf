@@ -39,7 +39,14 @@ data "aws_iam_policy_document" "prepalert" {
     ]
     resources = [aws_sqs_queue.prepalert.arn]
   }
-
+  statement {
+    actions = [
+      "ssm:GetParameter*",
+      "ssm:DescribeParameters",
+      "ssm:List*",
+    ]
+    resources = ["*"]
+  }
   statement {
     actions = [
       "logs:GetLog*",
