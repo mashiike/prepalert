@@ -3,6 +3,7 @@ module github.com/mashiike/prepalert
 go 1.19
 
 require (
+	github.com/Songmu/flextime v0.1.0
 	github.com/agext/levenshtein v1.2.3
 	github.com/aws/aws-lambda-go v1.34.1
 	github.com/aws/aws-sdk-go-v2 v1.16.14

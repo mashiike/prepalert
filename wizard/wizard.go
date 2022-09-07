@@ -1,13 +1,18 @@
 package wizard
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
+	"time"
 
+	"github.com/Songmu/flextime"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/mackerelio/mackerel-client-go"
@@ -22,7 +27,8 @@ func Run(ctx context.Context, version string, apikey string, outputPath string) 
 			return fmt.Errorf("can not make output dir:%w", err)
 		}
 	}
-	service, err := selectMackerelService(apikey)
+	client := mackerel.NewClient(apikey)
+	service, err := selectMackerelService(client)
 	if err != nil {
 		return fmt.Errorf("can not select Mackerel service:%w", err)
 	}
@@ -39,12 +45,26 @@ func Run(ctx context.Context, version string, apikey string, outputPath string) 
 		return fmt.Errorf("create config.hcl:%w", err)
 	}
 	defer fp.Close()
-	_, err = fp.Write(bs)
+	if _, err = fp.Write(bs); err != nil {
+		return err
+	}
+	if err := generateSampleEvent(client, outputPath); err != nil {
+		return err
+	}
+	f := ""
+	if apikey == "" {
+		f = "--mackerel-apikey <your Mackerel api key> "
+	}
+	fmt.Println("\nTry running the following two commands in a separate terminal:")
+	fmt.Printf("\n$ prepalert --config %s %srun --mode webhook\n", outputPath, f)
+	fmt.Printf("$ prepalert --config %s %srun --mode worker\n", outputPath, f)
+	fmt.Println("\nWhen performing a local operating environment, request the following")
+	fmt.Printf("\n"+`$ cat %s | curl -d @- -H "Content-Type: application/json" http://localhost:8080`, filepath.Join(outputPath, "event.json"))
+	fmt.Println("\nHave fun then.")
 	return err
 }
 
-func selectMackerelService(apikey string) (string, error) {
-	client := mackerel.NewClient(apikey)
+func selectMackerelService(client *mackerel.Client) (string, error) {
 	services, err := client.FindServices()
 	if err != nil {
 		services = make([]*mackerel.Service, 0)
@@ -103,4 +123,62 @@ func selectItems(label string, items []string) (string, error) {
 		return "", err
 	}
 	return result, nil
+}
+
+//go:embed sample_event.json.tpl
+var sampleEventTemplate string
+
+func generateSampleEvent(client *mackerel.Client, outputPath string) error {
+	t, err := template.New("sample_event").Parse(sampleEventTemplate)
+	if err != nil {
+		return err
+	}
+	now := flextime.Now()
+	alert := &mackerel.Alert{
+		ID:       "dummyAlertID",
+		Status:   "OK",
+		OpenedAt: now.Add(-15 * time.Minute).Unix(),
+		ClosedAt: now.Add(-1 * time.Minute).Unix(),
+		Value:    2.255356387321597,
+	}
+	monitorName := "dummyMonitor"
+	orgName := "dummyOrg"
+	if org, err := client.GetOrg(); err == nil {
+		orgName = org.Name
+	}
+	resp, err := client.FindWithClosedAlerts()
+	if err == nil {
+		for _, a := range resp.Alerts {
+			if a.Status != "OK" {
+				continue
+			}
+			alert = a
+			if monitor, err := client.GetMonitor(a.MonitorID); err == nil {
+				monitorName = monitor.MonitorName()
+				monitor.MonitorType()
+			}
+			break
+		}
+	}
+	createdAt := alert.OpenedAt * 1000
+	var buf bytes.Buffer
+	err = t.Execute(&buf, map[string]interface{}{
+		"OpenedAt":    alert.OpenedAt,
+		"ClosedAt":    alert.ClosedAt,
+		"CreatedAt":   createdAt,
+		"AlertID":     alert.ID,
+		"MetricValue": alert.Value,
+		"OrgName":     orgName,
+		"MonitorName": monitorName,
+	})
+	if err != nil {
+		return err
+	}
+	fp, err := os.Create(filepath.Join(outputPath, "event.json"))
+	if err != nil {
+		return fmt.Errorf("create event.json%w", err)
+	}
+	defer fp.Close()
+	_, err = fp.Write(buf.Bytes())
+	return err
 }
