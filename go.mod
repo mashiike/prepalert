@@ -16,7 +16,6 @@ require (
 	github.com/handlename/ssmwrap v1.2.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hcl/v2 v2.14.0
-	github.com/kayac/go-config v0.6.0
 	github.com/kayac/go-katsubushi v1.7.0
 	github.com/lestrrat-go/strftime v1.0.6
 	github.com/mackerelio/mackerel-client-go v0.21.2
@@ -32,7 +31,6 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.0 // indirect
 	github.com/Songmu/retry v0.1.0 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.38.71 // indirect
