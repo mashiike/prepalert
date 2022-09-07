@@ -219,7 +219,7 @@ func TestLoadError(t *testing.T) {
 			casename: "duplicate blocks",
 			path:     "testdata/duplicate",
 			expected: []string{
-				"testdata/duplicate/config.hcl:12,1-39: Duplicate \"query_runner\" name; A query runner named \"default\" was already declared at testdata/duplicate/config.hcl:7,1-39. Query runner names must unique",
+				"testdata/duplicate/config.hcl:12,1-39: Duplicate \"query_runner\" name; A query runner named \"default\" in group \"redshift_data\" was already declared at testdata/duplicate/config.hcl:7,1-39. Query runner names must unique",
 				"testdata/duplicate/config.hcl:25,1-28: Duplicate \"query\" name; A query named \"alb_target_5xx_info\" was already declared at testdata/duplicate/config.hcl:16,1-28. Query names must unique",
 			},
 		},

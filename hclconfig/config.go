@@ -36,7 +36,7 @@ func restrict(body hcl.Body) hcl.Diagnostics {
 	}
 	content, diags := body.Content(schema)
 	queryNames := make(map[string]*hcl.Range, 0)
-	queryRunnerNames := make(map[string]*hcl.Range, 0)
+	queryRunnerNames := make(map[string]map[string]*hcl.Range, 0)
 	for _, block := range content.Blocks {
 		switch block.Type {
 		case "prepalert":
@@ -50,16 +50,24 @@ func restrict(body hcl.Body) hcl.Diagnostics {
 			if len(block.Labels) != 2 {
 				continue
 			}
+
+			t := block.Labels[0]
 			name := block.Labels[1]
-			if r, ok := queryRunnerNames[name]; ok {
+			runners, ok := queryRunnerNames[t]
+			if !ok {
+				queryRunnerNames[t] = make(map[string]*hcl.Range, 1)
+				queryRunnerNames[t][name] = block.DefRange.Ptr()
+				continue
+			}
+			if r, ok := runners[name]; ok {
 				diags = append(diags, &hcl.Diagnostic{
 					Severity: hcl.DiagError,
 					Summary:  `Duplicate "query_runner" name`,
-					Detail:   fmt.Sprintf(`A query runner named "%s" was already declared at %s. Query runner names must unique`, name, r.String()),
+					Detail:   fmt.Sprintf(`A query runner named "%s" in group "%s" was already declared at %s. Query runner names must unique`, name, t, r.String()),
 					Subject:  block.DefRange.Ptr(),
 				})
 			}
-			queryRunnerNames[name] = block.DefRange.Ptr()
+			runners[name] = block.DefRange.Ptr()
 			restrictDiags := restrictQueryRunnerBlock(block.Body, block.Labels[0])
 			diags = append(diags, restrictDiags...)
 		case "query":
