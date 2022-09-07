@@ -7,14 +7,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner/redshiftdata"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 )
-
-func ptr[T any](t T) *T {
-	return &t
-}
 
 func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 	t.Helper()
@@ -58,7 +55,7 @@ func TestLoadNoError(t *testing.T) {
 							{
 								Name: "simple",
 								Alert: AlertBlock{
-									Any: ptr(true),
+									Any: generics.Ptr(true),
 								},
 								Queries:    make(map[string]*QueryBlock),
 								Infomation: "How do you respond to alerts?\nDescribe information about your alert response here.\n",
@@ -84,9 +81,9 @@ func TestLoadNoError(t *testing.T) {
 								Type: "redshift_data",
 								Name: "default",
 								Impl: &redshiftdata.QueryRunner{
-									ClusterIdentifier: ptr("warehouse"),
-									Database:          ptr("dev"),
-									DbUser:            ptr("admin"),
+									ClusterIdentifier: generics.Ptr("warehouse"),
+									Database:          generics.Ptr("dev"),
+									DbUser:            generics.Ptr("admin"),
 								},
 							},
 						},
@@ -94,7 +91,7 @@ func TestLoadNoError(t *testing.T) {
 							{
 								Name: "alb_target_5xx",
 								Alert: AlertBlock{
-									MonitorName: ptr("ALB Target 5xx"),
+									MonitorName: generics.Ptr("ALB Target 5xx"),
 								},
 								Queries: map[string]*QueryBlock{
 									"alb_target_5xx_info": {
@@ -132,9 +129,9 @@ func TestLoadNoError(t *testing.T) {
 								Type: "redshift_data",
 								Name: "default",
 								Impl: &redshiftdata.QueryRunner{
-									ClusterIdentifier: ptr(os.Getenv("TEST_CLUSTER")),
-									Database:          ptr(os.Getenv("TEST_ENV")),
-									DbUser:            ptr("admin"),
+									ClusterIdentifier: generics.Ptr(os.Getenv("TEST_CLUSTER")),
+									Database:          generics.Ptr(os.Getenv("TEST_ENV")),
+									DbUser:            generics.Ptr("admin"),
 								},
 							},
 						},
@@ -142,7 +139,7 @@ func TestLoadNoError(t *testing.T) {
 							{
 								Name: "alb_target_5xx",
 								Alert: AlertBlock{
-									MonitorName: ptr("ALB Target 5xx"),
+									MonitorName: generics.Ptr("ALB Target 5xx"),
 								},
 								Queries: map[string]*QueryBlock{
 									"alb_target_5xx_info": {
@@ -157,7 +154,7 @@ func TestLoadNoError(t *testing.T) {
 							{
 								Name: "constant",
 								Alert: AlertBlock{
-									MonitorID: ptr("xxxxxxxxxxxx"),
+									MonitorID: generics.Ptr("xxxxxxxxxxxx"),
 								},
 								Infomation: "prepalert: current",
 							},
