@@ -20,7 +20,7 @@ rule "simple" {
   infomation = "How do you respond to alerts?"
 }
 
-// // Extensive configuration
+// // Advanced configuration
 // // Query Redshift and embed the results in graph annotations.
 //
 // query_runner "redshift_data" "default" {
