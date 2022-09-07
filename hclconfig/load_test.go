@@ -223,6 +223,13 @@ func TestLoadError(t *testing.T) {
 				"testdata/duplicate/config.hcl:25,1-28: Duplicate \"query\" name; A query named \"alb_target_5xx_info\" was already declared at testdata/duplicate/config.hcl:16,1-28. Query names must unique",
 			},
 		},
+		{
+			casename: "empty_query",
+			path:     "testdata/empty_query",
+			expected: []string{
+				"testdata/empty_query/config.hcl:19,21-21: Invalid SQL template; sql is empty",
+			},
+		},
 	}
 
 	for _, c := range cases {

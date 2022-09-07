@@ -165,6 +165,15 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 	if diags.HasErrors() {
 		return nil, diags
 	}
+	if q.SQL == "" {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid SQL template",
+			Detail:   "sql is empty",
+			Subject:  body.MissingItemRange().Ptr(),
+		})
+		return nil, diags
+	}
 	queryTemplate, err := template.New(name).Funcs(funcs.QueryTemplateFuncMap).Parse(q.SQL)
 	if err != nil {
 		diags = append(diags, &hcl.Diagnostic{
