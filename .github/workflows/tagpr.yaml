@@ -6,8 +6,16 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v3
       - uses: Songmu/tagpr@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: check released version
+        id: version_check
+        run: |
+          version=$(git describe --tags)
+          echo ::set-output name=version::$version
+      - name: Adding summary
+        run: echo '### ${{steps.version_check.outputs.version}}' >> $GITHUB_STEP_SUMMARY
+
