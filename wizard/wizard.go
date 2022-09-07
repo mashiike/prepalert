@@ -47,7 +47,7 @@ func selectMackerelService(apikey string) (string, error) {
 	client := mackerel.NewClient(apikey)
 	services, err := client.FindServices()
 	if err != nil {
-		return "", err
+		services = make([]*mackerel.Service, 0)
 	}
 	return selectItems(
 		"Which Mackerel service do you use to post graph annotations?",
@@ -58,17 +58,19 @@ func selectMackerelService(apikey string) (string, error) {
 }
 
 func selectSQSQueueName(ctx context.Context) (string, error) {
+	label := "Which SQS Queue do you use?"
+	items := []string{}
 	awsCfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		return "", err
+		return selectItems(label, items)
 	}
 	client := sqs.NewFromConfig(awsCfg)
 	p := sqs.NewListQueuesPaginator(client, &sqs.ListQueuesInput{})
-	items := []string{}
+
 	for p.HasMorePages() {
 		output, err := p.NextPage(ctx)
 		if err != nil {
-			return "", err
+			break
 		}
 		items = append(items, lo.FilterMap(output.QueueUrls, func(urlStr string, _ int) (string, bool) {
 			u, err := url.Parse(urlStr)
@@ -82,14 +84,17 @@ func selectSQSQueueName(ctx context.Context) (string, error) {
 			return parts[1], true
 		})...)
 	}
-	return selectItems(
-		"Please select the SQS Queue that prepalert will use",
-		items,
-	)
+	return selectItems(label, items)
 }
 
 func selectItems(label string, items []string) (string, error) {
-	prompt := promptui.Select{
+	if len(items) == 0 {
+		prompt := promptui.Prompt{
+			Label: label,
+		}
+		return prompt.Run()
+	}
+	prompt := promptui.SelectWithAdd{
 		Label: label,
 		Items: items,
 	}
