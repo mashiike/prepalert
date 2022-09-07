@@ -5,67 +5,60 @@ import (
 	"testing"
 
 	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/hclconfig"
+	"github.com/mashiike/prepalert/internal/generics"
+	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRuleRenderMemo(t *testing.T) {
 	cases := []struct {
 		name          string
-		runners       prepalert.QueryRunners
-		cfg           *prepalert.RuleConfig
-		data          *prepalert.RenderMemoData
+		cfg           *hclconfig.RuleBlock
+		data          *prepalert.RenderInfomationData
 		expectedError bool
 		expectedMemo  string
 	}{
 		{
 			name: "empty query event data only",
-			cfg: &prepalert.RuleConfig{
-				Monitor: &prepalert.MonitorConfig{
-					Name: "hoge",
+			cfg: &hclconfig.RuleBlock{
+				Alert: hclconfig.AlertBlock{
+					MonitorName: generics.Ptr("hoge"),
 				},
-				Queries: make([]*prepalert.QueryConfig, 0),
-				Memo: &prepalert.MemoConfig{
-					Text: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%Y-%m-%d %H:%M:%S` `Asia/Tokyo`}}",
-				},
+				Infomation: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%Y-%m-%d %H:%M:%S` `Asia/Tokyo`}}",
 			},
-			data: &prepalert.RenderMemoData{
+			data: &prepalert.RenderInfomationData{
 				WebhookBody:  LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: make(map[string]*prepalert.QueryResult),
+				QueryResults: make(map[string]*queryrunner.QueryResult),
 			},
 			expectedMemo: "2016-09-06 11:45:12",
 		},
 		{
 			name: "invalid template",
-			cfg: &prepalert.RuleConfig{
-				Monitor: &prepalert.MonitorConfig{
-					Name: "hoge",
+			cfg: &hclconfig.RuleBlock{
+				Alert: hclconfig.AlertBlock{
+					MonitorName: generics.Ptr("hoge"),
 				},
-				Queries: make([]*prepalert.QueryConfig, 0),
-				Memo: &prepalert.MemoConfig{
-					Text: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%O%E%Q%1` `Asia/Tokyo`}}",
-				},
+				Infomation: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%O%E%Q%1` `Asia/Tokyo`}}",
 			},
-			data: &prepalert.RenderMemoData{
+			data: &prepalert.RenderInfomationData{
 				WebhookBody:  LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: make(map[string]*prepalert.QueryResult),
+				QueryResults: make(map[string]*queryrunner.QueryResult),
 			},
 			expectedError: true,
 		},
 		{
 			name: "render query_result",
-			cfg: &prepalert.RuleConfig{
-				Monitor: &prepalert.MonitorConfig{
-					Name: "hoge",
+			cfg: &hclconfig.RuleBlock{
+				Alert: hclconfig.AlertBlock{
+					MonitorName: generics.Ptr("hoge"),
 				},
-				Queries: make([]*prepalert.QueryConfig, 0),
-				Memo: &prepalert.MemoConfig{
-					Text: "{{ index .QueryResults `hoge_result` | to_table }}",
-				},
+				Infomation: "{{ index .QueryResults `hoge_result` | to_table }}",
 			},
-			data: &prepalert.RenderMemoData{
+			data: &prepalert.RenderInfomationData{
 				WebhookBody: LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: map[string]*prepalert.QueryResult{
-					"hoge_result": prepalert.NewQueryResult(
+				QueryResults: map[string]*queryrunner.QueryResult{
+					"hoge_result": queryrunner.NewQueryResult(
 						"hoge_result",
 						"dummy",
 						[]string{"Name", "Sign", "Rating"},
@@ -83,9 +76,9 @@ func TestRuleRenderMemo(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			rule, err := prepalert.NewRule(nil, c.cfg, c.runners)
+			rule, err := prepalert.NewRule(nil, c.cfg)
 			require.NoError(t, err)
-			actual, err := rule.RenderMemo(context.Background(), c.data)
+			actual, err := rule.RenderInfomation(context.Background(), c.data)
 			if c.expectedError {
 				require.Error(t, err)
 			} else {

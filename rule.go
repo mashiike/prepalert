@@ -9,64 +9,82 @@ import (
 	"text/template"
 
 	"github.com/mackerelio/mackerel-client-go"
+	"github.com/mashiike/prepalert/hclconfig"
+	"github.com/mashiike/prepalert/internal/funcs"
+	"github.com/mashiike/prepalert/queryrunner"
 	"golang.org/x/sync/errgroup"
 )
 
 type Rule struct {
 	monitorName  string
-	queries      []CompiledQuery
-	memoTamplate *template.Template
-	variables    map[string]interface{}
+	anyAlert     bool
+	queries      []queryrunner.PreparedQuery
+	infoTamplate *template.Template
+	params       interface{}
 }
 
-func NewRule(client *mackerel.Client, cfg *RuleConfig, runners QueryRunners) (*Rule, error) {
-	name := cfg.Monitor.Name
-	if name == "" {
-		m, err := client.GetMonitor(cfg.Monitor.ID)
+func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
+	var name string
+	var anyAlert bool
+	if cfg.Alert.MonitorID != nil {
+		m, err := client.GetMonitor(*cfg.Alert.MonitorID)
 		if err != nil {
 			return nil, fmt.Errorf("get monitor from mackerel:%w", err)
 		}
 		name = m.MonitorName()
 	}
-	queries := make([]CompiledQuery, 0, len(cfg.Queries))
-	for _, query := range cfg.Queries {
-		runner, ok := runners.Get(query.Runner)
-		if !ok {
-			return nil, fmt.Errorf("queires[%s] runner `%s` not found", query.Name, query.Runner)
-		}
-		compiled, err := runner.Compile(query)
-		if err != nil {
-			return nil, fmt.Errorf("queries[%s] compile faield:%w", query.Name, err)
-		}
-		queries = append(queries, compiled)
+	if cfg.Alert.MonitorName != nil {
+		name = *cfg.Alert.MonitorName
 	}
-	memoTemplate, err := template.New("memo_template").Funcs(memoTemplateFuncMap).Parse(cfg.Memo.Text)
+	if cfg.Alert.Any != nil {
+		anyAlert = *cfg.Alert.Any
+	}
+	queries := make([]queryrunner.PreparedQuery, 0, len(cfg.Queries))
+	for _, query := range cfg.Queries {
+		queries = append(queries, query.Impl)
+	}
+	infoTemplate, err := template.New("info_template").Funcs(funcs.InfomationTemplateFuncMap).Parse(cfg.Infomation)
 	if err != nil {
-		return nil, fmt.Errorf("parse memo template:%w", err)
+		return nil, fmt.Errorf("parse info template:%w", err)
 	}
 	rule := &Rule{
 		monitorName:  name,
+		anyAlert:     anyAlert,
 		queries:      queries,
-		memoTamplate: memoTemplate,
-		variables:    cfg.Variables,
+		infoTamplate: infoTemplate,
+		params:       cfg.Params,
 	}
 	return rule, nil
 }
 
 func (rule *Rule) Match(body *WebhookBody) bool {
+	if rule.anyAlert {
+		return true
+	}
 	return body.Alert.MonitorName == rule.monitorName
 }
 
-func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, error) {
+type QueryData struct {
+	*WebhookBody
+	Params interface{}
+}
+
+type RenderInfomationData struct {
+	*WebhookBody
+	QueryResults map[string]*queryrunner.QueryResult
+	Params       interface{}
+}
+
+func (rule *Rule) BuildInfomation(ctx context.Context, body *WebhookBody) (string, error) {
 	reqID := "-"
-	info, ok := GetHandleContext(ctx)
+	info, ok := queryrunner.GetQueryRunningContext(ctx)
 	if ok {
 		reqID = fmt.Sprintf("%d", info.ReqID)
 	}
 	eg, egctx := errgroup.WithContext(ctx)
 	queryData := &QueryData{
 		WebhookBody: body,
-		Variables:   rule.variables,
+		Params:      rule.params,
 	}
 	var queryResults sync.Map
 	for _, query := range rule.queries {
@@ -86,10 +104,10 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 	if err := eg.Wait(); err != nil {
 		return "", err
 	}
-	data := &RenderMemoData{
+	data := &RenderInfomationData{
 		WebhookBody:  body,
-		QueryResults: make(map[string]*QueryResult, len(rule.queries)),
-		Variables:    rule.variables,
+		QueryResults: make(map[string]*queryrunner.QueryResult, len(rule.queries)),
+		Params:       rule.params,
 	}
 	queryResults.Range(func(key any, value any) bool {
 		name, ok := key.(string)
@@ -97,7 +115,7 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 			log.Printf("[warn][%s] key=%v is not string", reqID, key)
 			return false
 		}
-		queryResult, ok := value.(*QueryResult)
+		queryResult, ok := value.(*queryrunner.QueryResult)
 		if !ok {
 			log.Printf("[warn][%s] value=%v is not *QueryResult", reqID, value)
 			return false
@@ -105,18 +123,12 @@ func (rule *Rule) BuildMemo(ctx context.Context, body *WebhookBody) (string, err
 		data.QueryResults[name] = queryResult
 		return true
 	})
-	return rule.RenderMemo(ctx, data)
+	return rule.RenderInfomation(ctx, data)
 }
 
-type RenderMemoData struct {
-	*WebhookBody
-	QueryResults map[string]*QueryResult
-	Variables    map[string]interface{}
-}
-
-func (rule *Rule) RenderMemo(ctx context.Context, data *RenderMemoData) (string, error) {
+func (rule *Rule) RenderInfomation(ctx context.Context, data *RenderInfomationData) (string, error) {
 	var buf bytes.Buffer
-	if err := rule.memoTamplate.Execute(&buf, data); err != nil {
+	if err := rule.infoTamplate.Execute(&buf, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

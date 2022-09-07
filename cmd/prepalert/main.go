@@ -13,6 +13,8 @@ import (
 	"github.com/fujiwara/logutils"
 	"github.com/handlename/ssmwrap"
 	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/hclconfig"
+	_ "github.com/mashiike/prepalert/queryrunner/redshiftdata"
 	"github.com/urfave/cli/v2"
 )
 
@@ -64,9 +66,9 @@ func main() {
 			&cli.StringFlag{
 				Name:    "config",
 				Aliases: []string{"c"},
-				Usage:   "config file path, can set multiple",
+				Usage:   "config path",
 				EnvVars: []string{"CONFIG", "PREPALERT_CONFIG"},
-				Value:   "config.yaml",
+				Value:   ".",
 			},
 			&cli.StringFlag{
 				Name:        "mackerel-apikey",
@@ -115,8 +117,8 @@ func main() {
 		Usage:     "run server (default command)",
 		UsageText: "prepalert [global options] run [command options]",
 		Action: func(ctx *cli.Context) error {
-			cfg := prepalert.DefaultConfig()
-			if err := cfg.Load(ctx.String("config")); err != nil {
+			cfg, err := hclconfig.Load(ctx.String("config"), Version)
+			if err != nil {
 				return err
 			}
 			app, err := prepalert.New(ctx.String("mackerel-apikey"), cfg)

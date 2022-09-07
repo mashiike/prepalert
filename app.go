@@ -19,26 +19,24 @@ import (
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/grat"
+	"github.com/mashiike/prepalert/hclconfig"
+	"github.com/mashiike/prepalert/queryrunner"
 )
 
 type App struct {
 	client    *mackerel.Client
-	auth      *AuthConfig
+	auth      *hclconfig.AuthBlock
 	rules     []*Rule
 	service   string
 	queueUrl  string
 	sqsClient *sqs.Client
 }
 
-func New(apikey string, cfg *Config) (*App, error) {
+func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 	client := mackerel.NewClient(apikey)
-	queryRunners, err := NewQueryRunners(cfg.QueryRunners)
-	if err != nil {
-		return nil, fmt.Errorf("build query runners:%w", err)
-	}
 	rules := make([]*Rule, 0, len(cfg.Rules))
-	for i, ruleCfg := range cfg.Rules {
-		rule, err := NewRule(client, ruleCfg, queryRunners)
+	for i, ruleBlock := range cfg.Rules {
+		rule, err := NewRule(client, ruleBlock)
 		if err != nil {
 			return nil, fmt.Errorf("rules[%d]:%w", i, err)
 		}
@@ -49,18 +47,18 @@ func New(apikey string, cfg *Config) (*App, error) {
 		return nil, fmt.Errorf("load aws default config:%w", err)
 	}
 	sqsClient := sqs.NewFromConfig(awsCfg)
-	log.Printf("[info] try get sqs queue url: %s", cfg.SQSQueueName)
+	log.Printf("[info] try get sqs queue url: %s", cfg.Prepalert.SQSQueueName)
 	output, err := sqsClient.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
-		QueueName: aws.String(cfg.SQSQueueName),
+		QueueName: aws.String(cfg.Prepalert.SQSQueueName),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("can not get sqs queu url:%w", err)
 	}
 	app := &App{
 		client:    client,
-		auth:      cfg.Auth,
+		auth:      cfg.Prepalert.Auth,
 		rules:     rules,
-		service:   cfg.Service,
+		service:   cfg.Prepalert.Service,
 		sqsClient: sqsClient,
 		queueUrl:  *output.QueueUrl,
 	}
@@ -193,8 +191,7 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 		log.Printf("[info][%d] alert is not closed, skip nothing todo id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
 		return nil
 	}
-	info := app.NewHandleContext(reqID, message)
-	ctx = WithHandleContext(ctx, info)
+	ctx = app.WithQueryRunningContext(ctx, reqID, message)
 	for _, rule := range app.rules {
 		if !rule.Match(&body) {
 			continue
@@ -209,7 +206,7 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 }
 
 func (app *App) EnableBasicAuth() bool {
-	return app.auth != nil
+	return !app.auth.IsEmpty()
 }
 
 func (app *App) CheckBasicAuth(r *http.Request) bool {
@@ -218,4 +215,9 @@ func (app *App) CheckBasicAuth(r *http.Request) bool {
 		return false
 	}
 	return clientID == app.auth.ClientID && clientSecret == app.auth.ClientSecret
+}
+
+func (app *App) WithQueryRunningContext(ctx context.Context, reqID uint64, message *events.SQSMessage) context.Context {
+	hctx := queryrunner.NewQueryRunningContext(app.sqsClient, app.queueUrl, reqID, message)
+	return queryrunner.WithQueryRunningContext(ctx, hctx)
 }

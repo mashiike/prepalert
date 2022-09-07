@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mackerelio/mackerel-client-go"
+	"github.com/mashiike/prepalert/queryrunner"
 )
 
 type WebhookBody struct {
@@ -66,22 +67,22 @@ type Alert struct {
 
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
 	reqID := "-"
-	info, ok := GetHandleContext(ctx)
+	hctx, ok := queryrunner.GetQueryRunningContext(ctx)
 	if ok {
-		reqID = fmt.Sprintf("%d", info.ReqID)
+		reqID = fmt.Sprintf("%d", hctx.ReqID)
 	}
-	memo, err := rule.BuildMemo(ctx, body)
+	info, err := rule.BuildInfomation(ctx, body)
 	if err != nil {
 		return err
 	}
-	log.Printf("[debug][%s] memo: %s", reqID, memo)
+	log.Printf("[debug][%s] infomation: %s", reqID, info)
 	findOffset := int64(15 * time.Minute / time.Second)
 	annotations, err := app.client.FindGraphAnnotations(app.service, body.Alert.OpenedAt-findOffset, body.Alert.ClosedAt+findOffset)
 	if err != nil {
 		return fmt.Errorf("find graph annotations: %w", err)
 	}
 	title := fmt.Sprintf("prepalert alert_id=%s", body.Alert.ID)
-	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, memo)
+	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
 	service := app.service
 	if len(description) > 1024 {
 		log.Printf("[warn][%s] description is too long length=%d, full description:%s", reqID, len(description), description)
