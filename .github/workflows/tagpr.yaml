@@ -17,19 +17,21 @@ jobs:
           ref: main
       - name: check released version
         id: version_check
+        continue-on-error: true
         run: |
           version=$(git describe --tags)
           echo ::set-output name=version::$version
       - name: Adding summary
         run: echo '### ${{steps.version_check.outputs.version}}' >> $GITHUB_STEP_SUMMARY
+        if: ${{ steps.version_check.outcome == 'success' }}
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
+        if: ${{ steps.version_check.outcome == 'success' }}
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v1
         with:
           version: latest
           args: release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ steps.version_check.outcome == 'success' }}
