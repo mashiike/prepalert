@@ -124,6 +124,13 @@ lambda.zip
 
 A related document is [https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html)
 
+for example.
+
+deploy two lambda functions, prepalert-webhook and prepalert-worker in [lambda directory](lambda/)  
+The example of lambda directory uses [lambroll](https://github.com/fujiwara/lambroll) for deployment.
+
+For more information on the infrastructure around lambda functions, please refer to [example.tf](lambda/example.tf).
+
 ## LICENSE
 
 MIT License
