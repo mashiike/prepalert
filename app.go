@@ -21,6 +21,7 @@ import (
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/grat"
+	"github.com/mashiike/ls3viewer"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/queryrunner"
 )
@@ -34,6 +35,7 @@ type App struct {
 	queueUrl  string
 	sqsClient *sqs.Client
 	uploader  *manager.Uploader
+	viewer    http.Handler
 }
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
@@ -71,6 +73,17 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		app.backend = backend
 		s3Client := s3.NewFromConfig(awsCfg)
 		app.uploader = manager.NewUploader(s3Client)
+		viewerOptFns := []func(*ls3viewer.Options){
+			ls3viewer.WithBaseURL(backend.ViewerBaseURL.String()),
+		}
+		if app.EnableBasicAuth() {
+			viewerOptFns = append(viewerOptFns, ls3viewer.WithBasicAuth(app.auth.ClientID, app.auth.ClientSecret))
+		}
+		h, err := ls3viewer.New(backend.BucketName, *backend.ObjectKeyPrefix, viewerOptFns...)
+		if err != nil {
+			return nil, fmt.Errorf("initialize ls3viewer:%w", err)
+		}
+		app.viewer = h
 	}
 	return app, nil
 }
@@ -120,6 +133,15 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("X-Request-ID", fmt.Sprintf("%d", reqID))
+	if r.Method == http.MethodGet {
+		if !app.EnableBackend() {
+			log.Printf("[info][%d] status=%d", reqID, http.StatusMethodNotAllowed)
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		app.viewer.ServeHTTP(w, r)
+		return
+	}
 	log.Printf("[info][%d] %s %s %s", reqID, r.Proto, r.Method, r.URL)
 	if app.EnableBasicAuth() && !app.CheckBasicAuth(r) {
 		log.Printf("[info][%d] status=%d", reqID, http.StatusUnauthorized)
