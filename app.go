@@ -74,8 +74,11 @@ type RunOptions struct {
 
 func (app *App) Run(ctx context.Context, opts RunOptions) error {
 	switch strings.ToLower(opts.Mode) {
-	case "webhook":
-		log.Println("[info] Run as webhook")
+	case "webhook", "http":
+		if strings.EqualFold(opts.Mode, "webhook") {
+			log.Println("[warn] mode webhook is deprecated. change to http")
+		}
+		log.Println("[info] Run as http")
 		if app.EnableBasicAuth() {
 			log.Printf("[info] with basic auth: client_id=%s", app.auth.ClientID)
 		}
