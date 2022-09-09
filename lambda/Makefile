@@ -11,7 +11,6 @@ deploy-all: deploy/http deploy/worker
 
 deploy/%: bootstrap
 	PREPALERT_MODE=$* lambroll --log-level debug deploy
-	$(MAKE) logs/$*
 
 logs/%:
 	PREPALERT_MODE=$* lambroll logs --follow --format=short
