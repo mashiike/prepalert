@@ -5,7 +5,7 @@ prepalert {
 
     s3_backend {
         bucket_name = "prepalert-infomation"
-        object_key_prefix = "/"
+        object_key_prefix = "alerts/"
     }
 }
 

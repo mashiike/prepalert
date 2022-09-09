@@ -7,6 +7,7 @@ import (
 
 	gv "github.com/hashicorp/go-version"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/convert"
 )
@@ -15,9 +16,10 @@ type PrepalertBlock struct {
 	RequiredVersionExpr hcl.Expression `hcl:"required_version"`
 	versionConstraints  gv.Constraints
 
-	SQSQueueName string     `hcl:"sqs_queue_name"`
-	Service      string     `hcl:"service"`
-	Auth         *AuthBlock `hcl:"auth,block"`
+	SQSQueueName string          `hcl:"sqs_queue_name"`
+	Service      string          `hcl:"service"`
+	Auth         *AuthBlock      `hcl:"auth,block"`
+	S3Backend    *S3BackendBlock `hcl:"s3_backend,block"`
 }
 
 func restrictPrepalertBlock(body hcl.Body) hcl.Diagnostics {
@@ -38,6 +40,9 @@ func restrictPrepalertBlock(body hcl.Body) hcl.Diagnostics {
 		Blocks: []hcl.BlockHeaderSchema{
 			{
 				Type: "auth",
+			},
+			{
+				Type: "s3_backend",
 			},
 		},
 	}
@@ -92,6 +97,10 @@ func (b *PrepalertBlock) build(ctx *hcl.EvalContext) hcl.Diagnostics {
 		return diags
 	}
 	b.versionConstraints = constraints
+
+	if b.S3Backend != nil {
+		diags = append(diags, b.S3Backend.build(ctx)...)
+	}
 	return diags
 }
 
@@ -123,4 +132,22 @@ func (b *AuthBlock) IsEmpty() bool {
 		return true
 	}
 	return b.ClientID == "" || b.ClientSecret == ""
+}
+
+type S3BackendBlock struct {
+	BucketName        string  `hcl:"bucket_name"`
+	ObjectKeyPrefix   *string `hcl:"object_key_prefix"`
+	ObjectKeyTemplate *string `hcl:"object_key_template"`
+}
+
+func (b *S3BackendBlock) build(ctx *hcl.EvalContext) hcl.Diagnostics {
+	if b.ObjectKeyPrefix == nil {
+		b.ObjectKeyPrefix = generics.Ptr("prepalert/")
+	} else {
+		*b.ObjectKeyPrefix = strings.TrimPrefix(*b.ObjectKeyPrefix, "/")
+	}
+	if b.ObjectKeyTemplate == nil {
+		b.ObjectKeyTemplate = generics.Ptr(*b.ObjectKeyPrefix + "{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/{{ .Alert.ID }}.txt")
+	}
+	return nil
 }

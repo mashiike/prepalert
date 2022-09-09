@@ -182,6 +182,11 @@ func TestLoadNoError(t *testing.T) {
 						Prepalert: PrepalertBlock{
 							SQSQueueName: "prepalert",
 							Service:      "prod",
+							S3Backend: &S3BackendBlock{
+								BucketName:        "prepalert-infomation",
+								ObjectKeyPrefix:   generics.Ptr("alerts/"),
+								ObjectKeyTemplate: generics.Ptr("alerts/{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/{{ .Alert.ID }}.txt"),
+							},
 						},
 						Rules: []*RuleBlock{
 							{
