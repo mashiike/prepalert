@@ -170,6 +170,32 @@ func TestLoadNoError(t *testing.T) {
 					}, cfg)
 			},
 		},
+		{
+			casename: "s3 backend config",
+			path:     "testdata/s3_Backend",
+			check: func(t *testing.T, cfg *Config) {
+				require.Error(t, cfg.ValidateVersion("v0.0.0"))
+				require.NoError(t, cfg.ValidateVersion("v0.2.0"))
+				require.Equal(t, 1, len(cfg.Rules))
+				requireConfigEqual(t,
+					&Config{
+						Prepalert: PrepalertBlock{
+							SQSQueueName: "prepalert",
+							Service:      "prod",
+						},
+						Rules: []*RuleBlock{
+							{
+								Name: "simple",
+								Alert: AlertBlock{
+									Any: generics.Ptr(true),
+								},
+								Queries:    make(map[string]*QueryBlock),
+								Infomation: "How do you respond to alerts?\nDescribe information about your alert response here.\n",
+							},
+						},
+					}, cfg)
+			},
+		},
 	}
 
 	for _, c := range cases {
