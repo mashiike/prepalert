@@ -24,7 +24,7 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr"),
 		cmpopts.IgnoreFields(QueryBlock{}, "RunnerExpr", "Remain"),
 		cmpopts.IgnoreFields(QueryRunnerBlock{}, "Remain"),
-		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "Remain"),
+		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey", "Remain"),
 		cmpopts.EquateEmpty(),
 	)
 	if diff != "" {
@@ -42,6 +42,7 @@ func diagnosticToString(diag *hcl.Diagnostic) string {
 func TestLoadNoError(t *testing.T) {
 	os.Setenv("TEST_CLUSTER", "test")
 	os.Setenv("TEST_ENV", "env")
+	os.Setenv("SESSION_ENCRYPT_KEY", "passpasspasspass")
 	cases := []struct {
 		casename string
 		path     string
@@ -184,10 +185,13 @@ func TestLoadNoError(t *testing.T) {
 							SQSQueueName: "prepalert",
 							Service:      "prod",
 							S3Backend: &S3BackendBlock{
-								BucketName:              "prepalert-infomation",
-								ObjectKeyPrefix:         generics.Ptr("alerts/"),
-								ObjectKeyTemplateString: generics.Ptr("alerts/{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/{{ .Alert.ID }}.txt"),
-								ViewerBaseURLString:     "http://localhost:8080",
+								BucketName:                    "prepalert-infomation",
+								ObjectKeyPrefix:               generics.Ptr("alerts/"),
+								ObjectKeyTemplateString:       generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/{{ .Alert.ID }}.txt"),
+								ViewerBaseURLString:           "http://localhost:8080",
+								ViewerGoogleClientID:          generics.Ptr(""),
+								ViewerGoogleClientSecret:      generics.Ptr(""),
+								ViewerSessionEncryptKeyString: generics.Ptr("passpasspasspass"),
 							},
 						},
 						Rules: []*RuleBlock{

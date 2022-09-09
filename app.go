@@ -76,8 +76,11 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		viewerOptFns := []func(*ls3viewer.Options){
 			ls3viewer.WithBaseURL(backend.ViewerBaseURL.String()),
 		}
-		if app.EnableBasicAuth() {
+		if app.EnableBasicAuth() && !backend.EnableGoogleAuth() {
 			viewerOptFns = append(viewerOptFns, ls3viewer.WithBasicAuth(app.auth.ClientID, app.auth.ClientSecret))
+		}
+		if backend.EnableGoogleAuth() {
+			viewerOptFns = append(viewerOptFns, ls3viewer.WithGoogleOIDC(*backend.ViewerGoogleClientID, *backend.ViewerGoogleClientSecret, backend.ViewerSessionEncryptKey))
 		}
 		h, err := ls3viewer.New(backend.BucketName, *backend.ObjectKeyPrefix, viewerOptFns...)
 		if err != nil {
@@ -128,11 +131,13 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	reqID, err := generator.NextID()
 	if err != nil {
+		log.Println("[info]", "-", r.Method, r.URL.Path)
 		log.Println("[error] can not get reqID")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("X-Request-ID", fmt.Sprintf("%d", reqID))
+	log.Println("[info]", reqID, r.Method, r.URL.Path)
 	if r.Method == http.MethodGet {
 		if !app.EnableBackend() {
 			log.Printf("[info][%d] status=%d", reqID, http.StatusMethodNotAllowed)
@@ -142,7 +147,6 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		app.viewer.ServeHTTP(w, r)
 		return
 	}
-	log.Printf("[info][%d] %s %s %s", reqID, r.Proto, r.Method, r.URL)
 	if app.EnableBasicAuth() && !app.CheckBasicAuth(r) {
 		log.Printf("[info][%d] status=%d", reqID, http.StatusUnauthorized)
 		w.Header().Add("WWW-Authenticate", `Basic realm="SECRET AREA"`)

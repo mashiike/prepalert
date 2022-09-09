@@ -167,3 +167,29 @@ resource "aws_ssm_parameter" "mackerel_apikey" {
   type        = "SecureString"
   value       = local.mackerel_apikey
 }
+
+resource "aws_ssm_parameter" "GOOGLE_CLIENT_SECRET" {
+  name        = "/prepalert/GOOGLE_CLIENT_SECRET"
+  description = "GOOGLE_CLIENT_SECRET for prepalert"
+  type        = "SecureString"
+  value       = local.google_client_secret
+}
+
+resource "aws_ssm_parameter" "GOOGLE_CLIENT_ID" {
+  name        = "/prepalert/GOOGLE_CLIENT_ID"
+  description = "GOOGLE_CLIENT_ID for prepalert"
+  type        = "SecureString"
+  value       = local.google_client_id
+}
+
+resource "aws_ssm_parameter" "SESSION_ENCRYPT_KEY" {
+  name        = "/prepalert/SESSION_ENCRYPT_KEY"
+  description = "SESSION_ENCRYPT_KEY for prepalert"
+  type        = "SecureString"
+  value       = local.session_encrypt_key
+}
+
+output "lambda_function_url" {
+  description = "Generated function URL"
+  value       = aws_lambda_function_url.prepalert_http.function_url
+}

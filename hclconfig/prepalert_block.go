@@ -143,14 +143,18 @@ func (b *AuthBlock) IsEmpty() bool {
 }
 
 type S3BackendBlock struct {
-	BucketName              string  `hcl:"bucket_name"`
-	ObjectKeyPrefix         *string `hcl:"object_key_prefix"`
-	ObjectKeyTemplateString *string `hcl:"object_key_template"`
-	ViewerBaseURLString     string  `hcl:"viewer_base_url"`
+	BucketName                    string  `hcl:"bucket_name"`
+	ObjectKeyPrefix               *string `hcl:"object_key_prefix"`
+	ObjectKeyTemplateString       *string `hcl:"object_key_template"`
+	ViewerBaseURLString           string  `hcl:"viewer_base_url"`
+	ViewerGoogleClientID          *string `hcl:"viewer_google_client_id"`
+	ViewerGoogleClientSecret      *string `hcl:"viewer_google_client_secret"`
+	ViewerSessionEncryptKeyString *string `hcl:"viewer_session_encrypt_key"`
 
-	ObjectKeyTemplate *template.Template
-	ViewerBaseURL     *url.URL
-	Remain            hcl.Body `hcl:",remain"`
+	ObjectKeyTemplate       *template.Template
+	ViewerBaseURL           *url.URL
+	Remain                  hcl.Body `hcl:",remain"`
+	ViewerSessionEncryptKey []byte
 }
 
 func restrictS3BackendBlock(body hcl.Body) hcl.Diagnostics {
@@ -168,6 +172,15 @@ func restrictS3BackendBlock(body hcl.Body) hcl.Diagnostics {
 			},
 			{
 				Name: "viewer_base_url",
+			},
+			{
+				Name: "viewer_google_client_id",
+			},
+			{
+				Name: "viewer_google_client_secret",
+			},
+			{
+				Name: "viewer_session_encrypt_key",
 			},
 		},
 	}
@@ -215,6 +228,30 @@ func (b *S3BackendBlock) build(ctx *hcl.EvalContext) hcl.Diagnostics {
 		return diags
 	}
 	b.ViewerBaseURL = u
+	if b.ViewerGoogleClientID != nil || b.ViewerGoogleClientSecret != nil || b.ViewerSessionEncryptKeyString != nil {
+		if b.ViewerGoogleClientID == nil || b.ViewerGoogleClientSecret == nil || b.ViewerSessionEncryptKeyString == nil {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Invalid viewer authentication",
+				Detail:   "If you want to set Google authentication for a viewer, in that case you need all of viewer_google_client_id, viewer_google_client_secret, and viewer_session_encrypt_key",
+				Subject:  b.Remain.MissingItemRange().Ptr(),
+			})
+			return diags
+		}
+	}
+	if b.ViewerSessionEncryptKeyString != nil {
+		b.ViewerSessionEncryptKey = []byte(*b.ViewerSessionEncryptKeyString)
+		keyLen := len(b.ViewerSessionEncryptKey)
+		if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Invalid viewer authentication",
+				Detail:   "viewer_session_encrypt_key lengths should be 16, 24, or 32",
+				Subject:  b.Remain.MissingItemRange().Ptr(),
+			})
+			return diags
+		}
+	}
 	return diags
 }
 
@@ -223,4 +260,11 @@ func (b *S3BackendBlock) IsEmpty() bool {
 		return true
 	}
 	return b.BucketName == "" || b.ObjectKeyPrefix == nil || b.ObjectKeyTemplate == nil || b.ViewerBaseURL == nil
+}
+
+func (b *S3BackendBlock) EnableGoogleAuth() bool {
+	if b == nil {
+		return false
+	}
+	return b.ViewerSessionEncryptKey != nil && b.ViewerGoogleClientID != nil && b.ViewerGoogleClientSecret != nil
 }
