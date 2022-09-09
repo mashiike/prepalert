@@ -1,2 +1,4 @@
 bootstrap
-locals.tf.jon
+config.tf
+.terraform*
+*_dummy.zip
