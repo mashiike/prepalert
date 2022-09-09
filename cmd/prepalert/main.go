@@ -100,7 +100,7 @@ func main() {
 				Name:    "mode",
 				Usage:   "run mode",
 				EnvVars: []string{"PREPALERT_MODE"},
-				Value:   "webhook",
+				Value:   "http",
 			},
 			&cli.IntFlag{
 				Name:    "batch-size",

@@ -24,6 +24,7 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr"),
 		cmpopts.IgnoreFields(QueryBlock{}, "RunnerExpr", "Remain"),
 		cmpopts.IgnoreFields(QueryRunnerBlock{}, "Remain"),
+		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey", "Remain"),
 		cmpopts.EquateEmpty(),
 	)
 	if diff != "" {
@@ -41,6 +42,7 @@ func diagnosticToString(diag *hcl.Diagnostic) string {
 func TestLoadNoError(t *testing.T) {
 	os.Setenv("TEST_CLUSTER", "test")
 	os.Setenv("TEST_ENV", "env")
+	os.Setenv("SESSION_ENCRYPT_KEY", "passpasspasspass")
 	cases := []struct {
 		casename string
 		path     string
@@ -165,6 +167,41 @@ func TestLoadNoError(t *testing.T) {
 									MonitorID: generics.Ptr("xxxxxxxxxxxx"),
 								},
 								Infomation: "prepalert: current",
+							},
+						},
+					}, cfg)
+			},
+		},
+		{
+			casename: "s3 backend config",
+			path:     "testdata/s3_Backend",
+			check: func(t *testing.T, cfg *Config) {
+				require.Error(t, cfg.ValidateVersion("v0.0.0"))
+				require.NoError(t, cfg.ValidateVersion("v0.2.0"))
+				require.Equal(t, 1, len(cfg.Rules))
+				requireConfigEqual(t,
+					&Config{
+						Prepalert: PrepalertBlock{
+							SQSQueueName: "prepalert",
+							Service:      "prod",
+							S3Backend: &S3BackendBlock{
+								BucketName:                    "prepalert-infomation",
+								ObjectKeyPrefix:               generics.Ptr("alerts/"),
+								ObjectKeyTemplateString:       generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/{{ .Alert.ID }}.txt"),
+								ViewerBaseURLString:           "http://localhost:8080",
+								ViewerGoogleClientID:          generics.Ptr(""),
+								ViewerGoogleClientSecret:      generics.Ptr(""),
+								ViewerSessionEncryptKeyString: generics.Ptr("passpasspasspass"),
+							},
+						},
+						Rules: []*RuleBlock{
+							{
+								Name: "simple",
+								Alert: AlertBlock{
+									Any: generics.Ptr(true),
+								},
+								Queries:    make(map[string]*QueryBlock),
+								Infomation: "How do you respond to alerts?\nDescribe information about your alert response here.\n",
 							},
 						},
 					}, cfg)

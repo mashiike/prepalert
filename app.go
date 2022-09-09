@@ -13,12 +13,15 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/fujiwara/ridge"
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/grat"
+	"github.com/mashiike/ls3viewer"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/queryrunner"
 )
@@ -26,10 +29,13 @@ import (
 type App struct {
 	client    *mackerel.Client
 	auth      *hclconfig.AuthBlock
+	backend   *hclconfig.S3BackendBlock
 	rules     []*Rule
 	service   string
 	queueUrl  string
 	sqsClient *sqs.Client
+	uploader  *manager.Uploader
+	viewer    http.Handler
 }
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
@@ -62,6 +68,26 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		sqsClient: sqsClient,
 		queueUrl:  *output.QueueUrl,
 	}
+	if backend := cfg.Prepalert.S3Backend; !backend.IsEmpty() {
+		log.Printf("[info] enable s3 backend: s3://%s", backend.BucketName)
+		app.backend = backend
+		s3Client := s3.NewFromConfig(awsCfg)
+		app.uploader = manager.NewUploader(s3Client)
+		viewerOptFns := []func(*ls3viewer.Options){
+			ls3viewer.WithBaseURL(backend.ViewerBaseURL.String()),
+		}
+		if app.EnableBasicAuth() && !backend.EnableGoogleAuth() {
+			viewerOptFns = append(viewerOptFns, ls3viewer.WithBasicAuth(app.auth.ClientID, app.auth.ClientSecret))
+		}
+		if backend.EnableGoogleAuth() {
+			viewerOptFns = append(viewerOptFns, ls3viewer.WithGoogleOIDC(*backend.ViewerGoogleClientID, *backend.ViewerGoogleClientSecret, backend.ViewerSessionEncryptKey))
+		}
+		h, err := ls3viewer.New(backend.BucketName, *backend.ObjectKeyPrefix, viewerOptFns...)
+		if err != nil {
+			return nil, fmt.Errorf("initialize ls3viewer:%w", err)
+		}
+		app.viewer = h
+	}
 	return app, nil
 }
 
@@ -74,8 +100,11 @@ type RunOptions struct {
 
 func (app *App) Run(ctx context.Context, opts RunOptions) error {
 	switch strings.ToLower(opts.Mode) {
-	case "webhook":
-		log.Println("[info] Run as webhook")
+	case "webhook", "http":
+		if strings.EqualFold(opts.Mode, "webhook") {
+			log.Println("[warn] mode webhook is deprecated. change to http")
+		}
+		log.Println("[info] Run as http")
 		if app.EnableBasicAuth() {
 			log.Printf("[info] with basic auth: client_id=%s", app.auth.ClientID)
 		}
@@ -102,12 +131,22 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	reqID, err := generator.NextID()
 	if err != nil {
+		log.Println("[info]", "-", r.Method, r.URL.Path)
 		log.Println("[error] can not get reqID")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("X-Request-ID", fmt.Sprintf("%d", reqID))
-	log.Printf("[info][%d] %s %s %s", reqID, r.Proto, r.Method, r.URL)
+	log.Println("[info]", reqID, r.Method, r.URL.Path)
+	if r.Method == http.MethodGet {
+		if !app.EnableBackend() {
+			log.Printf("[info][%d] status=%d", reqID, http.StatusMethodNotAllowed)
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		app.viewer.ServeHTTP(w, r)
+		return
+	}
 	if app.EnableBasicAuth() && !app.CheckBasicAuth(r) {
 		log.Printf("[info][%d] status=%d", reqID, http.StatusUnauthorized)
 		w.Header().Add("WWW-Authenticate", `Basic realm="SECRET AREA"`)
@@ -207,6 +246,10 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 
 func (app *App) EnableBasicAuth() bool {
 	return !app.auth.IsEmpty()
+}
+
+func (app *App) EnableBackend() bool {
+	return !app.backend.IsEmpty()
 }
 
 func (app *App) CheckBasicAuth(r *http.Request) bool {

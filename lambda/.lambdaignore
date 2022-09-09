@@ -2,4 +2,6 @@
 .lambdaignore
 Makefile
 function.json
-example.tf
+*.tf
+.terraform*
+*_dummy.zip

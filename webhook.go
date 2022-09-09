@@ -1,11 +1,16 @@
 package prepalert
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/queryrunner"
 )
@@ -65,6 +70,8 @@ type Alert struct {
 	WarningThreshold  float64 `json:"warningThreshold"`
 }
 
+const maxDescriptionSize = 1024
+
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
 	reqID := "-"
 	hctx, ok := queryrunner.GetQueryRunningContext(ctx)
@@ -82,11 +89,37 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		return fmt.Errorf("find graph annotations: %w", err)
 	}
 	title := fmt.Sprintf("prepalert alert_id=%s", body.Alert.ID)
-	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
+	baseMessage := fmt.Sprintf("related alert: %s\n\n", body.Alert.URL)
+	description := fmt.Sprintf("%s%s", baseMessage, info)
 	service := app.service
-	if len(description) > 1024 {
+	var abbreviatedMessage string = "\n..."
+	if app.EnableBackend() {
+		var buf bytes.Buffer
+		if err := app.backend.ObjectKeyTemplate.Execute(&buf, body); err != nil {
+			return fmt.Errorf("execute object key template: %w", err)
+		}
+		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, buf.String())
+		u := *app.backend.ViewerBaseURL
+		u.JoinPath(buf.String())
+		showDetailsURL := u.String()
+		if m := fmt.Sprintf("\nshow details: %s", showDetailsURL); len(m) < maxDescriptionSize-len(baseMessage) {
+			abbreviatedMessage = m
+		}
+		log.Printf("[debug][%s] show details url `%s`", reqID, showDetailsURL)
+		log.Printf("[debug][%s] try upload descriptsion to `s3://%s/%s`", reqID, app.backend.BucketName, objectKey)
+		output, err := app.uploader.Upload(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(app.backend.BucketName),
+			Key:    aws.String(objectKey),
+			Body:   strings.NewReader(description),
+		})
+		if err != nil {
+			return fmt.Errorf("upload description failed: %w", err)
+		}
+		log.Printf("[info][%s] upload_location=%s", reqID, output.Location)
+	}
+	if len(description) > maxDescriptionSize {
 		log.Printf("[warn][%s] description is too long length=%d, full description:%s", reqID, len(description), description)
-		description = description[0:1020] + "\n..."
+		description = description[0:maxDescriptionSize-len(abbreviatedMessage)] + abbreviatedMessage
 	}
 	for _, annotation := range annotations {
 		log.Printf("[debug][%s] check annotation id=%s title=%s", reqID, annotation.ID, annotation.Title)

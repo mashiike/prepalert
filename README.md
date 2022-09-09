@@ -59,7 +59,7 @@ GLOBAL OPTIONS:
    --help, -h                         show help (default: false)
    --log-level value                  output log-level (default: "info") [$PREPALERT_LOG_LEVEL]
    --mackerel-apikey value, -k value  for access mackerel API (default: *********) [$MACKEREL_APIKEY, $PREPALERT_MACKEREL_APIKEY]
-   --mode value                       run mode (default: "webhook") [$PREPALERT_MODE]
+   --mode value                       run mode (default: "http") [$PREPALERT_MODE]
    --prefix value                     run server prefix (default: "/") [$PREPALERT_PREFIX]
    --version, -v                      print the version (default: false)
 ```
@@ -101,10 +101,10 @@ Lambda Function requires a webhook and a worker
 ```mermaid
 sequenceDiagram
   autonumber
-  Mackerel->>+webhook lambda function : POST /
-  webhook lambda function ->>+Amazon SQS: SendMessage
-  Amazon SQS-->- webhook lambda function: 200 Ok
-  webhook lambda function-->- Mackerel: 200 Ok
+  Mackerel->>+http lambda function : POST /
+  http lambda function ->>+Amazon SQS: SendMessage
+  Amazon SQS-->- http lambda function: 200 Ok
+  http lambda function-->- Mackerel: 200 Ok
   Amazon SQS ->>+ worker lambda function: trigger by AWS Lambda
   worker lambda function ->>+ Data Source: query
   Data Source -->- worker lambda function: query results
@@ -126,7 +126,7 @@ A related document is [https://docs.aws.amazon.com/lambda/latest/dg/runtimes-cus
 
 for example.
 
-deploy two lambda functions, prepalert-webhook and prepalert-worker in [lambda directory](lambda/)  
+deploy two lambda functions, prepalert-http and prepalert-worker in [lambda directory](lambda/)  
 The example of lambda directory uses [lambroll](https://github.com/fujiwara/lambroll) for deployment.
 
 For more information on the infrastructure around lambda functions, please refer to [example.tf](lambda/example.tf).

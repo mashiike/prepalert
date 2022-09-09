@@ -1,6 +1,6 @@
 
 resource "aws_iam_role" "prepalert" {
-  name = "prepalert"
+  name = "prepalert_lambda"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -36,6 +36,7 @@ data "aws_iam_policy_document" "prepalert" {
       "sqs:ChangeMessageVisibility",
       "sqs:ReceiveMessage",
       "sqs:SendMessage",
+      "sqs:GetQueueAttributes",
     ]
     resources = [aws_sqs_queue.prepalert.arn]
   }
@@ -44,6 +45,14 @@ data "aws_iam_policy_document" "prepalert" {
       "ssm:GetParameter*",
       "ssm:DescribeParameters",
       "ssm:List*",
+    ]
+    resources = ["*"]
+  }
+    statement {
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:List*",
     ]
     resources = ["*"]
   }
@@ -59,7 +68,7 @@ data "aws_iam_policy_document" "prepalert" {
 }
 
 resource "aws_sqs_queue" "prepalert" {
-  name                       = "dev-prepalert"
+  name                       = "prepalert"
   message_retention_seconds  = 86400
   visibility_timeout_seconds = 900
   redrive_policy = jsonencode({
@@ -69,29 +78,77 @@ resource "aws_sqs_queue" "prepalert" {
 }
 
 resource "aws_sqs_queue" "prepalert-dlq" {
-  name                      = "dev-prepalert-dlq"
+  name                      = "prepalert-dlq"
   message_retention_seconds = 345600
 }
 
-data "aws_lambda_alias" "prepalert_webhook" {
-  function_name = "repalert-webhook"
-  name          = "current"
+data "archive_file" "prepalert_dummy" {
+  type        = "zip"
+  output_path = "${path.module}/prepalert_dummy.zip"
+  source {
+    content  = "prepalert_dummy"
+    filename = "bootstrap"
+  }
+  depends_on = [
+    null_resource.prepalert_dummy
+  ]
 }
 
-data "aws_lambda_alias" "prepalert_worker" {
+resource "null_resource" "prepalert_dummy" {}
+
+resource "aws_lambda_function" "prepalert_http" {
+  lifecycle {
+    ignore_changes = all
+  }
+
+  function_name = "prepalert-http"
+  role          = aws_iam_role.prepalert.arn
+
+  handler  = "bootstrap"
+  runtime  = "provided.al2"
+  filename = data.archive_file.prepalert_dummy.output_path
+}
+
+resource "aws_lambda_alias" "prepalert_http" {
+  lifecycle {
+    ignore_changes = all
+  }
+  name             = "current"
+  function_name    = aws_lambda_function.prepalert_http.arn
+  function_version = aws_lambda_function.prepalert_http.version
+}
+
+resource "aws_lambda_function" "prepalert_worker" {
+  lifecycle {
+    ignore_changes = all
+  }
+
   function_name = "prepalert-worker"
-  name          = "current"
+  role          = aws_iam_role.prepalert.arn
+
+  handler  = "bootstrap"
+  runtime  = "provided.al2"
+  filename = data.archive_file.prepalert_dummy.output_path
 }
 
-resource "aws_lambda_function_url" "prepalert_webhook" {
-  function_name      = data.aws_lambda_alias.prepalert_webhook.function_name
-  qualifier          = data.aws_lambda_alias.prepalert_webhook.name
+resource "aws_lambda_alias" "prepalert_worker" {
+  lifecycle {
+    ignore_changes = all
+  }
+  name             = "current"
+  function_name    = aws_lambda_function.prepalert_worker.arn
+  function_version = aws_lambda_function.prepalert_worker.version
+}
+
+resource "aws_lambda_function_url" "prepalert_http" {
+  function_name      = aws_lambda_alias.prepalert_http.function_name
+  qualifier          = aws_lambda_alias.prepalert_http.name
   authorization_type = "NONE"
 
   cors {
     allow_credentials = true
     allow_origins     = ["*"]
-    allow_methods     = ["POST"]
+    allow_methods     = ["POST", "GET"]
     expose_headers    = ["keep-alive", "date"]
     max_age           = 0
   }
@@ -101,12 +158,38 @@ resource "aws_lambda_event_source_mapping" "prepalert_worker_invoke_from_sqs" {
   batch_size       = 1
   event_source_arn = aws_sqs_queue.prepalert.arn
   enabled          = true
-  function_name    = data.aws_lambda_alias.prepalert_worker.arn
+  function_name    = aws_lambda_alias.prepalert_worker.arn
 }
 
 resource "aws_ssm_parameter" "mackerel_apikey" {
-  name        = "/dev/MACKEREL_APIKEY"
-  description = "Mackerel API Key for dev"
+  name        = "/prepalert/MACKEREL_APIKEY"
+  description = "Mackerel API Key for prepalert"
   type        = "SecureString"
-  value       = local.MACKEREL_APIKEY
+  value       = local.mackerel_apikey
+}
+
+resource "aws_ssm_parameter" "GOOGLE_CLIENT_SECRET" {
+  name        = "/prepalert/GOOGLE_CLIENT_SECRET"
+  description = "GOOGLE_CLIENT_SECRET for prepalert"
+  type        = "SecureString"
+  value       = local.google_client_secret
+}
+
+resource "aws_ssm_parameter" "GOOGLE_CLIENT_ID" {
+  name        = "/prepalert/GOOGLE_CLIENT_ID"
+  description = "GOOGLE_CLIENT_ID for prepalert"
+  type        = "SecureString"
+  value       = local.google_client_id
+}
+
+resource "aws_ssm_parameter" "SESSION_ENCRYPT_KEY" {
+  name        = "/prepalert/SESSION_ENCRYPT_KEY"
+  description = "SESSION_ENCRYPT_KEY for prepalert"
+  type        = "SecureString"
+  value       = local.session_encrypt_key
+}
+
+output "lambda_function_url" {
+  description = "Generated function URL"
+  value       = aws_lambda_function_url.prepalert_http.function_url
 }
