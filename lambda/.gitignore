@@ -2,3 +2,4 @@ bootstrap
 config.tf
 .terraform*
 *_dummy.zip
+event.json

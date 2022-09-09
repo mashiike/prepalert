@@ -35,3 +35,8 @@ terraform/plan:
 .PHONY: terraform/apply
 terraform/apply:
 	terraform apply
+
+.PHONY: send-event
+send-event:
+	cat event.json | curl -d @- -H "Content-Type: application/json" $(shell tfstate-lookup --state .terraform/terraform.tfstate aws_lambda_function_url.prepalert_http.function_url)
+	$(MAKE) logs/worker
