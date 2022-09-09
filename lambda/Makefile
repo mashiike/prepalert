@@ -6,6 +6,7 @@ bootstrap: ../cmd/prepalert/*.go ../*.go ../go.*
 
 clean:
 	rm -f bootstrap
+	rm -f *_dummy.zip
 
 deploy-all: deploy/http deploy/worker
 
