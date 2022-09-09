@@ -48,6 +48,14 @@ data "aws_iam_policy_document" "prepalert" {
     ]
     resources = ["*"]
   }
+    statement {
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:List*",
+    ]
+    resources = ["*"]
+  }
   statement {
     actions = [
       "logs:GetLog*",
@@ -140,7 +148,7 @@ resource "aws_lambda_function_url" "prepalert_http" {
   cors {
     allow_credentials = true
     allow_origins     = ["*"]
-    allow_methods     = ["POST"]
+    allow_methods     = ["POST", "GET"]
     expose_headers    = ["keep-alive", "date"]
     max_age           = 0
   }

@@ -13,6 +13,8 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/fujiwara/ridge"
@@ -26,10 +28,12 @@ import (
 type App struct {
 	client    *mackerel.Client
 	auth      *hclconfig.AuthBlock
+	backend   *hclconfig.S3BackendBlock
 	rules     []*Rule
 	service   string
 	queueUrl  string
 	sqsClient *sqs.Client
+	uploader  *manager.Uploader
 }
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
@@ -61,6 +65,12 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		service:   cfg.Prepalert.Service,
 		sqsClient: sqsClient,
 		queueUrl:  *output.QueueUrl,
+	}
+	if backend := cfg.Prepalert.S3Backend; !backend.IsEmpty() {
+		log.Printf("[info] enable s3 backend: s3://%s", backend.BucketName)
+		app.backend = backend
+		s3Client := s3.NewFromConfig(awsCfg)
+		app.uploader = manager.NewUploader(s3Client)
 	}
 	return app, nil
 }
@@ -210,6 +220,10 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 
 func (app *App) EnableBasicAuth() bool {
 	return !app.auth.IsEmpty()
+}
+
+func (app *App) EnableBackend() bool {
+	return !app.backend.IsEmpty()
 }
 
 func (app *App) CheckBasicAuth(r *http.Request) bool {

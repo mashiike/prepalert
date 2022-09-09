@@ -11,10 +11,10 @@ clean:
 deploy-all: deploy/http deploy/worker
 
 deploy/%: bootstrap
-	PREPALERT_MODE=$* lambroll --log-level debug deploy
+	PREPALERT_MODE=$* lambroll --log-level debug deploy --tfstate .terraform/terraform.tfstate
 
 logs/%:
-	PREPALERT_MODE=$* lambroll logs --follow --format=short
+	PREPALERT_MODE=$* lambroll logs --follow --format=short --tfstate .terraform/terraform.tfstate
 
 .PHONY: terraform/init
 terraform/init:

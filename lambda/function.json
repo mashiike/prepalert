@@ -4,6 +4,8 @@
       "Variables": {
           "PREPALERT_LOG_LEVEL": "{{ env `PREPALERT_LOG_LEVEL` `info`}}",
           "PREPALERT_MODE": "{{ env `PREPALERT_MODE` `http` }}",
+          "PREPALERT_S3_BACKEND": "{{ must_env `PREPALERT_S3_BACKEND` }}",
+          "PREPALERT_VIEWER_BASE_URL": "{{ tfstate `aws_lambda_function_url.prepalert_http.function_url` }}",
           "SSMWRAP_PATHS": "/prepalert/"
       }
   },
