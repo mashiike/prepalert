@@ -6,7 +6,8 @@
           "PREPALERT_MODE": "{{ env `PREPALERT_MODE` `http` }}",
           "PREPALERT_S3_BACKEND": "{{ must_env `PREPALERT_S3_BACKEND` }}",
           "PREPALERT_VIEWER_BASE_URL": "{{ tfstate `aws_lambda_function_url.prepalert_http.function_url` }}",
-          "SSMWRAP_PATHS": "/prepalert/"
+          "SSMWRAP_PATHS": "/prepalert/",
+          "TZ": "Asia/Tokyo"
       }
   },
   "FunctionName": "prepalert-{{ env `PREPALERT_MODE` `http` }}",
