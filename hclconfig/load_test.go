@@ -174,7 +174,7 @@ func TestLoadNoError(t *testing.T) {
 		},
 		{
 			casename: "s3 backend config",
-			path:     "testdata/s3_Backend",
+			path:     "testdata/s3_backend",
 			check: func(t *testing.T, cfg *Config) {
 				require.Error(t, cfg.ValidateVersion("v0.0.0"))
 				require.NoError(t, cfg.ValidateVersion("v0.2.0"))
