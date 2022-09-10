@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.4.0](https://github.com/mashiike/prepalert/compare/v0.3.1...v0.4.0) - 2022-09-10
+- Feature/lambda sample by @mashiike in https://github.com/mashiike/prepalert/pull/20
+- S3 because it has to be omitted when the Description is long. to see the result of the upload. by @mashiike in https://github.com/mashiike/prepalert/pull/22
+
 ## [v0.3.1](https://github.com/mashiike/prepalert/compare/v0.3.0...v0.3.1) - 2022-09-07
 - add Usage to README.md by @mashiike in https://github.com/mashiike/prepalert/pull/17
 - Change the template for the first setup by @mashiike in https://github.com/mashiike/prepalert/pull/19
