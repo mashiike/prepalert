@@ -107,7 +107,6 @@ func convertParams(val cty.Value) interface{} {
 	if val.IsNull() {
 		return nil
 	}
-	log.Printf("%#v", val.Type())
 	if val.Type().IsObjectType() {
 		valueMap := val.AsValueMap()
 		params := make(map[string]interface{}, len(valueMap))
