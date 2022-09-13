@@ -28,7 +28,7 @@ require (
 	github.com/mattn/go-isatty v0.0.16
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.28.0
-	github.com/sergi/go-diff v1.0.0
+	github.com/sergi/go-diff v1.2.0
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.14.1
 	github.com/zclconf/go-cty v1.11.0
