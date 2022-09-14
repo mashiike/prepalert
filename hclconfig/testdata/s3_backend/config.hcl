@@ -8,9 +8,9 @@ prepalert {
     bucket_name                 = "prepalert-infomation"
     object_key_prefix           = "alerts/"
     viewer_base_url             = "http://localhost:8080"
-    viewer_google_client_id     = env("GOOGLE_CLIENT_ID")
-    viewer_google_client_secret = env("GOOGLE_CLIENT_SECRET")
-    viewer_session_encrypt_key  = env("SESSION_ENCRYPT_KEY")
+    viewer_google_client_id     = env("GOOGLE_CLIENT_ID", "")
+    viewer_google_client_secret = env("GOOGLE_CLIENT_SECRET", "")
+    viewer_session_encrypt_key  = env("SESSION_ENCRYPT_KEY", "")
   }
 }
 
