@@ -53,6 +53,9 @@ func init() {
 		"to_vertical": func(qr *queryrunner.QueryResult) string {
 			return qr.ToVertical()
 		},
+		"to_json": func(qr *queryrunner.QueryResult) string {
+			return qr.ToJSON()
+		},
 	}
 	QueryTemplateFuncMap = template.FuncMap{}
 	for name, f := range commonTemplateFuncMap {

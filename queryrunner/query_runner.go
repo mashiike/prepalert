@@ -199,3 +199,17 @@ func (qr *QueryResult) ToVertical() string {
 	}
 	return builder.String()
 }
+
+func (qr *QueryResult) ToJSON() string {
+	var builder strings.Builder
+	encoder := json.NewEncoder(&builder)
+	for _, row := range qr.Rows {
+		v := make(map[string]string, len(qr.Columns))
+		for i, column := range qr.Columns {
+			v[column] = row[i]
+		}
+		encoder.Encode(v)
+		fmt.Fprintln(&builder, "")
+	}
+	return builder.String()
+}
