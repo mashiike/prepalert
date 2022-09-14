@@ -387,9 +387,10 @@ func (r *QueryRunner) RunQuery(ctx context.Context, params *runQueryParameters) 
 			totalScanSize += uint64(content.Size)
 			apiCallCount++
 			jsonLines = append(jsonLines, lines...)
-			log.Printf("[info][%s] total scan size: %s, total lines: %d, total object count: %d", reqID, humanize.Bytes(totalScanSize), len(jsonLines), apiCallCount)
+			log.Printf("[debug][%s] total scan size: %s, total lines: %d, total object count: %d", reqID, humanize.Bytes(totalScanSize), len(jsonLines), apiCallCount)
 		}
 	}
+	log.Printf("[info][%s] total scan size: %s, total lines: %d, total object count: %d", reqID, humanize.Bytes(totalScanSize), len(jsonLines), apiCallCount)
 
 	return queryrunner.NewQueryResultWithJSONLines(params.name, params.expression, jsonLines), nil
 }
