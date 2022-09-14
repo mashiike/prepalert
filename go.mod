@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.27.9
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.19.8
+	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.13.0
 	github.com/fujiwara/logutils v1.1.0
 	github.com/fujiwara/ridge v0.6.1
@@ -24,7 +25,6 @@ require (
 	github.com/mackerelio/mackerel-client-go v0.21.2
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
-	github.com/mashiike/hclconfig v0.0.3
 	github.com/mashiike/ls3viewer v0.1.4
 	github.com/mattn/go-isatty v0.0.16
 	github.com/olekukonko/tablewriter v0.0.5
@@ -61,7 +61,6 @@ require (
 	github.com/coreos/go-oidc/v3 v3.4.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect

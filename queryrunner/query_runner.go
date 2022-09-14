@@ -3,13 +3,17 @@ package queryrunner
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"sort"
 	"strings"
 
 	"github.com/agext/levenshtein"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/olekukonko/tablewriter"
+	"github.com/samber/lo"
 )
 
 var queryRunners = make(map[string]*QueryRunnerDefinition)
@@ -83,6 +87,7 @@ func RestrictQueryRunnerBlock(queryRunnerType string, body hcl.Body) hcl.Diagnos
 	if diags.HasErrors() {
 		return diags
 	}
+	log.Printf("[debug] restrict query_runner with def type  %s", def.TypeName)
 	diags = append(diags, def.RestrictQueryRunnerBlockFunc(body)...)
 	return diags
 }
@@ -92,6 +97,7 @@ func RestrictQueryBlock(queryRunnerType string, body hcl.Body) hcl.Diagnostics {
 	if diags.HasErrors() {
 		return diags
 	}
+	log.Printf("[debug] restrict query with def type  %s", def.TypeName)
 	diags = append(diags, def.RestrictQueryBlockFunc(body)...)
 	return diags
 }
@@ -102,7 +108,9 @@ func NewQueryRunner(queryRunnerType string, name string, body hcl.Body, ctx *hcl
 		return nil, diags
 	}
 	queryRunner, buildDiags := def.BuildQueryRunnerFunc(name, body, ctx)
+	log.Printf("[debug] build query_runner `%s` as %T", queryRunnerType, queryRunner)
 	diags = append(diags, buildDiags...)
+	log.Printf("[debug] build query_runner `%s`, `%d` error diags", queryRunnerType, len(diags.Errs()))
 	return queryRunner, diags
 }
 
@@ -129,6 +137,47 @@ func NewQueryResult(name string, query string, columns []string, rows [][]string
 		Columns: columns,
 		Rows:    rows,
 	}
+}
+
+func NewQueryResultWithJSONLines(name string, query string, lines [][]byte) *QueryResult {
+	queryResults := &QueryResult{
+		Name:  name,
+		Query: query,
+	}
+	columnsMap := make(map[string]int)
+	rowsMap := make([]map[string]interface{}, 0, len(lines))
+	for _, line := range lines {
+		var v map[string]interface{}
+		if err := json.Unmarshal(line, &v); err == nil {
+			rowsMap = append(rowsMap, v)
+			for columnName := range v {
+				if _, ok := columnsMap[columnName]; !ok {
+					columnsMap[columnName] = len(columnsMap)
+				}
+			}
+		}
+	}
+	columnsEntries := lo.Entries(columnsMap)
+	sort.Slice(columnsEntries, func(i, j int) bool {
+		return columnsEntries[i].Value < columnsEntries[j].Value
+	})
+	rows := make([][]string, 0, len(rowsMap))
+	for _, rowMap := range rowsMap {
+		row := make([]string, 0, len(columnsEntries))
+		for _, e := range columnsEntries {
+			if v, ok := rowMap[e.Key]; ok {
+				row = append(row, fmt.Sprintf("%v", v))
+			} else {
+				row = append(row, "")
+			}
+		}
+		rows = append(rows, row)
+	}
+	queryResults.Rows = rows
+	queryResults.Columns = lo.Map(columnsEntries, func(e lo.Entry[string, int], _ int) string {
+		return e.Key
+	})
+	return queryResults
 }
 
 func (qr *QueryResult) ToTable() string {

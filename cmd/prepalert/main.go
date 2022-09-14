@@ -15,6 +15,7 @@ import (
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
 	_ "github.com/mashiike/prepalert/queryrunner/redshiftdata"
+	_ "github.com/mashiike/prepalert/queryrunner/s3select"
 	"github.com/mashiike/prepalert/wizard"
 	"github.com/urfave/cli/v2"
 )

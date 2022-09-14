@@ -40,11 +40,15 @@ func (b *QueryRunnerBlock) build(ctx *hcl.EvalContext) hcl.Diagnostics {
 
 type QueryRunnerBlocks []*QueryRunnerBlock
 
-func (blocks QueryRunnerBlocks) Get(name string) (*QueryRunnerBlock, bool) {
+func (blocks QueryRunnerBlocks) Get(queryRunnerType string, name string) (*QueryRunnerBlock, bool) {
 	for _, block := range blocks {
-		if name == block.Name {
-			return block, true
+		if block.Type != queryRunnerType {
+			continue
 		}
+		if name != block.Name {
+			continue
+		}
+		return block, true
 	}
 	return nil, false
 }
