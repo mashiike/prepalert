@@ -2,7 +2,9 @@ package hclconfig
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/ext/tryfunc"
@@ -19,7 +21,36 @@ func newEvalContext(basePath string, version string) *hcl.EvalContext {
 				"version": cty.StringVal(version),
 			}),
 		},
-		Functions: defaultFunctions,
+		Functions: make(map[string]function.Function, len(defaultFunctions)+1),
+	}
+	ctx.Functions["file"] = function.New(&function.Spec{
+		Params: []function.Parameter{
+			{
+				Name:        "path",
+				Type:        cty.String,
+				AllowMarked: true,
+			},
+		},
+		Type: function.StaticReturnType(cty.String),
+		Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
+			pathArg, pathMarks := args[0].Unmark()
+			p := pathArg.AsString()
+			fp, err := os.Open(filepath.Join(basePath, p))
+			if err != nil {
+				err = function.NewArgError(0, err)
+				return cty.UnknownVal(cty.String), err
+			}
+			defer fp.Close()
+			bs, err := io.ReadAll(fp)
+			if err != nil {
+				err = function.NewArgError(0, err)
+				return cty.UnknownVal(cty.String), err
+			}
+			return cty.StringVal(string(bs)).WithMarks(pathMarks), nil
+		},
+	})
+	for name, f := range defaultFunctions {
+		ctx.Functions[name] = f
 	}
 	return ctx
 }
