@@ -117,16 +117,6 @@ var defaultFunctions = map[string]function.Function{
 	"zipmap":          stdlib.ZipmapFunc,
 }
 
-func mergeFunctions(dst map[string]function.Function, src map[string]function.Function) map[string]function.Function {
-	if dst == nil {
-		dst = make(map[string]function.Function, len(src))
-	}
-	for name, f := range src {
-		dst[name] = f
-	}
-	return dst
-}
-
 var MustEnvFunc = function.New(&function.Spec{
 	Params: []function.Parameter{
 		{
