@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 	"log"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -263,11 +263,10 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 	}
 	if q.CSVBlock != nil {
 		q.inputSerialization.CSV = &types.CSVInput{
-			AllowQuotedRecordDelimiter: true,
-			FieldDelimiter:             q.CSVBlock.FieldDelimiter,
-			RecordDelimiter:            q.CSVBlock.RecordDelimiter,
-			QuoteCharacter:             q.CSVBlock.QuoteCharacter,
-			QuoteEscapeCharacter:       q.CSVBlock.QuoteEscapeCharacter,
+			FieldDelimiter:       q.CSVBlock.FieldDelimiter,
+			RecordDelimiter:      q.CSVBlock.RecordDelimiter,
+			QuoteCharacter:       q.CSVBlock.QuoteCharacter,
+			QuoteEscapeCharacter: q.CSVBlock.QuoteEscapeCharacter,
 		}
 	}
 	if q.JSONBlock != nil {
