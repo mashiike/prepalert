@@ -24,14 +24,13 @@ require (
 	github.com/mackerelio/mackerel-client-go v0.21.2
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
-	github.com/mashiike/hclconfig v0.0.3
 	github.com/mashiike/ls3viewer v0.1.4
 	github.com/mattn/go-isatty v0.0.16
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.28.0
 	github.com/sergi/go-diff v1.2.0
 	github.com/stretchr/testify v1.8.0
-	github.com/urfave/cli/v2 v2.14.1
+	github.com/urfave/cli/v2 v2.16.3
 	github.com/zclconf/go-cty v1.11.0
 	github.com/zclconf/go-cty-yaml v1.0.2
 	golang.org/x/sync v0.0.0-20220907140024-f12130a52804
