@@ -48,9 +48,11 @@ VERSION:
    current
 
 COMMANDS:
-   init     create inital config
-   run      run server (default command)
-   help, h  Shows a list of commands or help for one command
+   exec      Generate a virtual webhook from past alert to execute the rule
+   init      create inital config
+   run       run server (default command)
+   validate  validate the configuration
+   help, h   Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
    --address value                    run address (default: ":8080") [$PREPALERT_ADDRESS]
