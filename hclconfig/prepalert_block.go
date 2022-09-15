@@ -195,7 +195,7 @@ func (b *S3BackendBlock) build(ctx *hcl.EvalContext) hcl.Diagnostics {
 		*b.ObjectKeyPrefix = strings.TrimPrefix(*b.ObjectKeyPrefix, "/")
 	}
 	if b.ObjectKeyTemplateString == nil {
-		b.ObjectKeyTemplateString = generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/{{ .Alert.ID }}.txt")
+		b.ObjectKeyTemplateString = generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/")
 	}
 	tmpl, err := template.New("object_key_template").Funcs(funcs.QueryTemplateFuncMap).Parse(*b.ObjectKeyTemplateString)
 	var diags hcl.Diagnostics
