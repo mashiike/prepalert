@@ -123,6 +123,15 @@ func main() {
 				},
 			},
 			{
+				Name:      "validate",
+				Usage:     "validate the configuration",
+				UsageText: "prepalert [global options] validate",
+				Action: func(ctx *cli.Context) error {
+					_, err := hclconfig.Load(ctx.String("config"), Version)
+					return err
+				},
+			},
+			{
 				Name:      "exec",
 				Usage:     "Generate a virtual webhook from past alert to execute the rule",
 				UsageText: "prepalert [global options] exec <alert_id>",
