@@ -100,7 +100,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 			return fmt.Errorf("execute object key template: %w", err)
 		}
 		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, buf.String(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
-		u := app.backend.ViewerBaseURL.JoinPath(buf.String())
+		u := app.backend.ViewerBaseURL.JoinPath(buf.String(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
 		showDetailsURL = u.String()
 		if m := fmt.Sprintf("\nshow details: %s", showDetailsURL); len(m) < maxDescriptionSize-len(baseMessage) {
 			abbreviatedMessage = m
