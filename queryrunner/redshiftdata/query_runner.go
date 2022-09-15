@@ -30,9 +30,11 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("register redshfit_data query runner:%w", err))
 	}
+	log.Println("[info] load redshift_data query runner")
 }
 
 func RestrictQueryRunnerBlock(body hcl.Body) hcl.Diagnostics {
+	log.Println("[debug] start redshit_data query_runner block restriction, on", body.MissingItemRange().String())
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
@@ -100,10 +102,12 @@ func RestrictQueryRunnerBlock(body hcl.Body) hcl.Diagnostics {
 	}
 	log.Printf("[debug] no valid or other combination is specified. at %s", body.MissingItemRange().String())
 	diags = append(diags, diag)
+	log.Printf("[debug] end redshit_data query_runner block %d error diags", len(diags.Errs()))
 	return diags
 }
 
 func RestrictQueryBlock(body hcl.Body) hcl.Diagnostics {
+	log.Println("[debug] start redshit_data query block restriction, on", body.MissingItemRange().String())
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
@@ -113,6 +117,7 @@ func RestrictQueryBlock(body hcl.Body) hcl.Diagnostics {
 		},
 	}
 	_, diags := body.Content(schema)
+	log.Printf("[debug] end redshit_data query block %d error diags", len(diags.Errs()))
 	return diags
 }
 
@@ -157,6 +162,7 @@ type PreparedQuery struct {
 }
 
 func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.PreparedQuery, hcl.Diagnostics) {
+	log.Printf("[debug] prepare `%s` with redshift_data query_runner", name)
 	q := &PreparedQuery{
 		name:   name,
 		runner: r,

@@ -92,6 +92,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	baseMessage := fmt.Sprintf("related alert: %s\n\n", body.Alert.URL)
 	description := fmt.Sprintf("%s%s", baseMessage, info)
 	service := app.service
+	var showDetailsURL string
 	var abbreviatedMessage string = "\n..."
 	if app.EnableBackend() {
 		var buf bytes.Buffer
@@ -99,9 +100,8 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 			return fmt.Errorf("execute object key template: %w", err)
 		}
 		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, buf.String())
-		u := *app.backend.ViewerBaseURL
-		u.JoinPath(buf.String())
-		showDetailsURL := u.String()
+		u := app.backend.ViewerBaseURL.JoinPath(buf.String())
+		showDetailsURL = u.String()
 		if m := fmt.Sprintf("\nshow details: %s", showDetailsURL); len(m) < maxDescriptionSize-len(baseMessage) {
 			abbreviatedMessage = m
 		}
@@ -118,7 +118,11 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		log.Printf("[info][%s] upload_location=%s", reqID, output.Location)
 	}
 	if len(description) > maxDescriptionSize {
-		log.Printf("[warn][%s] description is too long length=%d, full description:%s", reqID, len(description), description)
+		if app.EnableBackend() {
+			log.Printf("[warn][%s] description is too long length=%d, backend_url=%s", reqID, len(description), showDetailsURL)
+		} else {
+			log.Printf("[warn][%s] description is too long length=%d, full description:%s", reqID, len(description), description)
+		}
 		description = description[0:maxDescriptionSize-len(abbreviatedMessage)] + abbreviatedMessage
 	}
 	for _, annotation := range annotations {

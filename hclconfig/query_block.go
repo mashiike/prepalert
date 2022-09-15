@@ -62,6 +62,7 @@ func restrictQueryBlock(body hcl.Body) hcl.Diagnostics {
 				})
 				continue
 			}
+			log.Printf("[debug] try runner type `%s` restriction", typeAttr.Name)
 			diags = append(diags, queryrunner.RestrictQueryBlock(typeAttr.Name, partialBody)...)
 		}
 	}
@@ -71,7 +72,7 @@ func restrictQueryBlock(body hcl.Body) hcl.Diagnostics {
 func (b *QueryBlock) build(ctx *hcl.EvalContext, queryRunners QueryRunnerBlocks) hcl.Diagnostics {
 	var diags hcl.Diagnostics
 	variables := b.RunnerExpr.Variables()
-	attr, err := GetTraversalAttr(variables[0], "query_runner", 2)
+	typeAttr, err := GetTraversalAttr(variables[0], "query_runner", 1)
 	if err != nil {
 		log.Printf("[debug] get traversal attr failed, expression on %s: %v", variables[0].SourceRange().String(), err)
 		diags = append(diags, &hcl.Diagnostic{
@@ -82,12 +83,23 @@ func (b *QueryBlock) build(ctx *hcl.EvalContext, queryRunners QueryRunnerBlocks)
 		})
 		return diags
 	}
-	queryRunner, ok := queryRunners.Get(attr.Name)
+	nameAttr, err := GetTraversalAttr(variables[0], "query_runner", 2)
+	if err != nil {
+		log.Printf("[debug] get traversal attr failed, expression on %s: %v", variables[0].SourceRange().String(), err)
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid Relation",
+			Detail:   `query.runner depends on "qurey_runner" block, please write as runner = "query_runner.type.name"`,
+			Subject:  variables[0].SourceRange().Ptr(),
+		})
+		return diags
+	}
+	queryRunner, ok := queryRunners.Get(typeAttr.Name, nameAttr.Name)
 	if !ok {
 		diags = append(diags, &hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  "Invalid Relation",
-			Detail:   fmt.Sprintf("query_runner `%s` is not found", attr.Name),
+			Detail:   fmt.Sprintf("query_runner `%s.%s` is not found", typeAttr.Name, nameAttr.Name),
 			Subject:  variables[0].SourceRange().Ptr(),
 		})
 		return diags
