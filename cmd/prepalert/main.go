@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"os/signal"
@@ -119,6 +120,25 @@ func main() {
 				UsageText: "prepalert init\nprepalert [global options] init",
 				Action: func(ctx *cli.Context) error {
 					return wizard.Run(ctx.Context, Version, ctx.String("mackerel-apikey"), ctx.String("config"))
+				},
+			},
+			{
+				Name:      "exec",
+				Usage:     "Generate a virtual webhook from past alert to execute the rule",
+				UsageText: "prepalert [global options] exec <alert_id>",
+				Action: func(ctx *cli.Context) error {
+					if ctx.NArg() == 0 {
+						return errors.New("alert_id is required")
+					}
+					cfg, err := hclconfig.Load(ctx.String("config"), Version)
+					if err != nil {
+						return err
+					}
+					app, err := prepalert.New(ctx.String("mackerel-apikey"), cfg)
+					if err != nil {
+						return err
+					}
+					return app.Exec(ctx.Context, ctx.Args().First())
 				},
 			},
 		},

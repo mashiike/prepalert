@@ -88,7 +88,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	if err != nil {
 		return fmt.Errorf("find graph annotations: %w", err)
 	}
-	title := fmt.Sprintf("prepalert alert_id=%s", body.Alert.ID)
+	title := fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name())
 	baseMessage := fmt.Sprintf("related alert: %s\n\n", body.Alert.URL)
 	description := fmt.Sprintf("%s%s", baseMessage, info)
 	service := app.service
@@ -99,7 +99,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		if err := app.backend.ObjectKeyTemplate.Execute(&buf, body); err != nil {
 			return fmt.Errorf("execute object key template: %w", err)
 		}
-		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, buf.String())
+		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, buf.String(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
 		u := app.backend.ViewerBaseURL.JoinPath(buf.String())
 		showDetailsURL = u.String()
 		if m := fmt.Sprintf("\nshow details: %s", showDetailsURL); len(m) < maxDescriptionSize-len(baseMessage) {
@@ -152,4 +152,92 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	}
 	log.Printf("[info][%s] annotation created annotation_id=%s", reqID, output.ID)
 	return nil
+}
+
+func (app *App) NewWebhookBody(ctx context.Context, alertID string) (*WebhookBody, error) {
+	org, err := app.client.GetOrg()
+	if err != nil {
+		return nil, fmt.Errorf("get org:%w", err)
+	}
+	alert, err := app.client.GetAlert(alertID)
+	if err != nil {
+		return nil, fmt.Errorf("get alert:%w", err)
+	}
+	monitor, err := app.client.GetMonitor(alert.MonitorID)
+	if err != nil {
+		return nil, fmt.Errorf("get monitor:%w", err)
+	}
+	body := &WebhookBody{
+		OrgName: org.Name,
+		Event:   "alert",
+		Alert: &Alert{
+			OpenedAt:          alert.OpenedAt,
+			ClosedAt:          alert.ClosedAt,
+			CreatedAt:         alert.OpenedAt * 1000,
+			CriticalThreshold: 0,
+			Duration:          0,
+			IsOpen:            alert.Status != "OK",
+			MetricLabel:       "",
+			MetricValue:       0,
+			MonitorName:       monitor.MonitorName(),
+			MonitorOperator:   "",
+			Status:            alert.Status,
+			Trigger:           "monitor",
+			ID:                alert.ID,
+			URL:               fmt.Sprintf("https://mackerel.io/orgs/%s/alerts/%s", org.Name, alert.ID),
+			WarningThreshold:  0,
+		},
+	}
+	switch m := monitor.(type) {
+	case *mackerel.MonitorConnectivity:
+		body.Memo = m.Memo
+	case *mackerel.MonitorHostMetric:
+		body.Memo = m.Memo
+		if m.Warning != nil {
+			body.Alert.WarningThreshold = *m.Warning
+		}
+		if m.Critical != nil {
+			body.Alert.CriticalThreshold = *m.Critical
+		}
+		body.Alert.MonitorOperator = m.Operator
+		body.Alert.Duration = int64(m.Duration)
+		body.Alert.MetricLabel = m.Metric
+		body.Host = &Host{}
+	case *mackerel.MonitorServiceMetric:
+		body.Memo = m.Memo
+		if m.Warning != nil {
+			body.Alert.WarningThreshold = *m.Warning
+		}
+		if m.Critical != nil {
+			body.Alert.CriticalThreshold = *m.Critical
+		}
+		body.Alert.MonitorOperator = m.Operator
+		body.Alert.Duration = int64(m.Duration)
+		body.Alert.MetricLabel = m.Metric
+		body.Service = &Service{
+			Name:  m.Service,
+			OrgID: org.Name,
+		}
+	case *mackerel.MonitorExternalHTTP:
+		body.Memo = m.Memo
+		body.Service = &Service{
+			Name:  m.Service,
+			OrgID: org.Name,
+		}
+	case *mackerel.MonitorExpression:
+		body.Memo = m.Memo
+		if m.Warning != nil {
+			body.Alert.WarningThreshold = *m.Warning
+		}
+		if m.Critical != nil {
+			body.Alert.CriticalThreshold = *m.Critical
+		}
+		body.Alert.MonitorOperator = m.Operator
+	case *mackerel.MonitorAnomalyDetection:
+		body.Memo = m.Memo
+	default:
+		return nil, fmt.Errorf("unknown monitor type: %s", m.MonitorName())
+	}
+
+	return body, nil
 }
