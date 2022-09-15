@@ -16,6 +16,7 @@ import (
 )
 
 type Rule struct {
+	ruleName     string
 	monitorName  string
 	anyAlert     bool
 	queries      []queryrunner.PreparedQuery
@@ -48,6 +49,7 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		return nil, fmt.Errorf("parse info template:%w", err)
 	}
 	rule := &Rule{
+		ruleName:     cfg.Name,
 		monitorName:  name,
 		anyAlert:     anyAlert,
 		queries:      queries,
@@ -132,4 +134,8 @@ func (rule *Rule) RenderInfomation(ctx context.Context, data *RenderInfomationDa
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func (rule *Rule) Name() string {
+	return rule.ruleName
 }

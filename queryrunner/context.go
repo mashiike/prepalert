@@ -28,6 +28,9 @@ func NewQueryRunningContext(sqsClient *sqs.Client, queueURL string, reqID uint64
 }
 
 func (hctx *QueryRunningContext) ChangeSQSMessageVisibilityTimeout(ctx context.Context, visibilityTimeout time.Duration) error {
+	if hctx == nil {
+		return nil
+	}
 	log.Printf("[debug][%d] change message visivirity message id=%s, timeout=%s", hctx.ReqID, hctx.message.MessageId, visibilityTimeout)
 	_, err := hctx.sqsClient.ChangeMessageVisibility(ctx, &sqs.ChangeMessageVisibilityInput{
 		QueueUrl:          aws.String(hctx.queueURL),

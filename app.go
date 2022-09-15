@@ -116,6 +116,14 @@ func (app *App) Run(ctx context.Context, opts RunOptions) error {
 	return nil
 }
 
+func (app *App) Exec(ctx context.Context, alertID string) error {
+	body, err := app.NewWebhookBody(ctx, alertID)
+	if err != nil {
+		return err
+	}
+	return app.ProcessRules(ctx, body)
+}
+
 func must[T any](t T, err error) T {
 	if err != nil {
 		panic(err)
@@ -231,15 +239,22 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 		return nil
 	}
 	ctx = app.WithQueryRunningContext(ctx, reqID, message)
+	return app.ProcessRules(ctx, &body)
+}
+func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
+	matchCount := 0
 	for _, rule := range app.rules {
-		if !rule.Match(&body) {
+		if !rule.Match(body) {
 			continue
 		}
-		if err := app.ProcessRule(ctx, rule, &body); err != nil {
-			log.Printf("[error][%d] failed process Mackerel webhook body: %v", reqID, err)
-			return err
+		log.Printf("[info] match rule `%s`", rule.Name())
+		matchCount++
+		if err := app.ProcessRule(ctx, rule, body); err != nil {
+			return fmt.Errorf("failed process Mackerel webhook body:%s: %w", rule.Name(), err)
 		}
-		break
+	}
+	if matchCount == 0 {
+		log.Printf("[info] no match rules")
 	}
 	return nil
 }
