@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.5.1](https://github.com/mashiike/prepalert/compare/v0.5.0...v0.5.1) - 2022-09-15
+- fix template package by @mashiike in https://github.com/mashiike/prepalert/pull/31
+
 ## [v0.5.0](https://github.com/mashiike/prepalert/compare/v0.4.0...v0.5.0) - 2022-09-15
 - update go modules by @mashiike in https://github.com/mashiike/prepalert/pull/26
 - Feature/more functions by @mashiike in https://github.com/mashiike/prepalert/pull/27
