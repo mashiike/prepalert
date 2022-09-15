@@ -163,10 +163,12 @@ type PreparedQuery struct {
 }
 
 type QueryCSVBlock struct {
-	FieldDelimiter       *string `hcl:"field_delimiter"`
-	QuoteCharacter       *string `hcl:"quote_character"`
-	QuoteEscapeCharacter *string `hcl:"quote_escape_character"`
-	RecordDelimiter      *string `hcl:"record_delimiter"`
+	AllowQuotedRecordDelimiter *bool   `hcl:"allow_quoted_record_delimiter"`
+	FileHeaderInfo             *string `hcl:"file_header_info"`
+	FieldDelimiter             *string `hcl:"field_delimiter"`
+	QuoteCharacter             *string `hcl:"quote_character"`
+	QuoteEscapeCharacter       *string `hcl:"quote_escape_character"`
+	RecordDelimiter            *string `hcl:"record_delimiter"`
 }
 
 type QueryJSONBlock struct {
@@ -264,9 +266,39 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 		CompressionType: compressionType,
 	}
 	if q.CSVBlock != nil {
+		if q.CSVBlock.AllowQuotedRecordDelimiter == nil {
+			q.CSVBlock.AllowQuotedRecordDelimiter = generics.Ptr(false)
+		}
+		var fileHeaderInfo types.FileHeaderInfo
+		if q.CSVBlock.FileHeaderInfo == nil {
+			fileHeaderInfo = types.FileHeaderInfoNone
+		} else {
+			fileHeaderInfoList := fileHeaderInfo.Values()
+			for _, t := range fileHeaderInfoList {
+				if strings.EqualFold(*q.CSVBlock.FileHeaderInfo, string(t)) {
+					fileHeaderInfo = t
+					break
+				}
+			}
+			if fileHeaderInfo == "" {
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Invalid json.type",
+					Detail: fmt.Sprintf(
+						"Must be %s or %s",
+						strings.Join(lo.Map(fileHeaderInfoList[:len(fileHeaderInfoList)-1], func(t types.FileHeaderInfo, _ int) string {
+							return string(t)
+						}), ","),
+						fileHeaderInfoList[len(fileHeaderInfoList)-1],
+					),
+					Subject: body.MissingItemRange().Ptr(),
+				})
+				return nil, diags
+			}
+		}
 		q.inputSerialization.CSV = &types.CSVInput{
-			AllowQuotedRecordDelimiter: false,
-			FileHeaderInfo:             types.FileHeaderInfoNone,
+			AllowQuotedRecordDelimiter: *q.CSVBlock.AllowQuotedRecordDelimiter,
+			FileHeaderInfo:             fileHeaderInfo,
 			FieldDelimiter:             q.CSVBlock.FieldDelimiter,
 			RecordDelimiter:            q.CSVBlock.RecordDelimiter,
 			QuoteCharacter:             q.CSVBlock.QuoteCharacter,
