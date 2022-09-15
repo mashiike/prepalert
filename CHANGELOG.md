@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.5.0](https://github.com/mashiike/prepalert/compare/v0.4.0...v0.5.0) - 2022-09-15
+- update go modules by @mashiike in https://github.com/mashiike/prepalert/pull/26
+- Feature/more functions by @mashiike in https://github.com/mashiike/prepalert/pull/27
+- Bump github.com/sergi/go-diff from 1.0.0 to 1.2.0 by @dependabot in https://github.com/mashiike/prepalert/pull/23
+- Bump github.com/urfave/cli/v2 from 2.14.1 to 2.16.3 by @dependabot in https://github.com/mashiike/prepalert/pull/24
+- s3_select backend by @mashiike in https://github.com/mashiike/prepalert/pull/28
+- exec command by @mashiike in https://github.com/mashiike/prepalert/pull/29
+- validate command by @mashiike in https://github.com/mashiike/prepalert/pull/30
+
 ## [v0.4.0](https://github.com/mashiike/prepalert/compare/v0.3.1...v0.4.0) - 2022-09-10
 - Feature/lambda sample by @mashiike in https://github.com/mashiike/prepalert/pull/20
 - S3 because it has to be omitted when the Description is long. to see the result of the upload. by @mashiike in https://github.com/mashiike/prepalert/pull/22
