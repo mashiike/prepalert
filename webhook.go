@@ -88,7 +88,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	if err != nil {
 		return fmt.Errorf("find graph annotations: %w", err)
 	}
-	title := fmt.Sprintf("prepalert alert_id=%s", body.Alert.ID)
+	title := fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name())
 	baseMessage := fmt.Sprintf("related alert: %s\n\n", body.Alert.URL)
 	description := fmt.Sprintf("%s%s", baseMessage, info)
 	service := app.service
