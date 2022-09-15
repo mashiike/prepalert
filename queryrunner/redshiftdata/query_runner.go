@@ -5,8 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"log"
+	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
