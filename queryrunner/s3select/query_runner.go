@@ -3,7 +3,9 @@ package s3select
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"text/template"
@@ -263,10 +265,12 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 	}
 	if q.CSVBlock != nil {
 		q.inputSerialization.CSV = &types.CSVInput{
-			FieldDelimiter:       q.CSVBlock.FieldDelimiter,
-			RecordDelimiter:      q.CSVBlock.RecordDelimiter,
-			QuoteCharacter:       q.CSVBlock.QuoteCharacter,
-			QuoteEscapeCharacter: q.CSVBlock.QuoteEscapeCharacter,
+			AllowQuotedRecordDelimiter: false,
+			FileHeaderInfo:             types.FileHeaderInfoNone,
+			FieldDelimiter:             q.CSVBlock.FieldDelimiter,
+			RecordDelimiter:            q.CSVBlock.RecordDelimiter,
+			QuoteCharacter:             q.CSVBlock.QuoteCharacter,
+			QuoteEscapeCharacter:       q.CSVBlock.QuoteEscapeCharacter,
 		}
 	}
 	if q.JSONBlock != nil {
@@ -345,8 +349,9 @@ func (r *QueryRunner) RunQuery(ctx context.Context, params *runQueryParameters) 
 	}
 	log.Printf("[info][%s] start s3 select expression `%s`", reqID, params.name)
 	log.Printf("[info][%s] location: s3://%s/%s*%s", reqID, params.bucket, params.objectKeyPrefix, params.objectKeySuffix)
-	log.Printf("[debug][%s] expression: %s", reqID, params.expression)
-
+	log.Printf("[debug][%s] original expression: %s", reqID, params.expression)
+	expression := strings.ReplaceAll(params.expression, "\n", " ")
+	log.Printf("[debug][%s] rewirte expression: %s", reqID, expression)
 	p := s3.NewListObjectsV2Paginator(r.client, &s3.ListObjectsV2Input{
 		Bucket:    aws.String(params.bucket),
 		Prefix:    aws.String(params.objectKeyPrefix),
@@ -358,7 +363,6 @@ func (r *QueryRunner) RunQuery(ctx context.Context, params *runQueryParameters) 
 	if err := hctx.ChangeSQSMessageVisibilityTimeout(ctx, 30*time.Second); err != nil {
 		log.Println("[warn] failed change sqs message visibility timeout:", err)
 	}
-	expression := strings.ReplaceAll(params.expression, "\n", " ")
 	for p.HasMorePages() {
 		if totalScanSize > params.scanLimitation {
 			break
@@ -380,11 +384,11 @@ func (r *QueryRunner) RunQuery(ctx context.Context, params *runQueryParameters) 
 			}
 			log.Printf("[debug][%s] start select object: s3://%s/%s (%s)", reqID, params.bucket, *content.Key, humanize.Bytes(uint64(content.Size)))
 			lines, err := r.selectObject(ctx, params.bucket, *content.Key, expression, params.inputSerialization)
-			if err != nil {
-				return nil, fmt.Errorf("select object: %w", err)
-			}
 			totalScanSize += uint64(content.Size)
 			apiCallCount++
+			if err != nil {
+				return nil, fmt.Errorf("select object: %s : %w", *content.Key, err)
+			}
 			jsonLines = append(jsonLines, lines...)
 			log.Printf("[debug][%s] total scan size: %s, total lines: %d, total object count: %d", reqID, humanize.Bytes(totalScanSize), len(jsonLines), apiCallCount)
 		}
@@ -417,7 +421,19 @@ func (r *QueryRunner) selectObject(ctx context.Context, bucket string, key strin
 	for event := range stream.Events() {
 		v, ok := event.(*types.SelectObjectContentEventStreamMemberRecords)
 		if ok {
-			lines = append(lines, v.Value.Payload)
+			decoder := json.NewDecoder(bytes.NewReader(v.Value.Payload))
+			var err error
+			for {
+				var v json.RawMessage
+				err = decoder.Decode(&v)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					return nil, err
+				}
+				lines = append(lines, v)
+			}
 		}
 	}
 

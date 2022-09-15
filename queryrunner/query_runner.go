@@ -148,6 +148,7 @@ func NewQueryResultWithJSONLines(name string, query string, lines [][]byte) *Que
 	rowsMap := make([]map[string]interface{}, 0, len(lines))
 	for _, line := range lines {
 		var v map[string]interface{}
+		log.Println("[debug] NewQueryResultWithJSONLines:", string(line))
 		if err := json.Unmarshal(line, &v); err == nil {
 			rowsMap = append(rowsMap, v)
 			for columnName := range v {
@@ -155,6 +156,8 @@ func NewQueryResultWithJSONLines(name string, query string, lines [][]byte) *Que
 					columnsMap[columnName] = len(columnsMap)
 				}
 			}
+		} else {
+			log.Println("[warn] unmarshal err", err)
 		}
 	}
 	columnsEntries := lo.Entries(columnsMap)
@@ -209,7 +212,6 @@ func (qr *QueryResult) ToJSON() string {
 			v[column] = row[i]
 		}
 		encoder.Encode(v)
-		fmt.Fprintln(&builder, "")
 	}
 	return builder.String()
 }
