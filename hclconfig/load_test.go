@@ -187,7 +187,7 @@ func TestLoadNoError(t *testing.T) {
 							S3Backend: &S3BackendBlock{
 								BucketName:                    "prepalert-infomation",
 								ObjectKeyPrefix:               generics.Ptr("alerts/"),
-								ObjectKeyTemplateString:       generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/{{ .Alert.ID }}.txt"),
+								ObjectKeyTemplateString:       generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/"),
 								ViewerBaseURLString:           "http://localhost:8080",
 								ViewerGoogleClientID:          generics.Ptr(""),
 								ViewerGoogleClientSecret:      generics.Ptr(""),
