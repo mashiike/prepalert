@@ -37,6 +37,13 @@ var commonTemplateFuncMap = template.FuncMap{
 		return time.Unix(seconds, 0)
 
 	},
+	"add_time": func(d string, t time.Time) (time.Time, error) {
+		duration, err := time.ParseDuration(d)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return t.Add(duration), nil
+	},
 	"strftime": func(layout string, t time.Time) string {
 		return Strftime(layout, time.Local, t)
 	},
