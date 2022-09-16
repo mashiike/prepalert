@@ -26,7 +26,7 @@ require (
 	github.com/mackerelio/mackerel-client-go v0.21.2
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
-	github.com/mashiike/ls3viewer v0.1.4
+	github.com/mashiike/ls3viewer v0.2.0
 	github.com/mattn/go-isatty v0.0.16
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.28.0

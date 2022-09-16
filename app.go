@@ -80,7 +80,13 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 			viewerOptFns = append(viewerOptFns, ls3viewer.WithBasicAuth(app.auth.ClientID, app.auth.ClientSecret))
 		}
 		if backend.EnableGoogleAuth() {
-			viewerOptFns = append(viewerOptFns, ls3viewer.WithGoogleOIDC(*backend.ViewerGoogleClientID, *backend.ViewerGoogleClientSecret, backend.ViewerSessionEncryptKey))
+			viewerOptFns = append(viewerOptFns, ls3viewer.WithGoogleOIDC(
+				*backend.ViewerGoogleClientID,
+				*backend.ViewerGoogleClientSecret,
+				backend.ViewerSessionEncryptKey,
+				backend.Allowed,
+				backend.Denied,
+			))
 		}
 		h, err := ls3viewer.New(backend.BucketName, *backend.ObjectKeyPrefix, viewerOptFns...)
 		if err != nil {
