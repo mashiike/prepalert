@@ -20,6 +20,7 @@ import (
 	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/samber/lo"
 )
 
 func init() {
@@ -71,6 +72,9 @@ func RestrictQueryBlock(body hcl.Body) hcl.Diagnostics {
 			},
 			{
 				Name: "log_group_names",
+			},
+			{
+				Name: "ignore_fields",
 			},
 		},
 	}
@@ -140,27 +144,13 @@ type PreparedQuery struct {
 	Limit       *int32  `hcl:"limit"`
 
 	LogGroupName  *string  `hcl:"log_group_name"`
-	LogGroupNames []string `hcl:"log_group_names"`
+	LogGroupNames []string `hcl:"log_group_names,optional"`
+	IgnoreFields  []string `hcl:"ignore_fields,optional"`
 
 	queryTemplate     *template.Template
 	startTimeTemplate *template.Template
 	endTimeTemplate   *template.Template
 }
-
-type QueryCSVBlock struct {
-	AllowQuotedRecordDelimiter *bool   `hcl:"allow_quoted_record_delimiter"`
-	FileHeaderInfo             *string `hcl:"file_header_info"`
-	FieldDelimiter             *string `hcl:"field_delimiter"`
-	QuoteCharacter             *string `hcl:"quote_character"`
-	QuoteEscapeCharacter       *string `hcl:"quote_escape_character"`
-	RecordDelimiter            *string `hcl:"record_delimiter"`
-}
-
-type QueryJSONBlock struct {
-	Type string `hcl:"type"`
-}
-
-type QueryParquetBlock struct{}
 
 func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.PreparedQuery, hcl.Diagnostics) {
 	log.Printf("[debug] prepare `%s` with cloudwatch_logs_insights query_runner", name)
@@ -255,10 +245,10 @@ func (q *PreparedQuery) Run(ctx context.Context, data interface{}) (*queryrunner
 		LogGroupName:  q.LogGroupName,
 		LogGroupNames: q.LogGroupNames,
 	}
-	return q.runner.RunQuery(ctx, q.name, params)
+	return q.runner.RunQuery(ctx, q.name, params, q.IgnoreFields)
 }
 
-func (r *QueryRunner) RunQuery(ctx context.Context, name string, params *cloudwatchlogs.StartQueryInput) (*queryrunner.QueryResult, error) {
+func (r *QueryRunner) RunQuery(ctx context.Context, name string, params *cloudwatchlogs.StartQueryInput, ignoreFields []string) (*queryrunner.QueryResult, error) {
 	reqID := "-"
 	hctx, ok := queryrunner.GetQueryRunningContext(ctx)
 	if ok {
@@ -294,9 +284,13 @@ func (r *QueryRunner) RunQuery(ctx context.Context, name string, params *cloudwa
 	)
 	columnsMap := make(map[string]int)
 	rowsMap := make([]map[string]interface{}, 0, len(getQueryResultOutput.Results))
+	ignoreFields = append([]string{"@ptr"}, ignoreFields...)
 	for _, results := range getQueryResultOutput.Results {
 		row := make(map[string]interface{}, len(results))
 		for _, result := range results {
+			if lo.Contains(ignoreFields, *result.Field) {
+				continue
+			}
 			if _, ok := columnsMap[*result.Field]; !ok {
 				columnsMap[*result.Field] = len(columnsMap)
 			}
