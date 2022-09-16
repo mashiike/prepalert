@@ -187,10 +187,13 @@ func NewQueryResultWithRowsMap(name, query string, columnsMap map[string]int, ro
 	return queryResults
 }
 
-func (qr *QueryResult) ToTable() string {
+func (qr *QueryResult) ToTable(optFns ...func(*tablewriter.Table)) string {
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 	table.SetHeader(qr.Columns)
+	for _, optFn := range optFns {
+		optFn(table)
+	}
 	table.AppendBulk(qr.Rows)
 	table.Render()
 	return buf.String()
