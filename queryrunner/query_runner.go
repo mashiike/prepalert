@@ -140,10 +140,6 @@ func NewQueryResult(name string, query string, columns []string, rows [][]string
 }
 
 func NewQueryResultWithJSONLines(name string, query string, lines [][]byte) *QueryResult {
-	queryResults := &QueryResult{
-		Name:  name,
-		Query: query,
-	}
 	columnsMap := make(map[string]int)
 	rowsMap := make([]map[string]interface{}, 0, len(lines))
 	for _, line := range lines {
@@ -159,6 +155,14 @@ func NewQueryResultWithJSONLines(name string, query string, lines [][]byte) *Que
 		} else {
 			log.Println("[warn] unmarshal err", err)
 		}
+	}
+	return NewQueryResultWithRowsMap(name, query, columnsMap, rowsMap)
+}
+
+func NewQueryResultWithRowsMap(name, query string, columnsMap map[string]int, rowsMap []map[string]interface{}) *QueryResult {
+	queryResults := &QueryResult{
+		Name:  name,
+		Query: query,
 	}
 	columnsEntries := lo.Entries(columnsMap)
 	sort.Slice(columnsEntries, func(i, j int) bool {
@@ -183,10 +187,13 @@ func NewQueryResultWithJSONLines(name string, query string, lines [][]byte) *Que
 	return queryResults
 }
 
-func (qr *QueryResult) ToTable() string {
+func (qr *QueryResult) ToTable(optFns ...func(*tablewriter.Table)) string {
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 	table.SetHeader(qr.Columns)
+	for _, optFn := range optFns {
+		optFn(table)
+	}
 	table.AppendBulk(qr.Rows)
 	table.Render()
 	return buf.String()

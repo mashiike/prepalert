@@ -7,6 +7,7 @@ import (
 
 	"github.com/lestrrat-go/strftime"
 	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/olekukonko/tablewriter"
 )
 
 func StrftimeInZone(layout string, zone string, t time.Time) string {
@@ -37,6 +38,13 @@ var commonTemplateFuncMap = template.FuncMap{
 		return time.Unix(seconds, 0)
 
 	},
+	"add_time": func(d string, t time.Time) (time.Time, error) {
+		duration, err := time.ParseDuration(d)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return t.Add(duration), nil
+	},
 	"strftime": func(layout string, t time.Time) string {
 		return Strftime(layout, time.Local, t)
 	},
@@ -49,6 +57,27 @@ func init() {
 	InfomationTemplateFuncMap = template.FuncMap{
 		"to_table": func(qr *queryrunner.QueryResult) string {
 			return qr.ToTable()
+		},
+		"to_markdown_table": func(qr *queryrunner.QueryResult) string {
+			return qr.ToTable(
+				func(table *tablewriter.Table) {
+					table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+					table.SetCenterSeparator("|")
+					table.SetAutoFormatHeaders(false)
+					table.SetAutoWrapText(false)
+				},
+			)
+		},
+		"to_borderless_table": func(qr *queryrunner.QueryResult) string {
+			return qr.ToTable(
+				func(table *tablewriter.Table) {
+					table.SetCenterSeparator(" ")
+					table.SetAutoFormatHeaders(false)
+					table.SetAutoWrapText(false)
+					table.SetBorder(false)
+					table.SetColumnSeparator(" ")
+				},
+			)
 		},
 		"to_vertical": func(qr *queryrunner.QueryResult) string {
 			return qr.ToVertical()
