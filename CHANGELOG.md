@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.6.0](https://github.com/mashiike/prepalert/compare/v0.5.2...v0.6.0) - 2022-09-16
+- Feature/cloudwatch insights queryrunner by @mashiike in https://github.com/mashiike/prepalert/pull/34
+
 ## [v0.5.2](https://github.com/mashiike/prepalert/compare/v0.5.1...v0.5.2) - 2022-09-15
 
 ## [v0.5.1](https://github.com/mashiike/prepalert/compare/v0.5.0...v0.5.1) - 2022-09-15
