@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.6.1](https://github.com/mashiike/prepalert/compare/v0.6.0...v0.6.1) - 2022-09-16
+- Feature/docs query runner by @mashiike in https://github.com/mashiike/prepalert/pull/36
+- update ls3viewer by @mashiike in https://github.com/mashiike/prepalert/pull/38
+
 ## [v0.6.0](https://github.com/mashiike/prepalert/compare/v0.5.2...v0.6.0) - 2022-09-16
 - Feature/cloudwatch insights queryrunner by @mashiike in https://github.com/mashiike/prepalert/pull/34
 
