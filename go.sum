@@ -293,6 +293,8 @@ github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5 h1:OcRkYg6xkpG4N1ST3
 github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5/go.mod h1:ZyXINwEFX31eiYdyWNxmT3/UQIKEjYEjpa1Q9w4Dnbw=
 github.com/mashiike/ls3viewer v0.1.4 h1:bBHcJ+6/5ODXSwsRkYFkFa43qgYuW4vQl5A/q3AvMhw=
 github.com/mashiike/ls3viewer v0.1.4/go.mod h1:lCEcq1/Wv2q8NaZXDGERGu6ceqSa0L0MPd+hFm7rImU=
+github.com/mashiike/ls3viewer v0.2.0 h1:7cNLnfIoDIip13aaSCPtSjXux/JyltqEuRab7h7jigA=
+github.com/mashiike/ls3viewer v0.2.0/go.mod h1:lCEcq1/Wv2q8NaZXDGERGu6ceqSa0L0MPd+hFm7rImU=
 github.com/mattn/go-colorable v0.1.9 h1:sqDoxXbdeALODt0DAeJCVp38ps9ZogZEAXjus69YV3U=
 github.com/mattn/go-colorable v0.1.9/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=
 github.com/mattn/go-encoding v0.0.2 h1:OC1L+QXLJge9n7yIE3R5Os/UNasUeFvK3Sa4NjbDi6c=

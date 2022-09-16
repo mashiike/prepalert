@@ -143,13 +143,15 @@ func (b *AuthBlock) IsEmpty() bool {
 }
 
 type S3BackendBlock struct {
-	BucketName                    string  `hcl:"bucket_name"`
-	ObjectKeyPrefix               *string `hcl:"object_key_prefix"`
-	ObjectKeyTemplateString       *string `hcl:"object_key_template"`
-	ViewerBaseURLString           string  `hcl:"viewer_base_url"`
-	ViewerGoogleClientID          *string `hcl:"viewer_google_client_id"`
-	ViewerGoogleClientSecret      *string `hcl:"viewer_google_client_secret"`
-	ViewerSessionEncryptKeyString *string `hcl:"viewer_session_encrypt_key"`
+	BucketName                    string   `hcl:"bucket_name"`
+	ObjectKeyPrefix               *string  `hcl:"object_key_prefix"`
+	ObjectKeyTemplateString       *string  `hcl:"object_key_template"`
+	ViewerBaseURLString           string   `hcl:"viewer_base_url"`
+	ViewerGoogleClientID          *string  `hcl:"viewer_google_client_id"`
+	ViewerGoogleClientSecret      *string  `hcl:"viewer_google_client_secret"`
+	ViewerSessionEncryptKeyString *string  `hcl:"viewer_session_encrypt_key"`
+	Allowed                       []string `hcl:"allowed,optional"`
+	Denied                        []string `hcl:"denied,optional"`
 
 	ObjectKeyTemplate       *template.Template
 	ViewerBaseURL           *url.URL
@@ -181,6 +183,12 @@ func restrictS3BackendBlock(body hcl.Body) hcl.Diagnostics {
 			},
 			{
 				Name: "viewer_session_encrypt_key",
+			},
+			{
+				Name: "allowed",
+			},
+			{
+				Name: "denied",
 			},
 		},
 	}
