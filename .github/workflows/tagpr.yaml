@@ -10,28 +10,13 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v3
-      - uses: Songmu/tagpr@main
-      - name: Checkout main
-        uses: actions/checkout@v3
-        with:
-          ref: main
-      - name: check released version
-        id: version_check
-        continue-on-error: true
-        run: |
-          version=$(git describe --tags)
-          echo ::set-output name=version::$version
+      - id: tagpr
+        uses: Songmu/tagpr@main
       - name: Adding summary
-        run: echo '### ${{steps.version_check.outputs.version}}' >> $GITHUB_STEP_SUMMARY
-        if: ${{ steps.version_check.outcome == 'success' }}
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19
-        if: ${{ steps.version_check.outcome == 'success' }}
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v1
-        with:
-          version: latest
-          args: release
-        if: ${{ steps.version_check.outcome == 'success' }}
+        run: echo '### ${{steps.tagpr.outputs.tag}}' >> $GITHUB_STEP_SUMMARY
+        if: ${{ steps.tagpr.outputs.tag != '' }}
+    - uses: ./.github/actions/release
+      with:
+        tag: ${{ steps.tagpr.outputs.tag }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+      if: ${{ steps.tagpr.outputs.tag != '' }}
