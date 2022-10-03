@@ -28,7 +28,7 @@ type Rule struct {
 
 func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 	var name string
-	var anyAlert bool
+	var anyAlert, onClosed, onOpened bool
 	if cfg.Alert.MonitorID != nil {
 		m, err := client.GetMonitor(*cfg.Alert.MonitorID)
 		if err != nil {
@@ -42,6 +42,14 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 	if cfg.Alert.Any != nil {
 		anyAlert = *cfg.Alert.Any
 	}
+	if cfg.Alert.OnOpened != nil {
+		onOpened = *cfg.Alert.OnOpened
+	}
+	if cfg.Alert.OnClosed != nil {
+		onClosed = *cfg.Alert.OnClosed
+	} else {
+		onClosed = true
+	}
 	queries := make([]queryrunner.PreparedQuery, 0, len(cfg.Queries))
 	for _, query := range cfg.Queries {
 		queries = append(queries, query)
@@ -54,8 +62,8 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		ruleName:     cfg.Name,
 		monitorName:  name,
 		anyAlert:     anyAlert,
-		onClosed:     *cfg.Alert.OnClosed,
-		onOpened:     *cfg.Alert.OnOpened,
+		onOpened:     onOpened,
+		onClosed:     onClosed,
 		queries:      queries,
 		infoTamplate: infoTemplate,
 		params:       cfg.Params,
