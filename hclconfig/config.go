@@ -2,19 +2,21 @@ package hclconfig
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/mashiike/hclconfig"
+	"github.com/mashiike/prepalert/queryrunner"
 )
 
 type Config struct {
-	Prepalert    PrepalertBlock    `hcl:"prepalert,block"`
-	Rules        RuleBlocks        `hcl:"rule,block"`
-	QueryRunners QueryRunnerBlocks `hcl:"query_runner,block"`
-	Queries      QueryBlocks       `hcl:"query,block"`
+	Prepalert PrepalertBlock
+	Rules     RuleBlocks
+	Queries   queryrunner.PreparedQueries
 }
 
-func restrict(body hcl.Body) hcl.Diagnostics {
+func (cfg *Config) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
+	queries, body, diags := queryrunner.DecodeBody(body, ctx)
+	cfg.Queries = queries
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
@@ -24,87 +26,25 @@ func restrict(body hcl.Body) hcl.Diagnostics {
 				Type:       "rule",
 				LabelNames: []string{"name"},
 			},
-			{
-				Type:       "query_runner",
-				LabelNames: []string{"type", "name"},
-			},
-			{
-				Type:       "query",
-				LabelNames: []string{"name"},
-			},
 		},
 	}
-	content, diags := body.Content(schema)
-	queryNames := make(map[string]*hcl.Range, 0)
-	queryRunnerNames := make(map[string]map[string]*hcl.Range, 0)
+	content, contentDiags := body.Content(schema)
+	diags = append(diags, contentDiags...)
+	diags = append(diags, hclconfig.RestrictOnlyOneBlock(content, "prepalert")...)
+	diags = append(diags, hclconfig.RestrictUniqueBlockLabels(content)...)
+
 	for _, block := range content.Blocks {
 		switch block.Type {
 		case "prepalert":
-			restrictDiags := restrictPrepalertBlock(block.Body)
-			diags = append(diags, restrictDiags...)
+			diags = append(diags, cfg.Prepalert.DecodeBody(block.Body, ctx)...)
 		case "rule":
-			restrictDiags := restrictRuleBlock(block.Body)
-			diags = append(diags, restrictDiags...)
-
-		case "query_runner":
-			if len(block.Labels) != 2 {
-				continue
+			rule := &RuleBlock{
+				Name: block.Labels[0],
 			}
-
-			t := block.Labels[0]
-			name := block.Labels[1]
-			runners, ok := queryRunnerNames[t]
-			if !ok {
-				queryRunnerNames[t] = make(map[string]*hcl.Range, 1)
-				queryRunnerNames[t][name] = block.DefRange.Ptr()
-				continue
-			}
-			if r, ok := runners[name]; ok {
-				diags = append(diags, &hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  `Duplicate "query_runner" name`,
-					Detail:   fmt.Sprintf(`A query runner named "%s" in group "%s" was already declared at %s. Query runner names must unique`, name, t, r.String()),
-					Subject:  block.DefRange.Ptr(),
-				})
-			}
-			runners[name] = block.DefRange.Ptr()
-			restrictDiags := restrictQueryRunnerBlock(block.Body, block.Labels[0])
-			diags = append(diags, restrictDiags...)
-		case "query":
-			if len(block.Labels) != 1 {
-				continue
-			}
-			name := block.Labels[0]
-			if r, ok := queryNames[name]; ok {
-				diags = append(diags, &hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  `Duplicate "query" name`,
-					Detail:   fmt.Sprintf(`A query named "%s" was already declared at %s. Query names must unique`, name, r.String()),
-					Subject:  block.DefRange.Ptr(),
-				})
-			}
-			queryNames[name] = block.DefRange.Ptr()
-			restrictDiags := restrictQueryBlock(block.Body)
-			diags = append(diags, restrictDiags...)
+			diags = append(diags, rule.DecodeBody(block.Body, ctx, cfg.Queries)...)
+			cfg.Rules = append(cfg.Rules, rule)
 		}
 	}
-	return diags
-}
-
-func (cfg *Config) build(ctx *hcl.EvalContext) hcl.Diagnostics {
-	diags := cfg.Prepalert.build(ctx)
-	if diags.HasErrors() {
-		return diags
-	}
-	diags = append(diags, cfg.QueryRunners.build(ctx)...)
-	if diags.HasErrors() {
-		return diags
-	}
-	diags = append(diags, cfg.Queries.build(ctx, cfg.QueryRunners)...)
-	if diags.HasErrors() {
-		return diags
-	}
-	diags = append(diags, cfg.Rules.build(ctx, cfg.Queries)...)
 	return diags
 }
 

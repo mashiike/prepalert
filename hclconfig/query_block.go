@@ -9,26 +9,21 @@ import (
 )
 
 type QueryBlock struct {
-	Name       string         `hcl:"name,label"`
-	RunnerExpr hcl.Expression `hcl:"runner"`
-	Remain     hcl.Body       `hcl:",remain"`
-
-	Impl queryrunner.PreparedQuery
+	Name   string
+	Runner queryrunner.QueryRunner
+	Impl   queryrunner.PreparedQuery
 }
 
-func restrictQueryBlock(body hcl.Body) hcl.Diagnostics {
+func (b *QueryBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queryRunners QueryRunnerBlocks) hcl.Diagnostics {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
-			{
-				Name: "name",
-			},
 			{
 				Name:     "runner",
 				Required: true,
 			},
 		},
 	}
-	content, partialBody, diags := body.PartialContent(schema)
+	content, remain, diags := body.PartialContent(schema)
 	for _, attr := range content.Attributes {
 		switch attr.Name {
 		case "runner":
@@ -62,49 +57,36 @@ func restrictQueryBlock(body hcl.Body) hcl.Diagnostics {
 				})
 				continue
 			}
+			nameAttr, err := GetTraversalAttr(variables[0], "query_runner", 2)
+			if err != nil {
+				log.Printf("[debug] get traversal attr failed, expression on %s: %v", variables[0].SourceRange().String(), err)
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Invalid Relation",
+					Detail:   `query.runner depends on "qurey_runner" block, please write as runner = "query_runner.type.name"`,
+					Subject:  variables[0].SourceRange().Ptr(),
+				})
+				continue
+			}
 			log.Printf("[debug] try runner type `%s` restriction", typeAttr.Name)
-			diags = append(diags, queryrunner.RestrictQueryBlock(typeAttr.Name, partialBody)...)
+			queryRunner, ok := queryRunners.Get(typeAttr.Name, nameAttr.Name)
+			if !ok {
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Invalid Relation",
+					Detail:   fmt.Sprintf("query_runner `%s.%s` is not found", typeAttr.Name, nameAttr.Name),
+					Subject:  variables[0].SourceRange().Ptr(),
+				})
+				continue
+			}
+			b.Runner = queryRunner.Impl
 		}
 	}
-	return diags
-}
+	if diags.HasErrors() {
+		return diags
+	}
 
-func (b *QueryBlock) build(ctx *hcl.EvalContext, queryRunners QueryRunnerBlocks) hcl.Diagnostics {
-	var diags hcl.Diagnostics
-	variables := b.RunnerExpr.Variables()
-	typeAttr, err := GetTraversalAttr(variables[0], "query_runner", 1)
-	if err != nil {
-		log.Printf("[debug] get traversal attr failed, expression on %s: %v", variables[0].SourceRange().String(), err)
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid Relation",
-			Detail:   `query.runner depends on "qurey_runner" block, please write as runner = "query_runner.type.name"`,
-			Subject:  variables[0].SourceRange().Ptr(),
-		})
-		return diags
-	}
-	nameAttr, err := GetTraversalAttr(variables[0], "query_runner", 2)
-	if err != nil {
-		log.Printf("[debug] get traversal attr failed, expression on %s: %v", variables[0].SourceRange().String(), err)
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid Relation",
-			Detail:   `query.runner depends on "qurey_runner" block, please write as runner = "query_runner.type.name"`,
-			Subject:  variables[0].SourceRange().Ptr(),
-		})
-		return diags
-	}
-	queryRunner, ok := queryRunners.Get(typeAttr.Name, nameAttr.Name)
-	if !ok {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid Relation",
-			Detail:   fmt.Sprintf("query_runner `%s.%s` is not found", typeAttr.Name, nameAttr.Name),
-			Subject:  variables[0].SourceRange().Ptr(),
-		})
-		return diags
-	}
-	preparedQuery, prepareDiags := queryRunner.Impl.Prepare(b.Name, b.Remain, ctx)
+	preparedQuery, prepareDiags := b.Runner.Prepare(b.Name, remain, ctx)
 	diags = append(diags, prepareDiags...)
 	b.Impl = preparedQuery
 	return diags
@@ -119,12 +101,4 @@ func (blocks QueryBlocks) Get(name string) (*QueryBlock, bool) {
 		}
 	}
 	return nil, false
-}
-
-func (blocks QueryBlocks) build(ctx *hcl.EvalContext, queryRunners QueryRunnerBlocks) hcl.Diagnostics {
-	var diags hcl.Diagnostics
-	for _, query := range blocks {
-		diags = append(diags, query.build(ctx, queryRunners)...)
-	}
-	return diags
 }

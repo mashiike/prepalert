@@ -19,19 +19,46 @@ import (
 var queryRunners = make(map[string]*QueryRunnerDefinition)
 
 type QueryRunnerDefinition struct {
-	TypeName                     string
-	RestrictQueryRunnerBlockFunc func(body hcl.Body) hcl.Diagnostics
-	RestrictQueryBlockFunc       func(body hcl.Body) hcl.Diagnostics
-	BuildQueryRunnerFunc         func(name string, body hcl.Body, ctx *hcl.EvalContext) (QueryRunner, hcl.Diagnostics)
+	TypeName             string
+	BuildQueryRunnerFunc func(name string, body hcl.Body, ctx *hcl.EvalContext) (QueryRunner, hcl.Diagnostics)
 }
 
 type QueryRunner interface {
+	Name() string
+	Type() string
 	Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) (PreparedQuery, hcl.Diagnostics)
+}
+
+type QueryRunners []QueryRunner
+
+func (runners QueryRunners) Get(queryRunnerType string, name string) (QueryRunner, bool) {
+	for _, runner := range runners {
+		if runner.Type() != queryRunnerType {
+			continue
+		}
+		if runner.Name() != name {
+			continue
+		}
+		return runner, true
+	}
+	return nil, false
 }
 
 type PreparedQuery interface {
 	Name() string
 	Run(ctx context.Context, data interface{}) (*QueryResult, error)
+}
+
+type PreparedQueries []PreparedQuery
+
+func (queries PreparedQueries) Get(name string) (PreparedQuery, bool) {
+	for _, query := range queries {
+		if query.Name() != name {
+			continue
+		}
+		return query, true
+	}
+	return nil, false
 }
 
 func Register(def *QueryRunnerDefinition) error {
@@ -40,12 +67,6 @@ func Register(def *QueryRunnerDefinition) error {
 	}
 	if def.TypeName == "" {
 		return errors.New("TypeName is required")
-	}
-	if def.RestrictQueryRunnerBlockFunc == nil {
-		return errors.New("RestrictQueryRunnerBlockFunc is required")
-	}
-	if def.RestrictQueryBlockFunc == nil {
-		return errors.New("RestrictQueryBlockFunc is required")
 	}
 	if def.BuildQueryRunnerFunc == nil {
 		return errors.New("BuildQueryRunnerFunc is required")
@@ -80,26 +101,6 @@ func getQueryRunner(queryRunnerType string, body hcl.Body) (*QueryRunnerDefiniti
 		})
 	}
 	return def, nil
-}
-
-func RestrictQueryRunnerBlock(queryRunnerType string, body hcl.Body) hcl.Diagnostics {
-	def, diags := getQueryRunner(queryRunnerType, body)
-	if diags.HasErrors() {
-		return diags
-	}
-	log.Printf("[debug] restrict query_runner with def type  %s", def.TypeName)
-	diags = append(diags, def.RestrictQueryRunnerBlockFunc(body)...)
-	return diags
-}
-
-func RestrictQueryBlock(queryRunnerType string, body hcl.Body) hcl.Diagnostics {
-	def, diags := getQueryRunner(queryRunnerType, body)
-	if diags.HasErrors() {
-		return diags
-	}
-	log.Printf("[debug] restrict query with def type  %s", def.TypeName)
-	diags = append(diags, def.RestrictQueryBlockFunc(body)...)
-	return diags
 }
 
 func NewQueryRunner(queryRunnerType string, name string, body hcl.Body, ctx *hcl.EvalContext) (QueryRunner, hcl.Diagnostics) {

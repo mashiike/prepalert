@@ -9,23 +9,21 @@ import (
 
 	gv "github.com/hashicorp/go-version"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/internal/generics"
-	"github.com/zclconf/go-cty/cty"
-	"github.com/zclconf/go-cty/cty/convert"
 )
 
 type PrepalertBlock struct {
-	RequiredVersionExpr hcl.Expression `hcl:"required_version"`
-	versionConstraints  gv.Constraints
+	versionConstraints gv.Constraints
 
-	SQSQueueName string          `hcl:"sqs_queue_name"`
-	Service      string          `hcl:"service"`
-	Auth         *AuthBlock      `hcl:"auth,block"`
-	S3Backend    *S3BackendBlock `hcl:"s3_backend,block"`
+	SQSQueueName string
+	Service      string
+	Auth         *AuthBlock
+	S3Backend    *S3BackendBlock
 }
 
-func restrictPrepalertBlock(body hcl.Body) hcl.Diagnostics {
+func (b *PrepalertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
@@ -50,64 +48,45 @@ func restrictPrepalertBlock(body hcl.Body) hcl.Diagnostics {
 		},
 	}
 	content, diags := body.Content(schema)
-	for _, block := range content.Blocks {
-		if block.Type == "s3_backend" {
-			diags = append(diags, restrictS3BackendBlock(block.Body)...)
-		}
-	}
-	return diags
-}
-
-func (b *PrepalertBlock) build(ctx *hcl.EvalContext) hcl.Diagnostics {
-	value, diags := b.RequiredVersionExpr.Value(ctx)
+	diags = append(diags, hclconfig.RestrictOnlyOneBlock(content, "auth", "s3_backend")...)
 	if diags.HasErrors() {
 		return diags
 	}
-	var err error
-	value, err = convert.Convert(value, cty.String)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid required_version format",
-			Detail:   fmt.Sprintf("can not decode as string: %v", err.Error()),
-			Subject:  b.RequiredVersionExpr.Range().Ptr(),
-		})
-		return diags
+	for key, attr := range content.Attributes {
+		switch key {
+		case "required_version":
+			var str string
+			decodeDiags := hclconfig.DecodeExpression(attr.Expr, ctx, &str)
+			if !decodeDiags.HasErrors() && str != "" {
+				constraints, err := gv.NewConstraint(str)
+				if err != nil {
+					decodeDiags = append(decodeDiags, &hcl.Diagnostic{
+						Severity: hcl.DiagError,
+						Summary:  "Invalid version constraint format",
+						Detail:   err.Error(),
+						Subject:  attr.Range.Ptr(),
+					})
+				}
+				b.versionConstraints = constraints
+			}
+			diags = append(diags, decodeDiags...)
+		case "sqs_queue_name":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.SQSQueueName)...)
+		case "service":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Service)...)
+		}
 	}
-
-	if value.IsNull() {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid required_version format",
-			Detail:   "required_version is nil",
-			Subject:  b.RequiredVersionExpr.Range().Ptr(),
-		})
-		return diags
-	}
-
-	if !value.IsKnown() {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid required_version format",
-			Detail:   "value is not known",
-			Subject:  b.RequiredVersionExpr.Range().Ptr(),
-		})
-		return diags
-	}
-	constraints, err := gv.NewConstraint(value.AsString())
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid version constraint format",
-			Detail:   err.Error(),
-			Subject:  b.RequiredVersionExpr.Range().Ptr(),
-		})
-		return diags
-	}
-	b.versionConstraints = constraints
-
-	if b.S3Backend != nil {
-		diags = append(diags, b.S3Backend.build(ctx)...)
+	for _, block := range content.Blocks {
+		switch block.Type {
+		case "s3_backend":
+			var s3Backend S3BackendBlock
+			diags = append(diags, hclconfig.DecodeBody(block.Body, ctx, &s3Backend)...)
+			b.S3Backend = &s3Backend
+		case "auth":
+			var auth AuthBlock
+			diags = append(diags, hclconfig.DecodeBody(block.Body, ctx, &auth)...)
+			b.Auth = &auth
+		}
 	}
 	return diags
 }
@@ -143,23 +122,22 @@ func (b *AuthBlock) IsEmpty() bool {
 }
 
 type S3BackendBlock struct {
-	BucketName                    string   `hcl:"bucket_name"`
-	ObjectKeyPrefix               *string  `hcl:"object_key_prefix"`
-	ObjectKeyTemplateString       *string  `hcl:"object_key_template"`
-	ViewerBaseURLString           string   `hcl:"viewer_base_url"`
-	ViewerGoogleClientID          *string  `hcl:"viewer_google_client_id"`
-	ViewerGoogleClientSecret      *string  `hcl:"viewer_google_client_secret"`
-	ViewerSessionEncryptKeyString *string  `hcl:"viewer_session_encrypt_key"`
-	Allowed                       []string `hcl:"allowed,optional"`
-	Denied                        []string `hcl:"denied,optional"`
+	BucketName                    string
+	ObjectKeyPrefix               *string
+	ObjectKeyTemplateString       *string
+	ViewerBaseURLString           string
+	ViewerGoogleClientID          *string
+	ViewerGoogleClientSecret      *string
+	ViewerSessionEncryptKeyString *string
+	Allowed                       []string
+	Denied                        []string
 
 	ObjectKeyTemplate       *template.Template
 	ViewerBaseURL           *url.URL
-	Remain                  hcl.Body `hcl:",remain"`
 	ViewerSessionEncryptKey []byte
 }
 
-func restrictS3BackendBlock(body hcl.Body) hcl.Diagnostics {
+func (b *S3BackendBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
@@ -173,7 +151,8 @@ func restrictS3BackendBlock(body hcl.Body) hcl.Diagnostics {
 				Name: "object_key_template",
 			},
 			{
-				Name: "viewer_base_url",
+				Name:     "viewer_base_url",
+				Required: true,
 			},
 			{
 				Name: "viewer_google_client_id",
@@ -192,72 +171,105 @@ func restrictS3BackendBlock(body hcl.Body) hcl.Diagnostics {
 			},
 		},
 	}
-	_, diags := body.Content(schema)
-	return diags
-}
-
-func (b *S3BackendBlock) build(ctx *hcl.EvalContext) hcl.Diagnostics {
+	content, diags := body.Content(schema)
+	if diags.HasErrors() {
+		return diags
+	}
+	objectKeyTemplateRange := content.MissingItemRange.Ptr()
+	for key, attr := range content.Attributes {
+		switch key {
+		case "bucket_name":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.BucketName)...)
+		case "object_key_prefix":
+			var str string
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
+			str = strings.TrimPrefix(str, "/")
+			b.ObjectKeyPrefix = &str
+		case "object_key_template":
+			var str string
+			objectKeyTemplateRange = attr.Range.Ptr()
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
+			b.ObjectKeyTemplateString = &str
+		case "viewer_base_url":
+			var str string
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
+			if diags.HasErrors() {
+				continue
+			}
+			b.ViewerBaseURLString = str
+			u, err := url.Parse(str)
+			if err != nil {
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Invalid viewer_base_url format",
+					Detail:   fmt.Sprintf("can not parse as url : %v", err.Error()),
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
+			if u.Scheme != "http" && u.Scheme != "https" {
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Invalid viewer_base_url format",
+					Detail:   "must scheme http/https",
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
+			b.ViewerBaseURL = u
+		case "viewer_google_client_id":
+			var str string
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
+			b.ViewerGoogleClientID = &str
+		case "viewer_google_client_secret":
+			var str string
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
+			b.ViewerGoogleClientSecret = &str
+		case "viewer_session_encrypt_key":
+			var str string
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
+			b.ViewerSessionEncryptKeyString = &str
+			b.ViewerSessionEncryptKey = []byte(str)
+			keyLen := len(b.ViewerSessionEncryptKey)
+			if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Invalid viewer authentication",
+					Detail:   "viewer_session_encrypt_key lengths should be 16, 24, or 32",
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
+		case "allowed":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Allowed)...)
+		case "denied":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Denied)...)
+		}
+	}
 	if b.ObjectKeyPrefix == nil {
 		b.ObjectKeyPrefix = generics.Ptr("prepalert/")
-	} else {
-		*b.ObjectKeyPrefix = strings.TrimPrefix(*b.ObjectKeyPrefix, "/")
 	}
 	if b.ObjectKeyTemplateString == nil {
 		b.ObjectKeyTemplateString = generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/")
 	}
 	tmpl, err := template.New("object_key_template").Funcs(funcs.QueryTemplateFuncMap).Parse(*b.ObjectKeyTemplateString)
-	var diags hcl.Diagnostics
 	if err != nil {
 		diags = append(diags, &hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  "Invalid object_key_template format",
 			Detail:   fmt.Sprintf("can not parse as go template : %v", err.Error()),
-			Subject:  b.Remain.MissingItemRange().Ptr(),
+			Subject:  objectKeyTemplateRange,
 		})
 	}
 	b.ObjectKeyTemplate = tmpl
-	u, err := url.Parse(b.ViewerBaseURLString)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid viewer_base_url format",
-			Detail:   fmt.Sprintf("can not parse as url : %v", err.Error()),
-			Subject:  b.Remain.MissingItemRange().Ptr(),
-		})
-		return diags
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid viewer_base_url format",
-			Detail:   "must scheme http/https",
-			Subject:  b.Remain.MissingItemRange().Ptr(),
-		})
-		return diags
-	}
-	b.ViewerBaseURL = u
-	if b.ViewerGoogleClientID != nil || b.ViewerGoogleClientSecret != nil || b.ViewerSessionEncryptKeyString != nil {
-		if b.ViewerGoogleClientID == nil || b.ViewerGoogleClientSecret == nil || b.ViewerSessionEncryptKeyString == nil {
+	if b.ViewerGoogleClientID != nil || b.ViewerGoogleClientSecret != nil || b.ViewerSessionEncryptKey != nil {
+		if b.ViewerGoogleClientID == nil || b.ViewerGoogleClientSecret == nil || b.ViewerSessionEncryptKey == nil {
 			diags = append(diags, &hcl.Diagnostic{
 				Severity: hcl.DiagError,
 				Summary:  "Invalid viewer authentication",
 				Detail:   "If you want to set Google authentication for a viewer, in that case you need all of viewer_google_client_id, viewer_google_client_secret, and viewer_session_encrypt_key",
-				Subject:  b.Remain.MissingItemRange().Ptr(),
+				Subject:  content.MissingItemRange.Ptr(),
 			})
-			return diags
-		}
-	}
-	if b.ViewerSessionEncryptKeyString != nil {
-		b.ViewerSessionEncryptKey = []byte(*b.ViewerSessionEncryptKeyString)
-		keyLen := len(b.ViewerSessionEncryptKey)
-		if keyLen != 16 && keyLen != 24 && keyLen != 32 {
-			diags = append(diags, &hcl.Diagnostic{
-				Severity: hcl.DiagError,
-				Summary:  "Invalid viewer authentication",
-				Detail:   "viewer_session_encrypt_key lengths should be 16, 24, or 32",
-				Subject:  b.Remain.MissingItemRange().Ptr(),
-			})
-			return diags
 		}
 	}
 	return diags
