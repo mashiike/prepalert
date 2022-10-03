@@ -6,7 +6,7 @@ require (
 	github.com/Songmu/flextime v0.1.0
 	github.com/agext/levenshtein v1.2.3
 	github.com/aws/aws-lambda-go v1.34.1
-	github.com/aws/aws-sdk-go-v2 v1.16.15
+	github.com/aws/aws-sdk-go-v2 v1.16.16
 	github.com/aws/aws-sdk-go-v2/config v1.17.5
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.31
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.15.19
