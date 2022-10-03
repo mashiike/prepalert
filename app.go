@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -240,27 +241,34 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 		return err
 	}
 	log.Printf("[info][%d] hendle webhook id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
-	if body.Alert.IsOpen {
-		log.Printf("[info][%d] alert is not closed, skip nothing todo id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
-		return nil
-	}
 	ctx = app.WithQueryRunningContext(ctx, reqID, message)
 	return app.ProcessRules(ctx, &body)
 }
 func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
+	reqID := "-"
+	info, ok := queryrunner.GetQueryRunningContext(ctx)
+	if ok {
+		reqID = fmt.Sprintf("%d", info.ReqID)
+	}
+	if body.Alert.IsOpen {
+		log.Printf("[when][%s] alert is not closed, fill closed at now time id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
+		body.Alert.ClosedAt = flextime.Now().Unix()
+	}
 	matchCount := 0
 	for _, rule := range app.rules {
 		if !rule.Match(body) {
 			continue
 		}
-		log.Printf("[info] match rule `%s`", rule.Name())
+		log.Printf("[info][%s] match rule `%s`", reqID, rule.Name())
 		matchCount++
 		if err := app.ProcessRule(ctx, rule, body); err != nil {
 			return fmt.Errorf("failed process Mackerel webhook body:%s: %w", rule.Name(), err)
 		}
 	}
 	if matchCount == 0 {
-		log.Printf("[info] no match rules")
+		log.Printf("[info][%s] no match rules", reqID)
+	} else {
+		log.Printf("[info][%s] %d rules match", reqID, matchCount)
 	}
 	return nil
 }

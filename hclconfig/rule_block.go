@@ -105,6 +105,8 @@ type AlertBlock struct {
 	MonitorID   *string
 	MonitorName *string
 	Any         *bool
+	OnOpened    *bool
+	OnClosed    *bool
 }
 
 func (b *AlertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
@@ -118,6 +120,12 @@ func (b *AlertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnos
 			},
 			{
 				Name: "any",
+			},
+			{
+				Name: "on_opened",
+			},
+			{
+				Name: "on_closed",
 			},
 		},
 	}
@@ -136,6 +144,14 @@ func (b *AlertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnos
 			var any bool
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &any)...)
 			b.Any = &any
+		case "on_opened":
+			var flag bool
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &flag)...)
+			b.OnOpened = &flag
+		case "on_closed":
+			var flag bool
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &flag)...)
+			b.OnClosed = &flag
 		}
 	}
 	return diags

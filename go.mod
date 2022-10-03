@@ -34,7 +34,6 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.16.3
 	github.com/zclconf/go-cty v1.11.0
-	github.com/zclconf/go-cty-yaml v1.0.2
 	golang.org/x/sync v0.0.0-20220907140024-f12130a52804
 )
 
@@ -77,6 +76,7 @@ require (
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/thanhpk/randstr v1.0.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
+	github.com/zclconf/go-cty-yaml v1.0.2 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
