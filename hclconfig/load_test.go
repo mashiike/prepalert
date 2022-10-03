@@ -22,7 +22,6 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 		cmpopts.IgnoreUnexported(PrepalertBlock{}, redshiftdata.QueryRunner{}, redshiftdata.PreparedQuery{}),
 		cmpopts.IgnoreFields(Config{}, "Queries"),
 		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr", "Queries"),
-		cmpopts.IgnoreFields(QueryBlock{}, "Runner"),
 		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey"),
 		cmpopts.EquateEmpty(),
 	)
