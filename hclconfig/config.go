@@ -6,15 +6,22 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type Config struct {
+	Locals    cty.Value
 	Prepalert PrepalertBlock
 	Rules     RuleBlocks
 	Queries   queryrunner.PreparedQueries
 }
 
 func (cfg *Config) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
+	if locals, ok := ctx.Variables["local"]; ok {
+		cfg.Locals = locals
+	} else {
+		cfg.Locals = cty.NilVal
+	}
 	queries, body, diags := queryrunner.DecodeBody(body, ctx)
 	cfg.Queries = queries
 	schema := &hcl.BodySchema{
