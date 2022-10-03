@@ -23,12 +23,12 @@ import (
 	"github.com/samber/lo"
 )
 
+const TypeName = "cloudwatch_logs_insights"
+
 func init() {
 	err := queryrunner.Register(&queryrunner.QueryRunnerDefinition{
-		TypeName:                     "cloudwatch_logs_insights",
-		RestrictQueryRunnerBlockFunc: RestrictQueryRunnerBlock,
-		RestrictQueryBlockFunc:       RestrictQueryBlock,
-		BuildQueryRunnerFunc:         BuildQueryRunner,
+		TypeName:             TypeName,
+		BuildQueryRunnerFunc: BuildQueryRunner,
 	})
 	if err != nil {
 		panic(fmt.Errorf("register cloudwatch_logs_insights query runner:%w", err))
@@ -36,53 +36,75 @@ func init() {
 	log.Println("[info] load cloudwatch_logs_insights query runner")
 }
 
-func RestrictQueryRunnerBlock(body hcl.Body) hcl.Diagnostics {
-	log.Println("[debug] start cloudwatch_logs_insights query_runner block restriction, on", body.MissingItemRange().String())
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{
-				Name: "region",
-			},
-		},
+func BuildQueryRunner(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.QueryRunner, hcl.Diagnostics) {
+	queryRunner := &QueryRunner{
+		name: name,
 	}
-	_, diags := body.Content(schema)
-	log.Printf("[debug] end cloudwatch_logs_insights query_runner block %d error diags", len(diags.Errs()))
-	return diags
+	diags := gohcl.DecodeBody(body, ctx, queryRunner)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	optFns := make([]func(*config.LoadOptions) error, 0)
+	if queryRunner.Region != nil {
+		optFns = append(optFns, config.WithRegion(*queryRunner.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(context.Background(), optFns...)
+	if err != nil {
+
+		return nil, diags
+	}
+	queryRunner.client = cloudwatchlogs.NewFromConfig(awsCfg)
+	return queryRunner, diags
 }
 
-func RestrictQueryBlock(body hcl.Body) hcl.Diagnostics {
-	log.Println("[debug] start cloudwatch_logs_insights query block restriction, on", body.MissingItemRange().String())
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{
-				Name: "start_time",
-			},
-			{
-				Name: "end_time",
-			},
-			{
-				Name:     "query",
-				Required: true,
-			},
-			{
-				Name: "limit",
-			},
-			{
-				Name: "log_group_name",
-			},
-			{
-				Name: "log_group_names",
-			},
-			{
-				Name: "ignore_fields",
-			},
-		},
+func (r *QueryRunner) Name() string {
+	return r.name
+}
+
+func (r *QueryRunner) Type() string {
+	return TypeName
+}
+
+type QueryRunner struct {
+	client *cloudwatchlogs.Client
+	name   string
+	Region *string `hcl:"region"`
+}
+
+type PreparedQuery struct {
+	name   string
+	runner *QueryRunner
+
+	StartTime   *string `hcl:"start_time"`
+	EndTime     *string `hcl:"end_time"`
+	QueryString string  `hcl:"query"`
+	Limit       *int32  `hcl:"limit"`
+
+	LogGroupName  *string  `hcl:"log_group_name"`
+	LogGroupNames []string `hcl:"log_group_names,optional"`
+	IgnoreFields  []string `hcl:"ignore_fields,optional"`
+
+	queryTemplate     *template.Template
+	startTimeTemplate *template.Template
+	endTimeTemplate   *template.Template
+
+	Attrs hcl.Attributes `hcl:",body"`
+}
+
+func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.PreparedQuery, hcl.Diagnostics) {
+	log.Printf("[debug] prepare `%s` with cloudwatch_logs_insights query_runner", name)
+	q := &PreparedQuery{
+		name:   name,
+		runner: r,
+	}
+	diags := gohcl.DecodeBody(body, ctx, q)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
-	content, diags := body.Content(schema)
 	log.Printf("[debug] end cloudwatch_logs_insights query block %d error diags", len(diags.Errs()))
 	var logGroupNameRange, logGroupNamesRange *hcl.Range
-	for _, attr := range content.Attributes {
+	for _, attr := range q.Attrs {
 		switch attr.Name {
 		case "log_group_name":
 			logGroupNameRange = attr.Range.Ptr()
@@ -106,62 +128,7 @@ func RestrictQueryBlock(body hcl.Body) hcl.Diagnostics {
 			Subject:  body.MissingItemRange().Ptr(),
 		})
 	}
-	return diags
-}
 
-func BuildQueryRunner(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.QueryRunner, hcl.Diagnostics) {
-	queryRunner := &QueryRunner{}
-	diags := gohcl.DecodeBody(body, ctx, queryRunner)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-	optFns := make([]func(*config.LoadOptions) error, 0)
-	if queryRunner.Region != nil {
-		optFns = append(optFns, config.WithRegion(*queryRunner.Region))
-	}
-	awsCfg, err := config.LoadDefaultConfig(context.Background(), optFns...)
-	if err != nil {
-
-		return nil, diags
-	}
-	queryRunner.client = cloudwatchlogs.NewFromConfig(awsCfg)
-	return queryRunner, diags
-}
-
-type QueryRunner struct {
-	client *cloudwatchlogs.Client
-
-	Region *string `hcl:"region"`
-}
-
-type PreparedQuery struct {
-	name   string
-	runner *QueryRunner
-
-	StartTime   *string `hcl:"start_time"`
-	EndTime     *string `hcl:"end_time"`
-	QueryString string  `hcl:"query"`
-	Limit       *int32  `hcl:"limit"`
-
-	LogGroupName  *string  `hcl:"log_group_name"`
-	LogGroupNames []string `hcl:"log_group_names,optional"`
-	IgnoreFields  []string `hcl:"ignore_fields,optional"`
-
-	queryTemplate     *template.Template
-	startTimeTemplate *template.Template
-	endTimeTemplate   *template.Template
-}
-
-func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.PreparedQuery, hcl.Diagnostics) {
-	log.Printf("[debug] prepare `%s` with cloudwatch_logs_insights query_runner", name)
-	q := &PreparedQuery{
-		name:   name,
-		runner: r,
-	}
-	diags := gohcl.DecodeBody(body, ctx, q)
-	if diags.HasErrors() {
-		return nil, diags
-	}
 	if q.QueryString == "" {
 		diags = append(diags, &hcl.Diagnostic{
 			Severity: hcl.DiagError,

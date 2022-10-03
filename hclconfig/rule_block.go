@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
+	"github.com/mashiike/prepalert/queryrunner"
 )
 
 type RuleBlock struct {
@@ -16,10 +17,10 @@ type RuleBlock struct {
 	Infomation  string
 
 	Params  interface{}
-	Queries map[string]*QueryBlock
+	Queries map[string]queryrunner.PreparedQuery
 }
 
-func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries QueryBlocks) hcl.Diagnostics {
+func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries queryrunner.PreparedQueries) hcl.Diagnostics {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
@@ -64,7 +65,7 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries Quer
 		switch key {
 		case "queries":
 			variables := attr.Expr.Variables()
-			b.Queries = make(map[string]*QueryBlock, len(variables))
+			b.Queries = make(map[string]queryrunner.PreparedQuery, len(variables))
 			for _, variable := range variables {
 				attr, err := GetTraversalAttr(variable, "query", 1)
 				if err != nil {
@@ -87,7 +88,7 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries Quer
 					})
 					continue
 				}
-				b.Queries[query.Name] = query
+				b.Queries[query.Name()] = query
 			}
 		case "infomation":
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Infomation)...)

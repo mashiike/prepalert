@@ -42,7 +42,7 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 	}
 	queries := make([]queryrunner.PreparedQuery, 0, len(cfg.Queries))
 	for _, query := range cfg.Queries {
-		queries = append(queries, query.Impl)
+		queries = append(queries, query)
 	}
 	infoTemplate, err := template.New("info_template").Funcs(funcs.InfomationTemplateFuncMap).Parse(cfg.Infomation)
 	if err != nil {

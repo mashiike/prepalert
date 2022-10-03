@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
+	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/mashiike/prepalert/queryrunner/redshiftdata"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +21,7 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 		cfg1, cfg2,
 		cmpopts.IgnoreUnexported(PrepalertBlock{}, redshiftdata.QueryRunner{}, redshiftdata.PreparedQuery{}),
 		cmpopts.IgnoreFields(Config{}, "Queries"),
-		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr"),
+		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr", "Queries"),
 		cmpopts.IgnoreFields(QueryBlock{}, "Runner"),
 		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey"),
 		cmpopts.EquateEmpty(),
@@ -65,7 +66,7 @@ func TestLoadNoError(t *testing.T) {
 								Alert: AlertBlock{
 									Any: generics.Ptr(true),
 								},
-								Queries:    make(map[string]*QueryBlock),
+								Queries:    make(map[string]queryrunner.PreparedQuery),
 								Infomation: "How do you respond to alerts?\nDescribe information about your alert response here.\n",
 							},
 						},
@@ -84,30 +85,14 @@ func TestLoadNoError(t *testing.T) {
 							SQSQueueName: "prepalert",
 							Service:      "prod",
 						},
-						QueryRunners: []*QueryRunnerBlock{
-							{
-								Type: "redshift_data",
-								Name: "default",
-								Impl: &redshiftdata.QueryRunner{
-									ClusterIdentifier: generics.Ptr("warehouse"),
-									Database:          generics.Ptr("dev"),
-									DbUser:            generics.Ptr("admin"),
-								},
-							},
-						},
 						Rules: []*RuleBlock{
 							{
 								Name: "alb_target_5xx",
 								Alert: AlertBlock{
 									MonitorName: generics.Ptr("ALB Target 5xx"),
 								},
-								Queries: map[string]*QueryBlock{
-									"alb_target_5xx_info": {
-										Name: "alb_target_5xx_info",
-										Impl: &redshiftdata.PreparedQuery{
-											SQL: "SELECT *\nFROM access_logs\nLIMIT 1\n",
-										},
-									},
+								Queries: map[string]queryrunner.PreparedQuery{
+									"alb_target_5xx_info": nil,
 								},
 								Params: map[string]interface{}{
 									"hoge":    "hoge",
@@ -132,30 +117,14 @@ func TestLoadNoError(t *testing.T) {
 							Service:      os.Getenv("TEST_ENV"),
 							Auth:         &AuthBlock{},
 						},
-						QueryRunners: []*QueryRunnerBlock{
-							{
-								Type: "redshift_data",
-								Name: "default",
-								Impl: &redshiftdata.QueryRunner{
-									ClusterIdentifier: generics.Ptr(os.Getenv("TEST_CLUSTER")),
-									Database:          generics.Ptr(os.Getenv("TEST_ENV")),
-									DbUser:            generics.Ptr("admin"),
-								},
-							},
-						},
 						Rules: []*RuleBlock{
 							{
 								Name: "alb_target_5xx",
 								Alert: AlertBlock{
 									MonitorName: generics.Ptr("ALB Target 5xx"),
 								},
-								Queries: map[string]*QueryBlock{
-									"alb_target_5xx_info": {
-										Name: "alb_target_5xx_info",
-										Impl: &redshiftdata.PreparedQuery{
-											SQL: "SELECT\n    path, count(*) as cnt\nFROM access_log\nWHERE access_at\n    BETWEEN 'epoch'::TIMESTAMP + interval '{{ .Alert.OpenedAt }} seconds'\n    AND 'epoch'::TIMESTAMP + interval '{{ .Alert.ClosedAt }} seconds'\nGROUP BY 1\n",
-										},
-									},
+								Queries: map[string]queryrunner.PreparedQuery{
+									"alb_target_5xx_info": nil,
 								},
 								Infomation: "5xx info:\n{{ index .QueryResults `alb_target_5xx_info` | to_table }}\n",
 							},
@@ -198,7 +167,7 @@ func TestLoadNoError(t *testing.T) {
 								Alert: AlertBlock{
 									Any: generics.Ptr(true),
 								},
-								Queries:    make(map[string]*QueryBlock),
+								Queries:    make(map[string]queryrunner.PreparedQuery),
 								Infomation: "How do you respond to alerts?\nDescribe information about your alert response here.\n",
 							},
 						},

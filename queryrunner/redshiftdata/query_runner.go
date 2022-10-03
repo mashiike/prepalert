@@ -20,12 +20,12 @@ import (
 	"github.com/samber/lo"
 )
 
+const TypeName = "redshift_data"
+
 func init() {
 	err := queryrunner.Register(&queryrunner.QueryRunnerDefinition{
-		TypeName:                     "redshift_data",
-		RestrictQueryRunnerBlockFunc: RestrictQueryRunnerBlock,
-		RestrictQueryBlockFunc:       RestrictQueryBlock,
-		BuildQueryRunnerFunc:         BuildQueryRunner,
+		TypeName:             TypeName,
+		BuildQueryRunnerFunc: BuildQueryRunner,
 	})
 	if err != nil {
 		panic(fmt.Errorf("register redshfit_data query runner:%w", err))
@@ -33,30 +33,28 @@ func init() {
 	log.Println("[info] load redshift_data query runner")
 }
 
-func RestrictQueryRunnerBlock(body hcl.Body) hcl.Diagnostics {
-	log.Println("[debug] start redshit_data query_runner block restriction, on", body.MissingItemRange().String())
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{
-				Name: "cluster_identifier",
-			},
-			{
-				Name: "database",
-			},
-			{
-				Name: "db_user",
-			},
-			{
-				Name: "workgroup_name",
-			},
-			{
-				Name: "secrets_arn",
-			},
-		},
+func BuildQueryRunner(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.QueryRunner, hcl.Diagnostics) {
+	var diags hcl.Diagnostics
+	awsCfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		diags = append(diags, &hcl.Diagnostic{
+
+			Severity: hcl.DiagError,
+			Summary:  "initialize aws client",
+			Detail:   fmt.Sprintf("failed load aws default config:%v", err),
+			Subject:  body.MissingItemRange().Ptr(),
+		})
+		return nil, diags
 	}
-	content, diags := body.Content(schema)
+	client := redshiftdata.NewFromConfig(awsCfg)
+	queryRunner := &QueryRunner{
+		client: client,
+		name:   name,
+	}
+	decodeDiags := gohcl.DecodeBody(body, ctx, queryRunner)
+	diags = append(diags, decodeDiags...)
 	var cluster, db, dbUser, wgName, secrets bool
-	for _, attr := range content.Attributes {
+	for _, attr := range queryRunner.Attrs {
 		switch attr.Name {
 		case "cluster_identifier":
 			cluster = true
@@ -80,77 +78,51 @@ func RestrictQueryRunnerBlock(body hcl.Body) hcl.Diagnostics {
 		if cluster || db || dbUser || wgName {
 			log.Printf("[debug] secrets_arn is specified, but other attributes are also specified. at %s", body.MissingItemRange().String())
 			diags = append(diags, diag)
-			return diags
+			return nil, diags
 		}
-		return diags
+		return queryRunner, diags
 	}
 	if cluster && db && dbUser {
 		if secrets || wgName {
 			log.Printf("[debug] cluster_identifier, database, db_user is specified, but other attributes are also specified. at %s", body.MissingItemRange().String())
 			diags = append(diags, diag)
-			return diags
+			return nil, diags
 		}
-		return diags
+		return queryRunner, diags
 	}
 	if db && wgName {
 		if secrets || cluster || dbUser {
 			log.Printf("[debug] workgroup_name, database is specified, but other attributes are also specified. at %s", body.MissingItemRange().String())
 			diags = append(diags, diag)
-			return diags
+			return nil, diags
 		}
-		return diags
+		return queryRunner, diags
 	}
 	log.Printf("[debug] no valid or other combination is specified. at %s", body.MissingItemRange().String())
 	diags = append(diags, diag)
 	log.Printf("[debug] end redshit_data query_runner block %d error diags", len(diags.Errs()))
-	return diags
-}
-
-func RestrictQueryBlock(body hcl.Body) hcl.Diagnostics {
-	log.Println("[debug] start redshit_data query block restriction, on", body.MissingItemRange().String())
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{
-				Name:     "sql",
-				Required: true,
-			},
-		},
-	}
-	_, diags := body.Content(schema)
-	log.Printf("[debug] end redshit_data query block %d error diags", len(diags.Errs()))
-	return diags
-}
-
-func BuildQueryRunner(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.QueryRunner, hcl.Diagnostics) {
-	var diags hcl.Diagnostics
-	awsCfg, err := config.LoadDefaultConfig(context.Background())
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-
-			Severity: hcl.DiagError,
-			Summary:  "initialize aws client",
-			Detail:   fmt.Sprintf("failed load aws default config:%v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	client := redshiftdata.NewFromConfig(awsCfg)
-	queryRunner := &QueryRunner{
-		client: client,
-	}
-	decodeDiags := gohcl.DecodeBody(body, ctx, queryRunner)
-	diags = append(diags, decodeDiags...)
-	return queryRunner, diags
+	return nil, diags
 }
 
 type QueryRunner struct {
 	client *redshiftdata.Client
+	name   string
 
 	ClusterIdentifier *string `hcl:"cluster_identifier"`
 	Database          *string `hcl:"database"`
 	DbUser            *string `hcl:"db_user"`
 	WorkgroupName     *string `hcl:"workgroup_name"`
 	SecretsARN        *string `hcl:"secrets_arn"`
+
+	Attrs hcl.Attributes `hcl:",body"`
+}
+
+func (r *QueryRunner) Name() string {
+	return r.name
+}
+
+func (r *QueryRunner) Type() string {
+	return TypeName
 }
 
 type PreparedQuery struct {

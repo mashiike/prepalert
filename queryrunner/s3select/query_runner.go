@@ -24,12 +24,12 @@ import (
 	"github.com/samber/lo"
 )
 
+const TypeName = "s3_select"
+
 func init() {
 	err := queryrunner.Register(&queryrunner.QueryRunnerDefinition{
-		TypeName:                     "s3_select",
-		RestrictQueryRunnerBlockFunc: RestrictQueryRunnerBlock,
-		RestrictQueryBlockFunc:       RestrictQueryBlock,
-		BuildQueryRunnerFunc:         BuildQueryRunner,
+		TypeName:             TypeName,
+		BuildQueryRunnerFunc: BuildQueryRunner,
 	})
 	if err != nil {
 		panic(fmt.Errorf("register s3_select query runner:%w", err))
@@ -37,82 +37,10 @@ func init() {
 	log.Println("[info] load s3_select query runner")
 }
 
-func RestrictQueryRunnerBlock(body hcl.Body) hcl.Diagnostics {
-	log.Println("[debug] start s3_select query_runner block restriction, on", body.MissingItemRange().String())
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{
-				Name: "region",
-			},
-		},
-	}
-	_, diags := body.Content(schema)
-	log.Printf("[debug] end s3_select query_runner block %d error diags", len(diags.Errs()))
-	return diags
-}
-
-func RestrictQueryBlock(body hcl.Body) hcl.Diagnostics {
-	log.Println("[debug] start s3_select query block restriction, on", body.MissingItemRange().String())
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{
-				Name:     "expression",
-				Required: true,
-			},
-			{
-				Name:     "bucket_name",
-				Required: true,
-			},
-			{
-				Name:     "object_key_prefix",
-				Required: true,
-			},
-			{
-				Name: "object_key_suffix",
-			},
-			{
-				Name: "scan_limit",
-			},
-			{
-				Name:     "compression_type",
-				Required: true,
-			},
-		},
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type: "csv",
-			},
-			{
-				Type: "json",
-			},
-			{
-				Type: "parquet",
-			},
-		},
-	}
-	content, diags := body.Content(schema)
-	log.Printf("[debug] end s3_select query block %d error diags", len(diags.Errs()))
-	if len(content.Blocks) == 0 {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Require input serialization",
-			Detail:   "Input serialization are required: csv, json or parquet block must be inserted.",
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-	}
-	if len(content.Blocks) > 1 {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid input serialization",
-			Detail:   "Only one csv, json or parquet block can be defined",
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-	}
-	return diags
-}
-
 func BuildQueryRunner(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.QueryRunner, hcl.Diagnostics) {
-	queryRunner := &QueryRunner{}
+	queryRunner := &QueryRunner{
+		name: name,
+	}
 	diags := gohcl.DecodeBody(body, ctx, queryRunner)
 	if diags.HasErrors() {
 		return nil, diags
@@ -137,8 +65,17 @@ func BuildQueryRunner(name string, body hcl.Body, ctx *hcl.EvalContext) (queryru
 
 type QueryRunner struct {
 	client *s3.Client
+	name   string
 
 	Region *string `hcl:"region"`
+}
+
+func (r *QueryRunner) Name() string {
+	return r.name
+}
+
+func (r *QueryRunner) Type() string {
+	return TypeName
 }
 
 type PreparedQuery struct {
@@ -265,7 +202,10 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 	q.inputSerialization = &types.InputSerialization{
 		CompressionType: compressionType,
 	}
+
+	blockCount := 0
 	if q.CSVBlock != nil {
+		blockCount++
 		if q.CSVBlock.AllowQuotedRecordDelimiter == nil {
 			q.CSVBlock.AllowQuotedRecordDelimiter = generics.Ptr(false)
 		}
@@ -306,6 +246,7 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 		}
 	}
 	if q.JSONBlock != nil {
+		blockCount++
 		var jsonType types.JSONType
 		jsonTypes := jsonType.Values()
 		for _, t := range jsonTypes {
@@ -334,7 +275,24 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 		}
 	}
 	if q.ParquetBlock != nil {
+		blockCount++
 		q.inputSerialization.Parquet = &types.ParquetInput{}
+	}
+	if blockCount == 0 {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Require input serialization",
+			Detail:   "Input serialization are required: csv, json or parquet block must be inserted.",
+			Subject:  body.MissingItemRange().Ptr(),
+		})
+	}
+	if blockCount > 1 {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid input serialization",
+			Detail:   "Only one csv, json or parquet block can be defined",
+			Subject:  body.MissingItemRange().Ptr(),
+		})
 	}
 	return q, diags
 }
