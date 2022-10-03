@@ -8,9 +8,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner/redshiftdata"
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,11 +20,9 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 		cfg1, cfg2,
 		cmpopts.IgnoreUnexported(PrepalertBlock{}, redshiftdata.QueryRunner{}, redshiftdata.PreparedQuery{}),
 		cmpopts.IgnoreFields(Config{}, "Queries"),
-		cmpopts.IgnoreFields(PrepalertBlock{}, "RequiredVersionExpr"),
 		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr"),
-		cmpopts.IgnoreFields(QueryBlock{}, "RunnerExpr", "Remain"),
-		cmpopts.IgnoreFields(QueryRunnerBlock{}, "Remain"),
-		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey", "Remain"),
+		cmpopts.IgnoreFields(QueryBlock{}, "Runner"),
+		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey"),
 		cmpopts.EquateEmpty(),
 	)
 	if diff != "" {
@@ -211,13 +209,13 @@ func TestLoadNoError(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.casename, func(t *testing.T) {
-			cfg, _, diags := load(c.path, "current")
-			if diags.HasErrors() {
-				for _, diag := range diags {
+			cfg, err := Load(c.path, "current", func(loader *hclconfig.Loader) {
+				loader.DiagnosticWriter(hclconfig.DiagnosticWriterFunc(func(diag *hcl.Diagnostic) error {
 					t.Log(diagnosticToString(diag))
-				}
-				require.FailNow(t, "diagnostics should no has error ")
-			}
+					return nil
+				}))
+			})
+			require.NoError(t, err)
 			if c.check != nil {
 				c.check(t, cfg)
 			}
@@ -235,7 +233,7 @@ func TestLoadError(t *testing.T) {
 			casename: "required_version is invalid",
 			path:     "testdata/invalid_required_version_format",
 			expected: []string{
-				"testdata/invalid_required_version_format/config.hcl:2,24-40: Invalid version constraint format; Malformed constraint: invalid format",
+				"testdata/invalid_required_version_format/config.hcl:2,5-40: Invalid version constraint format; Malformed constraint: invalid format",
 			},
 		},
 		{
@@ -256,8 +254,8 @@ func TestLoadError(t *testing.T) {
 			casename: "duplicate blocks",
 			path:     "testdata/duplicate",
 			expected: []string{
-				"testdata/duplicate/config.hcl:12,1-39: Duplicate \"query_runner\" name; A query runner named \"default\" in group \"redshift_data\" was already declared at testdata/duplicate/config.hcl:7,1-39. Query runner names must unique",
-				"testdata/duplicate/config.hcl:25,1-28: Duplicate \"query\" name; A query named \"alb_target_5xx_info\" was already declared at testdata/duplicate/config.hcl:16,1-28. Query names must unique",
+				"testdata/duplicate/config.hcl:12,1-39: Duplicate query_runner \"redshift_data\" configuration; A redshift_data query_runner named \"default\" was already declared at testdata/duplicate/config.hcl:7,1-39. query_runner names must unique per type in a configuration",
+				"testdata/duplicate/config.hcl:25,1-28: Duplicate query declaration; A query named \"alb_target_5xx_info\" was already declared at testdata/duplicate/config.hcl:16,1-28. query names must unique within a configuration",
 			},
 		},
 		{
@@ -271,11 +269,15 @@ func TestLoadError(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.casename, func(t *testing.T) {
-			_, _, diags := load(c.path, "current")
-			require.True(t, diags.HasErrors())
-			require.ElementsMatch(t, c.expected, lo.Map(diags, func(diag *hcl.Diagnostic, _ int) string {
-				return diagnosticToString(diag)
-			}))
+			actual := make([]string, 0, len(c.expected))
+			_, err := Load(c.path, "current", func(loader *hclconfig.Loader) {
+				loader.DiagnosticWriter(hclconfig.DiagnosticWriterFunc(func(diag *hcl.Diagnostic) error {
+					actual = append(actual, diagnosticToString(diag))
+					return nil
+				}))
+			})
+			require.Error(t, err)
+			require.ElementsMatch(t, c.expected, actual)
 		})
 	}
 }
