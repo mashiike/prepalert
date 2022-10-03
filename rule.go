@@ -19,8 +19,8 @@ type Rule struct {
 	ruleName     string
 	monitorName  string
 	anyAlert     bool
-	whenClosed   bool
-	whenOpened   bool
+	onClosed     bool
+	onOpened     bool
 	queries      []queryrunner.PreparedQuery
 	infoTamplate *template.Template
 	params       interface{}
@@ -54,8 +54,8 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		ruleName:     cfg.Name,
 		monitorName:  name,
 		anyAlert:     anyAlert,
-		whenClosed:   *cfg.Alert.WhenClosed,
-		whenOpened:   *cfg.Alert.WhenOpened,
+		onClosed:     *cfg.Alert.OnClosed,
+		onOpened:     *cfg.Alert.OnOpened,
 		queries:      queries,
 		infoTamplate: infoTemplate,
 		params:       cfg.Params,
@@ -66,6 +66,15 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 func (rule *Rule) Match(body *WebhookBody) bool {
 	if rule.anyAlert {
 		return true
+	}
+	if body.Alert.IsOpen {
+		if !rule.onOpened {
+			return false
+		}
+	} else {
+		if !rule.onClosed {
+			return false
+		}
 	}
 	return body.Alert.MonitorName == rule.monitorName
 }
