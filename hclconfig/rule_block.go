@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
+	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner"
 )
 
@@ -105,6 +106,8 @@ type AlertBlock struct {
 	MonitorID   *string
 	MonitorName *string
 	Any         *bool
+	WhenOpened  *bool
+	WhenClosed  *bool
 }
 
 func (b *AlertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
@@ -118,6 +121,12 @@ func (b *AlertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnos
 			},
 			{
 				Name: "any",
+			},
+			{
+				Name: "when_opened",
+			},
+			{
+				Name: "when_closed",
 			},
 		},
 	}
@@ -136,7 +145,21 @@ func (b *AlertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnos
 			var any bool
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &any)...)
 			b.Any = &any
+		case "when_opened":
+			var flag bool
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &flag)...)
+			b.WhenOpened = &flag
+		case "when_closed":
+			var flag bool
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &flag)...)
+			b.WhenClosed = &flag
 		}
+	}
+	if b.WhenOpened == nil {
+		b.WhenOpened = generics.Ptr(false)
+	}
+	if b.WhenClosed == nil {
+		b.WhenClosed = generics.Ptr(true)
 	}
 	return diags
 }

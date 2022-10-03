@@ -19,6 +19,8 @@ type Rule struct {
 	ruleName     string
 	monitorName  string
 	anyAlert     bool
+	whenClosed   bool
+	whenOpened   bool
 	queries      []queryrunner.PreparedQuery
 	infoTamplate *template.Template
 	params       interface{}
@@ -52,6 +54,8 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		ruleName:     cfg.Name,
 		monitorName:  name,
 		anyAlert:     anyAlert,
+		whenClosed:   *cfg.Alert.WhenClosed,
+		whenOpened:   *cfg.Alert.WhenOpened,
 		queries:      queries,
 		infoTamplate: infoTemplate,
 		params:       cfg.Params,
