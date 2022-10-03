@@ -6,7 +6,6 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
-	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner"
 )
 
@@ -154,12 +153,6 @@ func (b *AlertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnos
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &flag)...)
 			b.OnClosed = &flag
 		}
-	}
-	if b.OnOpened == nil {
-		b.OnOpened = generics.Ptr(false)
-	}
-	if b.OnClosed == nil {
-		b.OnClosed = generics.Ptr(true)
 	}
 	return diags
 }
