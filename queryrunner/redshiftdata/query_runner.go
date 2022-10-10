@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/redshiftdata/types"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/samber/lo"
 )
@@ -129,8 +127,7 @@ type PreparedQuery struct {
 	name   string
 	runner *QueryRunner
 
-	SQL           string `hcl:"sql"`
-	queryTemplate *template.Template
+	SQL hcl.Expression `hcl:"sql"`
 }
 
 func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.PreparedQuery, hcl.Diagnostics) {
@@ -143,26 +140,28 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	if q.SQL == "" {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid SQL template",
-			Detail:   "sql is empty",
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	queryTemplate, err := template.New(name).Funcs(funcs.QueryTemplateFuncMap).Parse(q.SQL)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid SQL template",
-			Detail:   fmt.Sprintf("parse sql as go template: %v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	q.queryTemplate = queryTemplate
+	/*
+		if q.SQL == "" {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Invalid SQL template",
+				Detail:   "sql is empty",
+				Subject:  body.MissingItemRange().Ptr(),
+			})
+			return nil, diags
+		}
+		queryTemplate, err := template.New(name).Funcs(funcs.QueryTemplateFuncMap).Parse(q.SQL)
+		if err != nil {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Invalid SQL template",
+				Detail:   fmt.Sprintf("parse sql as go template: %v", err),
+				Subject:  body.MissingItemRange().Ptr(),
+			})
+			return nil, diags
+		}
+		q.queryTemplate = queryTemplate
+	*/
 	return q, diags
 }
 
@@ -170,11 +169,12 @@ func (q *PreparedQuery) Name() string {
 	return q.name
 }
 
-func (q *PreparedQuery) Run(ctx context.Context, data interface{}) (*queryrunner.QueryResult, error) {
+func (q *PreparedQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*queryrunner.QueryResult, error) {
 	var buf bytes.Buffer
+	/*q.SQL.Value(evalCtx)
 	if err := q.queryTemplate.Execute(&buf, data); err != nil {
 		return nil, fmt.Errorf("execute query template:%w", err)
-	}
+	}*/
 	return q.runner.RunQuery(ctx, "prepalert-"+q.name, buf.String())
 }
 

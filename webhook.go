@@ -1,8 +1,8 @@
 package prepalert
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -184,12 +184,25 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	var showDetailsURL string
 	var abbreviatedMessage string = "\n..."
 	if app.EnableBackend() {
-		var buf bytes.Buffer
-		if err := app.backend.ObjectKeyTemplate.Execute(&buf, body); err != nil {
-			return fmt.Errorf("execute object key template: %w", err)
+		evalCtx := app.evalCtx.NewChild()
+		evalCtx.Variables = map[string]cty.Value{
+			"runtime": cty.ObjectVal(map[string]cty.Value{
+				"event": cty.ObjectVal(body.MarshalCTYValues()),
+			}),
 		}
-		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, buf.String(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
-		u := app.backend.ViewerBaseURL.JoinPath(buf.String(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
+		expr := *app.backend.ObjectKeyTemplate
+		objectKeyTemplateValue, diags := expr.Value(evalCtx)
+		if diags.HasErrors() {
+			return fmt.Errorf("eval object key template: %w", diags)
+		}
+		if objectKeyTemplateValue.Type() != cty.String {
+			return errors.New("object key template is not string")
+		}
+		if !objectKeyTemplateValue.IsKnown() {
+			return errors.New("object key template is unknown")
+		}
+		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
+		u := app.backend.ViewerBaseURL.JoinPath(objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
 		showDetailsURL = u.String()
 		if m := fmt.Sprintf("\nshow details: %s", showDetailsURL); len(m) < maxDescriptionSize-len(baseMessage) {
 			abbreviatedMessage = m

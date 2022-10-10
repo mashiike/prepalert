@@ -30,7 +30,7 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 		),
 		cmpopts.IgnoreFields(Config{}, "Queries", "EvalContext"),
 		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr", "Queries"),
-		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey"),
+		cmpopts.IgnoreFields(S3BackendBlock{}, "ViewerBaseURL", "ViewerSessionEncryptKey"),
 		cmpopts.IgnoreFields(hclsyntax.FunctionCallExpr{}, "NameRange", "OpenParenRange", "CloseParenRange"),
 		cmpopts.IgnoreFields(hclsyntax.LiteralValueExpr{}, "SrcRange"),
 		cmpopts.IgnoreFields(hclsyntax.TemplateExpr{}, "SrcRange"),
@@ -236,9 +236,49 @@ func TestLoadNoError(t *testing.T) {
 							SQSQueueName: "prepalert",
 							Service:      "prod",
 							S3Backend: &S3BackendBlock{
-								BucketName:                    "prepalert-infomation",
-								ObjectKeyPrefix:               generics.Ptr("alerts/"),
-								ObjectKeyTemplateString:       generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/"),
+								BucketName:      "prepalert-infomation",
+								ObjectKeyPrefix: generics.Ptr("alerts/"),
+								ObjectKeyTemplate: generics.Ptr(hcl.Expression(&hclsyntax.FunctionCallExpr{
+									Name: "strftime",
+									Args: []hclsyntax.Expression{
+										&hclsyntax.TemplateExpr{
+											Parts: []hclsyntax.Expression{
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("%"),
+												},
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("Y/"),
+												},
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("%"),
+												},
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("m/"),
+												},
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("%"),
+												},
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("d/"),
+												},
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("%"),
+												},
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("H/"),
+												},
+											},
+										},
+										&hclsyntax.ScopeTraversalExpr{
+											Traversal: hcl.Traversal{
+												hcl.TraverseRoot{Name: "runtime"},
+												hcl.TraverseAttr{Name: "event"},
+												hcl.TraverseAttr{Name: "alert"},
+												hcl.TraverseAttr{Name: "opened_at"},
+											},
+										},
+									},
+								})),
 								ViewerBaseURLString:           "http://localhost:8080",
 								ViewerGoogleClientID:          generics.Ptr(""),
 								ViewerGoogleClientSecret:      generics.Ptr(""),
@@ -343,10 +383,3 @@ func TestLoadError(t *testing.T) {
 		})
 	}
 }
-
-/*
-func parseExpression(t *testing.T, str string) hcl.Expression {
-	t.Helper()
-	hclsyntax.ParseExpression([]byte(str), "dummy.hcl", hcl.Init)
-}
-*/
