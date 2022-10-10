@@ -34,6 +34,6 @@ rule "alb_target_5xx" {
 
     infomation = <<EOT
 5xx info:
-{{ index .QueryResults `alb_target_5xx_info` | to_table }}
+${to_table(runtime.query_result.alb_target_5xx_info)}
 EOT
 }

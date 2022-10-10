@@ -8,22 +8,40 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/mashiike/prepalert/queryrunner/redshiftdata"
 	"github.com/stretchr/testify/require"
+	"github.com/zclconf/go-cty/cty"
 )
 
 func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 	t.Helper()
 	diff := cmp.Diff(
 		cfg1, cfg2,
-		cmpopts.IgnoreUnexported(PrepalertBlock{}, redshiftdata.QueryRunner{}, redshiftdata.PreparedQuery{}),
-		cmpopts.IgnoreFields(Config{}, "Queries"),
+		cmpopts.IgnoreUnexported(
+			PrepalertBlock{},
+			redshiftdata.QueryRunner{},
+			redshiftdata.PreparedQuery{},
+			hcl.TraverseRoot{},
+			hcl.TraverseAttr{},
+		),
+		cmpopts.IgnoreFields(Config{}, "Queries", "EvalContext"),
 		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr", "Queries"),
 		cmpopts.IgnoreFields(S3BackendBlock{}, "ObjectKeyTemplate", "ViewerBaseURL", "ViewerSessionEncryptKey"),
+		cmpopts.IgnoreFields(hclsyntax.FunctionCallExpr{}, "NameRange", "OpenParenRange", "CloseParenRange"),
+		cmpopts.IgnoreFields(hclsyntax.LiteralValueExpr{}, "SrcRange"),
+		cmpopts.IgnoreFields(hclsyntax.TemplateExpr{}, "SrcRange"),
+		cmpopts.IgnoreFields(hclsyntax.ScopeTraversalExpr{}, "SrcRange"),
+		cmpopts.IgnoreFields(hclsyntax.ObjectConsExpr{}, "SrcRange", "OpenRange"),
+		cmpopts.IgnoreFields(hcl.TraverseRoot{}, "SrcRange"),
+		cmpopts.IgnoreFields(hcl.TraverseAttr{}, "SrcRange"),
 		cmpopts.EquateEmpty(),
+		cmp.Comparer(func(x, y cty.Value) bool {
+			return x.GoString() == y.GoString()
+		}),
 	)
 	if diff != "" {
 		require.FailNow(t, diff)
@@ -65,8 +83,17 @@ func TestLoadNoError(t *testing.T) {
 								Alert: AlertBlock{
 									Any: generics.Ptr(true),
 								},
-								Queries:    make(map[string]queryrunner.PreparedQuery),
-								Infomation: "How do you respond to alerts?\nDescribe information about your alert response here.\n",
+								Queries: make(map[string]queryrunner.PreparedQuery),
+								Infomation: &hclsyntax.TemplateExpr{
+									Parts: []hclsyntax.Expression{
+										&hclsyntax.LiteralValueExpr{
+											Val: cty.StringVal("How do you respond to alerts?\n"),
+										},
+										&hclsyntax.LiteralValueExpr{
+											Val: cty.StringVal("Describe information about your alert response here.\n"),
+										},
+									},
+								},
 							},
 						},
 					}, cfg)
@@ -97,7 +124,28 @@ func TestLoadNoError(t *testing.T) {
 									"hoge":    "hoge",
 									"version": "current",
 								},
-								Infomation: "5xx info:\n{{ index .QueryResults `alb_target_5xx_info` | to_table }}\n",
+								Infomation: &hclsyntax.TemplateExpr{
+									Parts: []hclsyntax.Expression{
+										&hclsyntax.LiteralValueExpr{
+											Val: cty.StringVal("5xx info:\n"),
+										},
+										&hclsyntax.FunctionCallExpr{
+											Name: "to_table",
+											Args: []hclsyntax.Expression{
+												&hclsyntax.ScopeTraversalExpr{
+													Traversal: hcl.Traversal{
+														hcl.TraverseRoot{Name: "runtime"},
+														hcl.TraverseAttr{Name: "query_result"},
+														hcl.TraverseAttr{Name: "alb_target_5xx_info"},
+													},
+												},
+											},
+										},
+										&hclsyntax.LiteralValueExpr{
+											Val: cty.StringVal("\n"),
+										},
+									},
+								},
 							},
 						},
 					}, cfg)
@@ -125,14 +173,55 @@ func TestLoadNoError(t *testing.T) {
 								Queries: map[string]queryrunner.PreparedQuery{
 									"alb_target_5xx_info": nil,
 								},
-								Infomation: "5xx info:\n{{ index .QueryResults `alb_target_5xx_info` | to_table }}\n",
+								Infomation: &hclsyntax.FunctionCallExpr{
+									Name: "templatefile",
+									Args: []hclsyntax.Expression{
+										&hclsyntax.TemplateExpr{
+											Parts: []hclsyntax.Expression{
+												&hclsyntax.LiteralValueExpr{
+													Val: cty.StringVal("./infomation_template.txt"),
+												},
+											},
+										},
+										&hclsyntax.ObjectConsExpr{
+											Items: []hclsyntax.ObjectConsItem{
+												{
+													KeyExpr: &hclsyntax.ObjectConsKeyExpr{
+														Wrapped: &hclsyntax.ScopeTraversalExpr{
+															Traversal: hcl.Traversal{
+																hcl.TraverseRoot{Name: "runtime"},
+															},
+														},
+													},
+													ValueExpr: &hclsyntax.ScopeTraversalExpr{
+														Traversal: hcl.Traversal{
+															hcl.TraverseRoot{Name: "runtime"},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 							{
 								Name: "constant",
 								Alert: AlertBlock{
 									MonitorID: generics.Ptr("xxxxxxxxxxxx"),
 								},
-								Infomation: "prepalert: current",
+								Infomation: &hclsyntax.TemplateExpr{
+									Parts: []hclsyntax.Expression{
+										&hclsyntax.LiteralValueExpr{
+											Val: cty.StringVal("prepalert: "),
+										},
+										&hclsyntax.ScopeTraversalExpr{
+											Traversal: hcl.Traversal{
+												hcl.TraverseRoot{Name: "var"},
+												hcl.TraverseAttr{Name: "version"},
+											},
+										},
+									},
+								},
 							},
 						},
 					}, cfg)
@@ -166,8 +255,17 @@ func TestLoadNoError(t *testing.T) {
 								Alert: AlertBlock{
 									Any: generics.Ptr(true),
 								},
-								Queries:    make(map[string]queryrunner.PreparedQuery),
-								Infomation: "How do you respond to alerts?\nDescribe information about your alert response here.\n",
+								Queries: make(map[string]queryrunner.PreparedQuery),
+								Infomation: &hclsyntax.TemplateExpr{
+									Parts: []hclsyntax.Expression{
+										&hclsyntax.LiteralValueExpr{
+											Val: cty.StringVal("How do you respond to alerts?\n"),
+										},
+										&hclsyntax.LiteralValueExpr{
+											Val: cty.StringVal("Describe information about your alert response here.\n"),
+										},
+									},
+								},
 							},
 						},
 					}, cfg)
@@ -249,3 +347,10 @@ func TestLoadError(t *testing.T) {
 		})
 	}
 }
+
+/*
+func parseExpression(t *testing.T, str string) hcl.Expression {
+	t.Helper()
+	hclsyntax.ParseExpression([]byte(str), "dummy.hcl", hcl.Init)
+}
+*/

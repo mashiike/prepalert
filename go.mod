@@ -26,7 +26,7 @@ require (
 	github.com/mackerelio/mackerel-client-go v0.21.2
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
-	github.com/mashiike/hclconfig v0.3.0
+	github.com/mashiike/hclconfig v0.5.0
 	github.com/mashiike/ls3viewer v0.2.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.28.0
@@ -85,7 +85,7 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
-	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
+	golang.org/x/sys v0.0.0-20221006211917-84dc82d7e875 // indirect
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.12 // indirect

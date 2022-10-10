@@ -14,7 +14,7 @@ type RuleBlock struct {
 	Alert       AlertBlock
 	QueriesExpr hcl.Expression
 	ParamsExpr  hcl.Expression
-	Infomation  string
+	Infomation  hcl.Expression
 
 	Params  interface{}
 	Queries map[string]queryrunner.PreparedQuery
@@ -91,7 +91,7 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 				b.Queries[query.Name()] = query
 			}
 		case "infomation":
-			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Infomation)...)
+			b.Infomation = attr.Expr
 		case "params":
 			var params interface{}
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &params)...)
