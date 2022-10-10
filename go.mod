@@ -29,7 +29,7 @@ require (
 	github.com/mashiike/hclconfig v0.3.0
 	github.com/mashiike/ls3viewer v0.2.0
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/samber/lo v1.28.0
+	github.com/samber/lo v1.31.0
 	github.com/sergi/go-diff v1.2.0
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.16.3
