@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type RuleBlock struct {
@@ -16,7 +17,7 @@ type RuleBlock struct {
 	ParamsExpr  hcl.Expression
 	Infomation  hcl.Expression
 
-	Params  interface{}
+	Params  cty.Value
 	Queries map[string]queryrunner.PreparedQuery
 }
 
@@ -93,8 +94,8 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 		case "infomation":
 			b.Infomation = attr.Expr
 		case "params":
-			var params interface{}
-			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &params)...)
+			params, valueDiags := attr.Expr.Value(ctx)
+			diags = append(diags, valueDiags...)
 			b.Params = params
 		}
 	}

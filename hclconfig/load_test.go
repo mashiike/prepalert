@@ -120,10 +120,10 @@ func TestLoadNoError(t *testing.T) {
 								Queries: map[string]queryrunner.PreparedQuery{
 									"alb_target_5xx_info": nil,
 								},
-								Params: map[string]interface{}{
-									"hoge":    "hoge",
-									"version": "current",
-								},
+								Params: cty.ObjectVal(map[string]cty.Value{
+									"hoge":    cty.StringVal("hoge"),
+									"version": cty.StringVal("current"),
+								}),
 								Infomation: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
