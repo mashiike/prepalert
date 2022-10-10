@@ -129,16 +129,12 @@ func TestLoadNoError(t *testing.T) {
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("5xx info:\n"),
 										},
-										&hclsyntax.FunctionCallExpr{
-											Name: "to_table",
-											Args: []hclsyntax.Expression{
-												&hclsyntax.ScopeTraversalExpr{
-													Traversal: hcl.Traversal{
-														hcl.TraverseRoot{Name: "runtime"},
-														hcl.TraverseAttr{Name: "query_result"},
-														hcl.TraverseAttr{Name: "alb_target_5xx_info"},
-													},
-												},
+										&hclsyntax.ScopeTraversalExpr{
+											Traversal: hcl.Traversal{
+												hcl.TraverseRoot{Name: "runtime"},
+												hcl.TraverseAttr{Name: "query_result"},
+												hcl.TraverseAttr{Name: "alb_target_5xx_info"},
+												hcl.TraverseAttr{Name: "table"},
 											},
 										},
 										&hclsyntax.LiteralValueExpr{

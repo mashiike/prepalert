@@ -6,6 +6,9 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
+	"github.com/olekukonko/tablewriter"
+	"github.com/samber/lo"
+	"github.com/zclconf/go-cty/cty"
 )
 
 func DecodeBody(body hcl.Body, ctx *hcl.EvalContext) (PreparedQueries, hcl.Body, hcl.Diagnostics) {
@@ -156,4 +159,39 @@ func decodeBodyForQueryBlock(body hcl.Body, ctx *hcl.EvalContext, name string, q
 	preparedQuery, prepareDiags := queryRunner.Prepare(name, remain, ctx)
 	diags = append(diags, prepareDiags...)
 	return preparedQuery, diags
+}
+
+func (qr *QueryResult) MarshalCTYValue() cty.Value {
+	return cty.ObjectVal(map[string]cty.Value{
+		"name":  cty.StringVal(qr.Name),
+		"query": cty.StringVal(qr.Query),
+		"columns": cty.ListVal(lo.Map(qr.Columns, func(column string, _ int) cty.Value {
+			return cty.StringVal(column)
+		})),
+		"rows": cty.ListVal(lo.Map(qr.Rows, func(row []string, _ int) cty.Value {
+			return cty.ListVal(lo.Map(row, func(v string, _ int) cty.Value {
+				return cty.StringVal(v)
+			}))
+		})),
+		"table": cty.StringVal(qr.ToTable()),
+		"markdown_table": cty.StringVal(qr.ToTable(
+			func(table *tablewriter.Table) {
+				table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+				table.SetCenterSeparator("|")
+				table.SetAutoFormatHeaders(false)
+				table.SetAutoWrapText(false)
+			},
+		)),
+		"borderless_table": cty.StringVal(qr.ToTable(
+			func(table *tablewriter.Table) {
+				table.SetCenterSeparator(" ")
+				table.SetAutoFormatHeaders(false)
+				table.SetAutoWrapText(false)
+				table.SetBorder(false)
+				table.SetColumnSeparator(" ")
+			},
+		)),
+		"vertical_table": cty.StringVal(qr.ToVertical()),
+		"json_lines":     cty.StringVal(qr.ToJSON()),
+	})
 }

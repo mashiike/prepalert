@@ -75,16 +75,15 @@ type PreparedQuery struct {
 	name   string
 	runner *QueryRunner
 
-	StartTime   *string `hcl:"start_time"`
-	EndTime     *string `hcl:"end_time"`
-	QueryString string  `hcl:"query"`
-	Limit       *int32  `hcl:"limit"`
+	StartTime *string        `hcl:"start_time"`
+	EndTime   *string        `hcl:"end_time"`
+	Query     hcl.Expression `hcl:"query"`
+	Limit     *int32         `hcl:"limit"`
 
 	LogGroupName  *string  `hcl:"log_group_name"`
 	LogGroupNames []string `hcl:"log_group_names,optional"`
 	IgnoreFields  []string `hcl:"ignore_fields,optional"`
 
-	queryTemplate     *template.Template
 	startTimeTemplate *template.Template
 	endTimeTemplate   *template.Template
 
@@ -184,7 +183,7 @@ func (q *PreparedQuery) Name() string {
 
 const layout = "2006-01-02T15:04:05-0700"
 
-func (q *PreparedQuery) Run(ctx context.Context, data interface{}) (*queryrunner.QueryResult, error) {
+func (q *PreparedQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*queryrunner.QueryResult, error) {
 	var queryBuf, startTimeBuf, endTimeBuf bytes.Buffer
 	if err := q.queryTemplate.Execute(&queryBuf, data); err != nil {
 		return nil, fmt.Errorf("execute query template:%w", err)

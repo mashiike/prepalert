@@ -1,29 +1,29 @@
 package prepalert
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
-	"text/template"
 
+	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/hclconfig"
-	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/zclconf/go-cty/cty"
 	"golang.org/x/sync/errgroup"
 )
 
 type Rule struct {
-	ruleName     string
-	monitorName  string
-	anyAlert     bool
-	onClosed     bool
-	onOpened     bool
-	queries      []queryrunner.PreparedQuery
-	infoTamplate *template.Template
-	params       interface{}
+	ruleName    string
+	monitorName string
+	anyAlert    bool
+	onClosed    bool
+	onOpened    bool
+	queries     []queryrunner.PreparedQuery
+	infomation  hcl.Expression
+	params      cty.Value
 }
 
 func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
@@ -54,19 +54,15 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 	for _, query := range cfg.Queries {
 		queries = append(queries, query)
 	}
-	infoTemplate, err := template.New("info_template").Funcs(funcs.InfomationTemplateFuncMap).Parse(cfg.Infomation)
-	if err != nil {
-		return nil, fmt.Errorf("parse info template:%w", err)
-	}
 	rule := &Rule{
-		ruleName:     cfg.Name,
-		monitorName:  name,
-		anyAlert:     anyAlert,
-		onOpened:     onOpened,
-		onClosed:     onClosed,
-		queries:      queries,
-		infoTamplate: infoTemplate,
-		params:       cfg.Params,
+		ruleName:    cfg.Name,
+		monitorName: name,
+		anyAlert:    anyAlert,
+		onOpened:    onOpened,
+		onClosed:    onClosed,
+		queries:     queries,
+		infomation:  cfg.Infomation,
+		params:      cfg.Params,
 	}
 	return rule, nil
 }
@@ -87,34 +83,26 @@ func (rule *Rule) Match(body *WebhookBody) bool {
 	return body.Alert.MonitorName == rule.monitorName
 }
 
-type QueryData struct {
-	*WebhookBody
-	Params interface{}
-}
-
-type RenderInfomationData struct {
-	*WebhookBody
-	QueryResults map[string]*queryrunner.QueryResult
-	Params       interface{}
-}
-
-func (rule *Rule) BuildInfomation(ctx context.Context, body *WebhookBody) (string, error) {
+func (rule *Rule) BuildInfomation(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) (string, error) {
 	reqID := "-"
 	info, ok := queryrunner.GetQueryRunningContext(ctx)
 	if ok {
 		reqID = fmt.Sprintf("%d", info.ReqID)
 	}
 	eg, egctx := errgroup.WithContext(ctx)
-	queryData := &QueryData{
-		WebhookBody: body,
-		Params:      rule.params,
+	runtimeVariables := map[string]cty.Value{
+		"params": rule.params,
+		"event":  cty.ObjectVal(body.MarshalCTYValues()),
+	}
+	evalCtx.Variables = map[string]cty.Value{
+		"runtime": cty.ObjectVal(runtimeVariables),
 	}
 	var queryResults sync.Map
 	for _, query := range rule.queries {
 		_query := query
 		eg.Go(func() error {
 			log.Printf("[info][%s] start run query name=%s", reqID, _query.Name())
-			result, err := _query.Run(egctx, queryData)
+			result, err := _query.Run(egctx, evalCtx)
 			if err != nil {
 				log.Printf("[error][%s]failed run query name=%s", reqID, _query.Name())
 				return fmt.Errorf("query `%s`:%w", _query.Name(), err)
@@ -127,11 +115,7 @@ func (rule *Rule) BuildInfomation(ctx context.Context, body *WebhookBody) (strin
 	if err := eg.Wait(); err != nil {
 		return "", err
 	}
-	data := &RenderInfomationData{
-		WebhookBody:  body,
-		QueryResults: make(map[string]*queryrunner.QueryResult, len(rule.queries)),
-		Params:       rule.params,
-	}
+	queryResultVariables := make(map[string]cty.Value, len(rule.queries))
 	queryResults.Range(func(key any, value any) bool {
 		name, ok := key.(string)
 		if !ok {
@@ -143,18 +127,31 @@ func (rule *Rule) BuildInfomation(ctx context.Context, body *WebhookBody) (strin
 			log.Printf("[warn][%s] value=%v is not *QueryResult", reqID, value)
 			return false
 		}
-		data.QueryResults[name] = queryResult
+		queryResultVariables[name] = queryResult.MarshalCTYValue()
 		return true
 	})
-	return rule.RenderInfomation(ctx, data)
+	runtimeVariables["query_result"] = cty.ObjectVal(queryResultVariables)
+	evalCtx.Variables = map[string]cty.Value{
+		"runtime": cty.ObjectVal(runtimeVariables),
+	}
+	return rule.RenderInfomation(evalCtx)
 }
 
-func (rule *Rule) RenderInfomation(ctx context.Context, data *RenderInfomationData) (string, error) {
-	var buf bytes.Buffer
-	if err := rule.infoTamplate.Execute(&buf, data); err != nil {
-		return "", err
+func (rule *Rule) RenderInfomation(evalCtx *hcl.EvalContext) (string, error) {
+	value, diags := rule.infomation.Value(evalCtx)
+	if diags.HasErrors() {
+		return "", diags
 	}
-	return buf.String(), nil
+	if value.Type() != cty.String {
+		return "", errors.New("infomation is not string")
+	}
+	if value.IsNull() {
+		return "", errors.New("infomation is nil")
+	}
+	if !value.IsKnown() {
+		return "", errors.New("infomation is unknown")
+	}
+	return value.AsString(), nil
 }
 
 func (rule *Rule) Name() string {

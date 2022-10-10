@@ -34,6 +34,6 @@ rule "alb_target_5xx" {
 
     infomation = <<EOT
 5xx info:
-${to_table(runtime.query_result.alb_target_5xx_info)}
+${runtime.query_result.alb_target_5xx_info.table}
 EOT
 }

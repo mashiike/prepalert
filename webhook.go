@@ -167,7 +167,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	if ok {
 		reqID = fmt.Sprintf("%d", hctx.ReqID)
 	}
-	info, err := rule.BuildInfomation(ctx, body)
+	info, err := rule.BuildInfomation(ctx, app.evalCtx.NewChild(), body)
 	if err != nil {
 		return err
 	}

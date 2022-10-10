@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/fujiwara/ridge"
+	"github.com/hashicorp/hcl/v2"
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/grat"
@@ -37,6 +38,7 @@ type App struct {
 	sqsClient *sqs.Client
 	uploader  *manager.Uploader
 	viewer    http.Handler
+	evalCtx   *hcl.EvalContext
 }
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
@@ -68,6 +70,7 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		service:   cfg.Prepalert.Service,
 		sqsClient: sqsClient,
 		queueUrl:  *output.QueueUrl,
+		evalCtx:   cfg.EvalContext,
 	}
 	if backend := cfg.Prepalert.S3Backend; !backend.IsEmpty() {
 		log.Printf("[info] enable s3 backend: s3://%s", backend.BucketName)

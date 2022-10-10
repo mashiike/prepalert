@@ -1,2 +1,2 @@
 5xx info:
-${to_table(runtime.query_result.alb_target_5xx_info)}
+${runtime.query_result.alb_target_5xx_info.table}
