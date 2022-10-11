@@ -1,6 +1,7 @@
 package queryrunner
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -205,4 +206,25 @@ func (qr *QueryResult) MarshalCTYValue() cty.Value {
 		"vertical_table": cty.StringVal(qr.ToVertical()),
 		"json_lines":     cty.StringVal(qr.ToJSON()),
 	})
+}
+
+func TraversalQuery(traversal hcl.Traversal, queries PreparedQueries) (PreparedQuery, error) {
+	if traversal.IsRelative() {
+		return nil, errors.New("traversal is relative")
+	}
+	if traversal.RootName() != "query" {
+		return nil, fmt.Errorf("expected root name is `query` s, actual %s", traversal.RootName())
+	}
+	if len(traversal) < 2 {
+		return nil, errors.New("traversal length < 2")
+	}
+	attr, ok := traversal[1].(hcl.TraverseAttr)
+	if !ok {
+		return nil, errors.New("traversal[1] is not TraverseAttr")
+	}
+	query, ok := queries.Get(attr.Name)
+	if !ok {
+		return nil, fmt.Errorf("query.%s is not found", attr.Name)
+	}
+	return query, nil
 }
