@@ -15,7 +15,7 @@ query_runner "cloudwatch_logs_insights" "default" {
 
 query "cw_logs" {
   runner = query_runner.cloudwatch_logs_insights.default
-  start_time = "{{ .Alert.OpenedAt | to_time | add_time `-15m` | strftime_in_zone `%Y-%m-%dT%H:%M:%S%z` `UTC`  }}"
+  start_time = strftime_in_zone("%Y-%m-%dT%H:%M:%S%z", "UTC", runtime.event.alert.opened_at - duration("15m"))
   query  = <<EOT
 fields @timestamp, @message
 | sort @timestamp desc
@@ -33,7 +33,7 @@ rule "cloudwatch_test" {
   queries = [
     query.cw_logs,
   ]
-  infomation = "{{ index .QueryResults `cw_logs` | to_vertical }}"
+  infomation = runtime.query_result.cw_logs.vertical_table
 }
 ```
 

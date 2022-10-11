@@ -14,7 +14,7 @@ The query and query_runner settings are generally as follows
 
 ```hcl
 prepalert {
-    required_version = ">=v0.2.0"
+    required_version = ">=v0.7.0"
     sqs_queue_name   = "prepalert"
     service          = "prod"
 }
@@ -38,18 +38,24 @@ rule "simple" {
 
     infomation = <<EOF
 query_result:
-{{ index .QueryResults `<query_name>` | to_table }}
+${runtime.query_result.<query_name>.table}
 EOF
 }
 ```
 
 The queries attribute of a rule lists the queries to be executed.
-Then, using the go template notation, the results of the query can be referenced in the infomation attribute.
+Then, using the runtime variables, the results of the query can be referenced in the infomation attribute.
 
-### template function
-The results of the referenced query are output using a stringing function such as to_table.
+### runtime variables
 
-#### to_table 
+The runtime variable is evaluated at runtime with a delay.
+The runtime variable has the following three pieces of information
+
+* `runtime.event`  : It contains the event information of the webhook that caused the prepalert to be executed. The structure is a snake case of the Mackerel webhook key.
+* `runtime.params` : It contains the PARAMS specified in the rule.
+* `runtime.query_result` It contains the results of the query executed by the rule. 
+
+#### runtime.query_result.__query_name__.table 
 
 The following standard table is provided
 
@@ -62,7 +68,7 @@ The following standard table is provided
 +--------+---- --+--------+
 ```
 
-#### to_vertical 
+#### runtime.query_result.__query_name__.vertical_table
 
 The following mysql \G option like table is provided
 
@@ -78,7 +84,7 @@ p99: 0.5022
 ```
 
 
-#### to_json 
+#### runtime.query_result.__query_name__.json_lines
 
 output as json lines
 
