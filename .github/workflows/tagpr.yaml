@@ -16,8 +16,8 @@ jobs:
       - name: Adding summary
         run: echo '### ${{steps.tagpr.outputs.tag}}' >> $GITHUB_STEP_SUMMARY
         if: ${{ steps.tagpr.outputs.tag != '' }}
-    - uses: ./.github/actions/release
-      with:
-        tag: ${{ steps.tagpr.outputs.tag }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ steps.tagpr.outputs.tag != '' }}
+      - uses: ./.github/actions/release
+        with:
+          tag: ${{ steps.tagpr.outputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ steps.tagpr.outputs.tag != '' }}
