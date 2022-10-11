@@ -162,18 +162,29 @@ func decodeBodyForQueryBlock(body hcl.Body, ctx *hcl.EvalContext, name string, q
 }
 
 func (qr *QueryResult) MarshalCTYValue() cty.Value {
-	return cty.ObjectVal(map[string]cty.Value{
-		"name":  cty.StringVal(qr.Name),
-		"query": cty.StringVal(qr.Query),
-		"columns": cty.ListVal(lo.Map(qr.Columns, func(column string, _ int) cty.Value {
+	columns := cty.ListValEmpty(cty.String)
+	rows := cty.ListValEmpty(cty.List(cty.String))
+	if len(qr.Columns) > 0 {
+		columns = cty.ListVal(lo.Map(qr.Columns, func(column string, _ int) cty.Value {
 			return cty.StringVal(column)
-		})),
-		"rows": cty.ListVal(lo.Map(qr.Rows, func(row []string, _ int) cty.Value {
+		}))
+	}
+	if len(qr.Rows) > 0 {
+		rows = cty.ListVal(lo.Map(qr.Rows, func(row []string, _ int) cty.Value {
+			if len(row) == 0 {
+				return cty.ListValEmpty(cty.String)
+			}
 			return cty.ListVal(lo.Map(row, func(v string, _ int) cty.Value {
 				return cty.StringVal(v)
 			}))
-		})),
-		"table": cty.StringVal(qr.ToTable()),
+		}))
+	}
+	return cty.ObjectVal(map[string]cty.Value{
+		"name":    cty.StringVal(qr.Name),
+		"query":   cty.StringVal(qr.Query),
+		"columns": columns,
+		"rows":    rows,
+		"table":   cty.StringVal(qr.ToTable()),
 		"markdown_table": cty.StringVal(qr.ToTable(
 			func(table *tablewriter.Table) {
 				table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})

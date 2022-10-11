@@ -1,14 +1,12 @@
 package s3select
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,10 +16,11 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/samber/lo"
+	"github.com/zclconf/go-cty/cty"
+	"golang.org/x/sync/errgroup"
 )
 
 const TypeName = "s3_select"
@@ -82,21 +81,20 @@ type PreparedQuery struct {
 	name   string
 	runner *QueryRunner
 
-	Expression      string  `hcl:"expression"`
-	BucketName      string  `hcl:"bucket_name"`
-	ObjectKeyPrefix string  `hcl:"object_key_prefix"`
-	ObjectKeySuffix *string `hcl:"object_key_suffix"`
-	ScanLimit       *string `hcl:"scan_limit"`
-	CompressionType string  `hcl:"compression_type"`
+	Expression      hcl.Expression `hcl:"expression"`
+	BucketName      string         `hcl:"bucket_name"`
+	ObjectKeyPrefix hcl.Expression `hcl:"object_key_prefix"`
+	ObjectKeySuffix *string        `hcl:"object_key_suffix"`
+	ScanLimit       *string        `hcl:"scan_limit"`
+	CompressionType string         `hcl:"compression_type"`
+	ContinueOnError bool           `hcl:"continue_on_error,optional"`
 
 	CSVBlock     *QueryCSVBlock     `hcl:"csv,block"`
 	JSONBlock    *QueryJSONBlock    `hcl:"json,block"`
 	ParquetBlock *QueryParquetBlock `hcl:"parquet,block"`
 
-	expressionTemplate      *template.Template
-	objectKeyPrefixTemplate *template.Template
-	inputSerialization      *types.InputSerialization
-	scanLimit               uint64
+	inputSerialization *types.InputSerialization
+	scanLimit          uint64
 }
 
 type QueryCSVBlock struct {
@@ -124,38 +122,7 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	if q.Expression == "" {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid Expression template",
-			Detail:   "expression is empty",
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	expressionTemplate, err := template.New(name + "_expression").Funcs(funcs.QueryTemplateFuncMap).Parse(q.Expression)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid Expression template",
-			Detail:   fmt.Sprintf("parse expression as go template: %v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	q.expressionTemplate = expressionTemplate
-
-	objectKeyPrefixTemplate, err := template.New(name + "_object_key_prefix").Funcs(funcs.QueryTemplateFuncMap).Parse(q.ObjectKeyPrefix)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid ObjectKeyPrefix template",
-			Detail:   fmt.Sprintf("parse object_key_prefix as go template: %v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	q.objectKeyPrefixTemplate = objectKeyPrefixTemplate
+	var err error
 	if q.ScanLimit == nil {
 		q.ScanLimit = generics.Ptr("1GB")
 	}
@@ -309,24 +276,76 @@ type runQueryParameters struct {
 	objectKeySuffix    string
 	inputSerialization *types.InputSerialization
 	scanLimitation     uint64
+	continueOnError    bool
 }
 
-func (q *PreparedQuery) Run(ctx context.Context, data interface{}) (*queryrunner.QueryResult, error) {
-	var expressionBuf, objectKeyPrefixBuf bytes.Buffer
-	if err := q.expressionTemplate.Execute(&expressionBuf, data); err != nil {
-		return nil, fmt.Errorf("execute expression template:%w", err)
+func (q *PreparedQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*queryrunner.QueryResult, error) {
+	expressionValue, diags := q.Expression.Value(evalCtx)
+	if diags.HasErrors() {
+		return nil, diags
 	}
-	if err := q.objectKeyPrefixTemplate.Execute(&objectKeyPrefixBuf, data); err != nil {
-		return nil, fmt.Errorf("execute object_key_prefix template:%w", err)
+	if !expressionValue.IsKnown() {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid expression template",
+			Detail:   "expression is unknown",
+			Subject:  q.Expression.Range().Ptr(),
+		})
+		return nil, diags
 	}
+	if expressionValue.Type() != cty.String {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid query template",
+			Detail:   "expression is not string",
+			Subject:  q.Expression.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	expr := expressionValue.AsString()
+	if expr == "" {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid expression template",
+			Detail:   "expression is empty",
+			Subject:  q.Expression.Range().Ptr(),
+		})
+		return nil, diags
+	}
+
+	objectKeyPrefixValue, diags := q.ObjectKeyPrefix.Value(evalCtx)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	if !objectKeyPrefixValue.IsKnown() {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid object_key_prefix template",
+			Detail:   "object_key_prefix is unknown",
+			Subject:  q.ObjectKeyPrefix.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	if objectKeyPrefixValue.Type() != cty.String {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid object_key_prefix template",
+			Detail:   "object_key_prefix is not string",
+			Subject:  q.ObjectKeyPrefix.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	objectKeyPrefix := objectKeyPrefixValue.AsString()
+
 	params := &runQueryParameters{
 		name:               "prepalert-" + q.name,
-		expression:         expressionBuf.String(),
+		expression:         expr,
 		bucket:             q.BucketName,
-		objectKeyPrefix:    objectKeyPrefixBuf.String(),
+		objectKeyPrefix:    objectKeyPrefix,
 		objectKeySuffix:    *q.ObjectKeySuffix,
 		inputSerialization: q.inputSerialization,
 		scanLimitation:     q.scanLimit,
+		continueOnError:    q.ContinueOnError,
 	}
 	return q.runner.RunQuery(ctx, params)
 }
@@ -377,7 +396,11 @@ func (r *QueryRunner) RunQuery(ctx context.Context, params *runQueryParameters) 
 			totalScanSize += uint64(content.Size)
 			apiCallCount++
 			if err != nil {
-				return nil, fmt.Errorf("select object: %s : %w", *content.Key, err)
+				if params.continueOnError {
+					log.Printf("[warn][%s] select object failed: %v", reqID, err)
+				} else {
+					return nil, fmt.Errorf("select object: %s : %w", *content.Key, err)
+				}
 			}
 			jsonLines = append(jsonLines, lines...)
 			log.Printf("[debug][%s] total scan size: %s, total lines: %d, total object count: %d", reqID, humanize.Bytes(totalScanSize), len(jsonLines), apiCallCount)
@@ -408,26 +431,34 @@ func (r *QueryRunner) selectObject(ctx context.Context, bucket string, key strin
 	defer stream.Close()
 
 	lines := make([][]byte, 0)
-	for event := range stream.Events() {
-		v, ok := event.(*types.SelectObjectContentEventStreamMemberRecords)
-		if ok {
-			decoder := json.NewDecoder(bytes.NewReader(v.Value.Payload))
-			var err error
-			for {
-				var v json.RawMessage
-				err = decoder.Decode(&v)
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					return nil, err
+	pr, pw := io.Pipe()
+
+	eg, egctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		defer pw.Close()
+		for event := range stream.Events() {
+			select {
+			case <-egctx.Done():
+				return nil
+			default:
+				record, ok := event.(*types.SelectObjectContentEventStreamMemberRecords)
+				if ok {
+					pw.Write(record.Value.Payload)
 				}
-				lines = append(lines, v)
 			}
 		}
-	}
+		return nil
+	})
 
-	if err := stream.Err(); err != nil {
+	decoder := json.NewDecoder(pr)
+	for decoder.More() {
+		var v json.RawMessage
+		if err := decoder.Decode(&v); err != nil {
+			return nil, err
+		}
+		lines = append(lines, v)
+	}
+	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
 	return lines, nil

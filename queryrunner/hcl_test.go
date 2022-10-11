@@ -238,3 +238,19 @@ func TestQueryReusltMarshalCTYValue(t *testing.T) {
 		"json_lines":       cty.StringVal(jsonLines),
 	}), value)
 }
+
+func TestQueryEmptyReusltMarshalCTYValue(t *testing.T) {
+	qr := queryrunner.NewEmptyQueryResult("empty", "")
+	value := qr.MarshalCTYValue()
+	require.EqualValues(t, cty.ObjectVal(map[string]cty.Value{
+		"name":             cty.StringVal("empty"),
+		"query":            cty.StringVal(""),
+		"columns":          cty.ListValEmpty(cty.String),
+		"rows":             cty.ListValEmpty(cty.List(cty.String)),
+		"table":            cty.StringVal("+\n+\n"),
+		"markdown_table":   cty.StringVal(""),
+		"borderless_table": cty.StringVal(""),
+		"vertical_table":   cty.StringVal(""),
+		"json_lines":       cty.StringVal(""),
+	}), value)
+}
