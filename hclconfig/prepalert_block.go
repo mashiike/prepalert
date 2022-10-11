@@ -5,12 +5,11 @@ import (
 	"log"
 	"net/url"
 	"strings"
-	"text/template"
 
 	gv "github.com/hashicorp/go-version"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mashiike/hclconfig"
-	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/internal/generics"
 )
 
@@ -124,7 +123,7 @@ func (b *AuthBlock) IsEmpty() bool {
 type S3BackendBlock struct {
 	BucketName                    string
 	ObjectKeyPrefix               *string
-	ObjectKeyTemplateString       *string
+	ObjectKeyTemplate             *hcl.Expression
 	ViewerBaseURLString           string
 	ViewerGoogleClientID          *string
 	ViewerGoogleClientSecret      *string
@@ -132,7 +131,6 @@ type S3BackendBlock struct {
 	Allowed                       []string
 	Denied                        []string
 
-	ObjectKeyTemplate       *template.Template
 	ViewerBaseURL           *url.URL
 	ViewerSessionEncryptKey []byte
 }
@@ -175,7 +173,6 @@ func (b *S3BackendBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Dia
 	if diags.HasErrors() {
 		return diags
 	}
-	objectKeyTemplateRange := content.MissingItemRange.Ptr()
 	for key, attr := range content.Attributes {
 		switch key {
 		case "bucket_name":
@@ -186,10 +183,7 @@ func (b *S3BackendBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Dia
 			str = strings.TrimPrefix(str, "/")
 			b.ObjectKeyPrefix = &str
 		case "object_key_template":
-			var str string
-			objectKeyTemplateRange = attr.Range.Ptr()
-			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
-			b.ObjectKeyTemplateString = &str
+			b.ObjectKeyTemplate = &attr.Expr
 		case "viewer_base_url":
 			var str string
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &str)...)
@@ -249,19 +243,13 @@ func (b *S3BackendBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Dia
 	if b.ObjectKeyPrefix == nil {
 		b.ObjectKeyPrefix = generics.Ptr("prepalert/")
 	}
-	if b.ObjectKeyTemplateString == nil {
-		b.ObjectKeyTemplateString = generics.Ptr("{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d/%H` }}/")
+	if b.ObjectKeyTemplate == nil {
+		var parseDiags hcl.Diagnostics
+		var expr hcl.Expression
+		expr, parseDiags = hclsyntax.ParseExpression([]byte(`strftime("%Y/%m/%d/%H/", runtime.event.alert.opened_at)`), "default_object_key_template.hcl", hcl.InitialPos)
+		diags = append(diags, parseDiags...)
+		b.ObjectKeyTemplate = &expr
 	}
-	tmpl, err := template.New("object_key_template").Funcs(funcs.QueryTemplateFuncMap).Parse(*b.ObjectKeyTemplateString)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid object_key_template format",
-			Detail:   fmt.Sprintf("can not parse as go template : %v", err.Error()),
-			Subject:  objectKeyTemplateRange,
-		})
-	}
-	b.ObjectKeyTemplate = tmpl
 	if b.ViewerGoogleClientID != nil || b.ViewerGoogleClientSecret != nil || b.ViewerSessionEncryptKey != nil {
 		if b.ViewerGoogleClientID == nil || b.ViewerGoogleClientSecret == nil || b.ViewerSessionEncryptKey == nil {
 			diags = append(diags, &hcl.Diagnostic{

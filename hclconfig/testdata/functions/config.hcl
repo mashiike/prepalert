@@ -17,7 +17,9 @@ query_runner "redshift_data" "default" {
 
 query "alb_target_5xx_info" {
   runner = query_runner.redshift_data.default
-  sql    = file("./query.sql")
+  sql    = templatefile("./query.sql", {
+    runtime = runtime
+  })
 }
 
 rule "alb_target_5xx" {
@@ -29,7 +31,9 @@ rule "alb_target_5xx" {
     query.alb_target_5xx_info,
   ]
 
-  infomation = file("./infomation_template.txt")
+  infomation = templatefile("./infomation_template.txt",{
+    runtime = runtime
+  })
 }
 
 rule "constant" {

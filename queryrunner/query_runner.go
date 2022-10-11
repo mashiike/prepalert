@@ -46,7 +46,7 @@ func (runners QueryRunners) Get(queryRunnerType string, name string) (QueryRunne
 
 type PreparedQuery interface {
 	Name() string
-	Run(ctx context.Context, data interface{}) (*QueryResult, error)
+	Run(ctx context.Context, evalCtx *hcl.EvalContext) (*QueryResult, error)
 }
 
 type PreparedQueries []PreparedQuery

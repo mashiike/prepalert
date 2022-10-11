@@ -1,21 +1,27 @@
 package prepalert_test
 
 import (
-	"context"
 	"testing"
 
+	"github.com/hashicorp/hcl/v2"
+	libhclconfig "github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
 	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/stretchr/testify/require"
+	"github.com/zclconf/go-cty/cty"
 )
 
 func TestRuleRenderMemo(t *testing.T) {
+	baseCtx := libhclconfig.NewEvalContext("testdata")
+	baseCtx.Variables = map[string]cty.Value{
+		"runtime": cty.UnknownVal(cty.DynamicPseudoType),
+	}
 	cases := []struct {
 		name          string
 		cfg           *hclconfig.RuleBlock
-		data          *prepalert.RenderInfomationData
+		newCtx        func(t *testing.T) *hcl.EvalContext
 		expectedError bool
 		expectedMemo  string
 	}{
@@ -25,11 +31,18 @@ func TestRuleRenderMemo(t *testing.T) {
 				Alert: hclconfig.AlertBlock{
 					MonitorName: generics.Ptr("hoge"),
 				},
-				Infomation: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%Y-%m-%d %H:%M:%S` `Asia/Tokyo`}}",
+				Infomation: ParseExpression(t, `"${strftime_in_zone("%Y-%m-%d %H:%M:%S","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
-			data: &prepalert.RenderInfomationData{
-				WebhookBody:  LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: make(map[string]*queryrunner.QueryResult),
+			newCtx: func(t *testing.T) *hcl.EvalContext {
+				ctx := baseCtx.NewChild()
+				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
+				ctx.Variables = map[string]cty.Value{
+					"runtime": cty.ObjectVal(map[string]cty.Value{
+						"event":        cty.ObjectVal(body.MarshalCTYValues()),
+						"query_reuslt": cty.ObjectVal(map[string]cty.Value{}),
+					}),
+				}
+				return ctx
 			},
 			expectedMemo: "2016-09-06 11:45:12",
 		},
@@ -39,11 +52,18 @@ func TestRuleRenderMemo(t *testing.T) {
 				Alert: hclconfig.AlertBlock{
 					MonitorName: generics.Ptr("hoge"),
 				},
-				Infomation: "{{ .Alert.OpenedAt | to_time | strftime_in_zone `%O%E%Q%1` `Asia/Tokyo`}}",
+				Infomation: ParseExpression(t, `"${strftime_in_zone("%O%E%Q%1","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
-			data: &prepalert.RenderInfomationData{
-				WebhookBody:  LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: make(map[string]*queryrunner.QueryResult),
+			newCtx: func(t *testing.T) *hcl.EvalContext {
+				ctx := baseCtx.NewChild()
+				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
+				ctx.Variables = map[string]cty.Value{
+					"runtime": cty.ObjectVal(map[string]cty.Value{
+						"event":        cty.ObjectVal(body.MarshalCTYValues()),
+						"query_reuslt": cty.ObjectVal(map[string]cty.Value{}),
+					}),
+				}
+				return ctx
 			},
 			expectedError: true,
 		},
@@ -53,23 +73,30 @@ func TestRuleRenderMemo(t *testing.T) {
 				Alert: hclconfig.AlertBlock{
 					MonitorName: generics.Ptr("hoge"),
 				},
-				Infomation: "{{ index .QueryResults `hoge_result` | to_table }}",
+				Infomation: ParseExpression(t, `"${runtime.query_result.hoge_result.table}"`),
 			},
-			data: &prepalert.RenderInfomationData{
-				WebhookBody: LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-				QueryResults: map[string]*queryrunner.QueryResult{
-					"hoge_result": queryrunner.NewQueryResult(
-						"hoge_result",
-						"dummy",
-						[]string{"Name", "Sign", "Rating"},
-						[][]string{
-							{"A", "The Good", "500"},
-							{"B", "The Very very Bad Man", "288"},
-							{"C", "The Ugly", "120"},
-							{"D", "The Gopher", "800"},
-						},
-					),
-				},
+			newCtx: func(t *testing.T) *hcl.EvalContext {
+				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
+				ctx := baseCtx.NewChild()
+				ctx.Variables = map[string]cty.Value{
+					"runtime": cty.ObjectVal(map[string]cty.Value{
+						"event": cty.ObjectVal(body.MarshalCTYValues()),
+						"query_result": cty.ObjectVal(map[string]cty.Value{
+							"hoge_result": queryrunner.NewQueryResult(
+								"hoge_result",
+								"dummy",
+								[]string{"Name", "Sign", "Rating"},
+								[][]string{
+									{"A", "The Good", "500"},
+									{"B", "The Very very Bad Man", "288"},
+									{"C", "The Ugly", "120"},
+									{"D", "The Gopher", "800"},
+								},
+							).MarshalCTYValue(),
+						}),
+					}),
+				}
+				return ctx
 			},
 			expectedMemo: string(LoadFile(t, "testdata/table.txt")),
 		},
@@ -78,7 +105,7 @@ func TestRuleRenderMemo(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			rule, err := prepalert.NewRule(nil, c.cfg)
 			require.NoError(t, err)
-			actual, err := rule.RenderInfomation(context.Background(), c.data)
+			actual, err := rule.RenderInfomation(c.newCtx(t))
 			if c.expectedError {
 				require.Error(t, err)
 			} else {

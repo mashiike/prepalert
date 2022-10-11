@@ -1,12 +1,10 @@
 package hclconfig
 
 import (
-	"fmt"
-	"log"
-
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type RuleBlock struct {
@@ -14,9 +12,9 @@ type RuleBlock struct {
 	Alert       AlertBlock
 	QueriesExpr hcl.Expression
 	ParamsExpr  hcl.Expression
-	Infomation  string
+	Infomation  hcl.Expression
 
-	Params  interface{}
+	Params  cty.Value
 	Queries map[string]queryrunner.PreparedQuery
 }
 
@@ -67,23 +65,12 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 			variables := attr.Expr.Variables()
 			b.Queries = make(map[string]queryrunner.PreparedQuery, len(variables))
 			for _, variable := range variables {
-				attr, err := GetTraversalAttr(variable, "query", 1)
+				query, err := queryrunner.TraversalQuery(variable, queries)
 				if err != nil {
-					log.Printf("[debug] get traversal attr failed, expression on %s: %v", variable.SourceRange().String(), err)
 					diags = append(diags, &hcl.Diagnostic{
 						Severity: hcl.DiagError,
 						Summary:  "Invalid Relation",
-						Detail:   `rule.queries depends on "query" block, please write as "query.name"`,
-						Subject:  variable.SourceRange().Ptr(),
-					})
-					continue
-				}
-				query, ok := queries.Get(attr.Name)
-				if !ok {
-					diags = append(diags, &hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  "Invalid Relation",
-						Detail:   fmt.Sprintf("query.%s is not found", attr.Name),
+						Detail:   err.Error() + `: rule.queries depends on "query" block, please write as "query.name"`,
 						Subject:  variable.SourceRange().Ptr(),
 					})
 					continue
@@ -91,10 +78,10 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 				b.Queries[query.Name()] = query
 			}
 		case "infomation":
-			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Infomation)...)
+			b.Infomation = attr.Expr
 		case "params":
-			var params interface{}
-			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &params)...)
+			params, valueDiags := attr.Expr.Value(ctx)
+			diags = append(diags, valueDiags...)
 			b.Params = params
 		}
 	}

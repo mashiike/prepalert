@@ -37,8 +37,8 @@ rule "simple" {
 // FROM access_logs
 // WHERE
 //     access_at
-//         BETWEEN '{{ .Alert.OpenedAt | to_time | strftime `%Y-%m-%d %H:%M:%S` }}'::TIMESTAMP - interval '15 minutes'
-//         AND '{{ .Alert.ClosedAt | to_time | strftime `%Y-%m-%d %H:%M:%S` }}'
+//         BETWEEN '${strftime("%Y-%m-%d %H:%M:%S",runtime.event.alert.opened_at)}'::TIMESTAMP - interval '15 minutes'
+//         AND '${strftime("%Y-%m-%d %H:%M:%S",runtime.event.alert.closed_at)}'
 //     status BETWEEN 500 AND 599
 // GROUP BY 1,2
 // ORDER BY 3 desc LIMIT 5
@@ -56,6 +56,6 @@ rule "simple" {
 //
 //   infomation = <<EOT
 // 5xx info:
-// {{  index .QueryResults `alb_target_5xx_info` | to_table }}
+// ${runtime.query_result.alb_target_5xx_info.table}
 // EOT
 // }

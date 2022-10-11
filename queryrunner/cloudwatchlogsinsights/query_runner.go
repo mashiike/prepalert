@@ -1,13 +1,11 @@
 package cloudwatchlogsinsights
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,10 +15,10 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/mashiike/prepalert/internal/funcs"
-	"github.com/mashiike/prepalert/internal/generics"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/samber/lo"
+	"github.com/zclconf/go-cty/cty"
 )
 
 const TypeName = "cloudwatch_logs_insights"
@@ -75,18 +73,14 @@ type PreparedQuery struct {
 	name   string
 	runner *QueryRunner
 
-	StartTime   *string `hcl:"start_time"`
-	EndTime     *string `hcl:"end_time"`
-	QueryString string  `hcl:"query"`
-	Limit       *int32  `hcl:"limit"`
+	StartTime hcl.Expression `hcl:"start_time"`
+	EndTime   hcl.Expression `hcl:"end_time"`
+	Query     hcl.Expression `hcl:"query"`
+	Limit     *int32         `hcl:"limit"`
 
 	LogGroupName  *string  `hcl:"log_group_name"`
 	LogGroupNames []string `hcl:"log_group_names,optional"`
 	IgnoreFields  []string `hcl:"ignore_fields,optional"`
-
-	queryTemplate     *template.Template
-	startTimeTemplate *template.Template
-	endTimeTemplate   *template.Template
 
 	Attrs hcl.Attributes `hcl:",body"`
 }
@@ -128,52 +122,17 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 			Subject:  body.MissingItemRange().Ptr(),
 		})
 	}
-
-	if q.QueryString == "" {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid query template",
-			Detail:   "query is empty",
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
+	startTimeValue, _ := q.StartTime.Value(ctx)
+	if startTimeValue.IsKnown() && startTimeValue.IsNull() {
+		var parseDiags hcl.Diagnostics
+		q.StartTime, parseDiags = hclsyntax.ParseExpression([]byte(`strftime_in_zone("%Y-%m-%dT%H:%M:%S%z", "UTC", runtime.event.alert.opened_at)`), "default_start_time.hcl", hcl.InitialPos)
+		diags = append(diags, parseDiags...)
 	}
-	var err error
-	q.queryTemplate, err = template.New(name + "query").Funcs(funcs.QueryTemplateFuncMap).Parse(q.QueryString)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid query template",
-			Detail:   fmt.Sprintf("parse query as go template: %v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	if q.StartTime == nil || *q.StartTime == "" {
-		q.StartTime = generics.Ptr(`{{ .Alert.OpenedAt | to_time | strftime_in_zone "%Y-%m-%dT%H:%M:%S%z" "UTC"  }}`)
-	}
-	q.startTimeTemplate, err = template.New(name + "start_time").Funcs(funcs.QueryTemplateFuncMap).Parse(*q.StartTime)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid start_time template",
-			Detail:   fmt.Sprintf("parse start_time as go template: %v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	if q.EndTime == nil || *q.EndTime == "" {
-		q.EndTime = generics.Ptr(`{{ .Alert.ClosedAt | to_time | strftime_in_zone "%Y-%m-%dT%H:%M:%S%z" "UTC"  }}`)
-	}
-	q.endTimeTemplate, err = template.New(name + "end_time").Funcs(funcs.QueryTemplateFuncMap).Parse(*q.EndTime)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid start_time template",
-			Detail:   fmt.Sprintf("parse start_time as go template: %v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
+	endTimeValue, _ := q.EndTime.Value(ctx)
+	if endTimeValue.IsKnown() && endTimeValue.IsNull() {
+		var parseDiags hcl.Diagnostics
+		q.EndTime, parseDiags = hclsyntax.ParseExpression([]byte(`strftime_in_zone("%Y-%m-%dT%H:%M:%S%z", "UTC", runtime.event.alert.closed_at)`), "default_end_time.hcl", hcl.InitialPos)
+		diags = append(diags, parseDiags...)
 	}
 	return q, diags
 }
@@ -184,22 +143,90 @@ func (q *PreparedQuery) Name() string {
 
 const layout = "2006-01-02T15:04:05-0700"
 
-func (q *PreparedQuery) Run(ctx context.Context, data interface{}) (*queryrunner.QueryResult, error) {
-	var queryBuf, startTimeBuf, endTimeBuf bytes.Buffer
-	if err := q.queryTemplate.Execute(&queryBuf, data); err != nil {
-		return nil, fmt.Errorf("execute query template:%w", err)
+func (q *PreparedQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*queryrunner.QueryResult, error) {
+	queryValue, diags := q.Query.Value(evalCtx)
+	if diags.HasErrors() {
+		return nil, diags
 	}
-	if err := q.startTimeTemplate.Execute(&startTimeBuf, data); err != nil {
-		return nil, fmt.Errorf("execute start_time template:%w", err)
+	if !queryValue.IsKnown() {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid query template",
+			Detail:   "query is unknown",
+			Subject:  q.Query.Range().Ptr(),
+		})
+		return nil, diags
 	}
-	startTime, err := time.Parse(layout, startTimeBuf.String())
+	if queryValue.Type() != cty.String {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid query template",
+			Detail:   "query is not string",
+			Subject:  q.Query.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	query := queryValue.AsString()
+	if query == "" {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid query template",
+			Detail:   "query is empty",
+			Subject:  q.Query.Range().Ptr(),
+		})
+		return nil, diags
+	}
+
+	startTimeValue, diags := q.StartTime.Value(evalCtx)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	if !startTimeValue.IsKnown() {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid start_time template",
+			Detail:   "start_time is unknown",
+			Subject:  q.StartTime.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	if startTimeValue.Type() != cty.String {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid start_time template",
+			Detail:   "start_time is not string",
+			Subject:  q.StartTime.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	startTime, err := time.Parse(layout, startTimeValue.AsString())
 	if err != nil {
 		return nil, fmt.Errorf("parse start_time: %w", err)
 	}
-	if err := q.endTimeTemplate.Execute(&endTimeBuf, data); err != nil {
-		return nil, fmt.Errorf("execute end_time template:%w", err)
+
+	endTimeValue, diags := q.EndTime.Value(evalCtx)
+	if diags.HasErrors() {
+		return nil, diags
 	}
-	endTime, err := time.Parse(layout, endTimeBuf.String())
+	if !endTimeValue.IsKnown() {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid end_time template",
+			Detail:   "end_time is unknown",
+			Subject:  q.EndTime.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	if endTimeValue.Type() != cty.String {
+		diags = append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid end_time template",
+			Detail:   "end_time is not string",
+			Subject:  q.EndTime.Range().Ptr(),
+		})
+		return nil, diags
+	}
+	endTime, err := time.Parse(layout, endTimeValue.AsString())
 	if err != nil {
 		return nil, fmt.Errorf("parse end_time: %w", err)
 	}
@@ -207,7 +234,7 @@ func (q *PreparedQuery) Run(ctx context.Context, data interface{}) (*queryrunner
 	params := &cloudwatchlogs.StartQueryInput{
 		StartTime:     aws.Int64(startTime.Unix()),
 		EndTime:       aws.Int64(endTime.Unix()),
-		QueryString:   aws.String(queryBuf.String()),
+		QueryString:   aws.String(query),
 		Limit:         q.Limit,
 		LogGroupName:  q.LogGroupName,
 		LogGroupNames: q.LogGroupNames,

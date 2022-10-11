@@ -4,7 +4,7 @@ sample configuration
 
 ```hcl
 prepalert {
-    required_version = ">=v0.2.0"
+    required_version = ">=v0.7.0"
     sqs_queue_name   = "prepalert"
     service          = "prod"
 }
@@ -22,8 +22,8 @@ SELECT *
 FROM access_logs
 WHERE status BETWEEN 500 AND 599
     AND "time" BETWEEN 
-        '{{ .Alert.OpenedAt | to_time | strftime_in_zone `%Y-%m-%dT%H:%M:%SZ` `UTC` }}'::timestamp - interval '15 minutes'
-        AND '{{ .Alert.ClosedAt | to_time | strftime_in_zone `%Y-%m-%dT%H:%M:%SZ` `UTC`  }}'::timestamp
+        '${strftime("%Y-%m-%dT%H:%M:%SZ","UTC", runtime.event.alert.opened_at)}'::timestamp - interval '15 minutes'
+        AND '${strftime("%Y-%m-%dT%H:%M:%SZ","UTC", runtime.event.alert.closed_at)}'::timestamp
 LIMIT 200
 EOQ
 }
@@ -39,7 +39,7 @@ rule "alb_target_5xx" {
 
     infomation = <<EOT
 5xx info:
-{{ index .QueryResults `alb_target_5xx_info` | to_table }}
+${runtime.query_result.alb_target_5xx_info.table}
 EOT
 }
 ```
@@ -90,8 +90,8 @@ SELECT *
 FROM access_logs
 WHERE status BETWEEN 500 AND 599
     AND "time" BETWEEN 
-        '{{ .Alert.OpenedAt | to_time | strftime_in_zone `%Y-%m-%dT%H:%M:%SZ` `UTC` }}'::timestamp - interval '15 minutes'
-        AND '{{ .Alert.ClosedAt | to_time | strftime_in_zone `%Y-%m-%dT%H:%M:%SZ` `UTC`  }}'::timestamp
+        '${strftime("%Y-%m-%dT%H:%M:%SZ","UTC", runtime.event.alert.opened_at)}'::timestamp - interval '15 minutes'
+        AND '${strftime("%Y-%m-%dT%H:%M:%SZ","UTC", runtime.event.alert.closed_at)}'::timestamp
 LIMIT 200
 EOQ
 }
@@ -99,4 +99,4 @@ EOQ
 
 only sql attribute.
 
-sql attribute can use go template.
+

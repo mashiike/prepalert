@@ -1,12 +1,10 @@
 package redshiftdata
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log"
-	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,9 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/redshiftdata/types"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/mashiike/prepalert/internal/funcs"
 	"github.com/mashiike/prepalert/queryrunner"
 	"github.com/samber/lo"
+	"github.com/zclconf/go-cty/cty"
 )
 
 const TypeName = "redshift_data"
@@ -129,8 +127,7 @@ type PreparedQuery struct {
 	name   string
 	runner *QueryRunner
 
-	SQL           string `hcl:"sql"`
-	queryTemplate *template.Template
+	SQL hcl.Expression `hcl:"sql"`
 }
 
 func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) (queryrunner.PreparedQuery, hcl.Diagnostics) {
@@ -143,26 +140,26 @@ func (r *QueryRunner) Prepare(name string, body hcl.Body, ctx *hcl.EvalContext) 
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	if q.SQL == "" {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid SQL template",
-			Detail:   "sql is empty",
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
+	if value, _ := q.SQL.Value(ctx); value.IsKnown() {
+		if value.Type() != cty.String {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Invalid SQL template",
+				Detail:   "sql is not string",
+				Subject:  body.MissingItemRange().Ptr(),
+			})
+			return nil, diags
+		}
+		if value.AsString() == "" {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Invalid SQL template",
+				Detail:   "sql is empty",
+				Subject:  body.MissingItemRange().Ptr(),
+			})
+			return nil, diags
+		}
 	}
-	queryTemplate, err := template.New(name).Funcs(funcs.QueryTemplateFuncMap).Parse(q.SQL)
-	if err != nil {
-		diags = append(diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Invalid SQL template",
-			Detail:   fmt.Sprintf("parse sql as go template: %v", err),
-			Subject:  body.MissingItemRange().Ptr(),
-		})
-		return nil, diags
-	}
-	q.queryTemplate = queryTemplate
 	return q, diags
 }
 
@@ -170,12 +167,18 @@ func (q *PreparedQuery) Name() string {
 	return q.name
 }
 
-func (q *PreparedQuery) Run(ctx context.Context, data interface{}) (*queryrunner.QueryResult, error) {
-	var buf bytes.Buffer
-	if err := q.queryTemplate.Execute(&buf, data); err != nil {
-		return nil, fmt.Errorf("execute query template:%w", err)
+func (q *PreparedQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*queryrunner.QueryResult, error) {
+	value, diags := q.SQL.Value(evalCtx)
+	if diags.HasErrors() {
+		return nil, diags
 	}
-	return q.runner.RunQuery(ctx, "prepalert-"+q.name, buf.String())
+	if !value.IsKnown() {
+		return nil, errors.New("SQL is unknown")
+	}
+	if value.Type() != cty.String {
+		return nil, errors.New("SQL is string")
+	}
+	return q.runner.RunQuery(ctx, q.name, value.AsString())
 }
 
 func (r *QueryRunner) RunQuery(ctx context.Context, stmtName string, query string) (*queryrunner.QueryResult, error) {
@@ -188,7 +191,7 @@ func (r *QueryRunner) RunQuery(ctx context.Context, stmtName string, query strin
 	log.Printf("[debug][%s] query: %s", reqID, query)
 	executeOutput, err := r.client.ExecuteStatement(ctx, &redshiftdata.ExecuteStatementInput{
 		Database:          r.Database,
-		Sql:               aws.String("/* prepalert query */" + query),
+		Sql:               aws.String(query),
 		ClusterIdentifier: r.ClusterIdentifier,
 		DbUser:            r.DbUser,
 		SecretArn:         r.SecretsARN,

@@ -9,12 +9,14 @@ import (
 )
 
 type Config struct {
-	Prepalert PrepalertBlock
-	Rules     RuleBlocks
-	Queries   queryrunner.PreparedQueries
+	EvalContext *hcl.EvalContext
+	Prepalert   PrepalertBlock
+	Rules       RuleBlocks
+	Queries     queryrunner.PreparedQueries
 }
 
 func (cfg *Config) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
+	cfg.EvalContext = ctx.NewChild()
 	queries, body, diags := queryrunner.DecodeBody(body, ctx)
 	cfg.Queries = queries
 	schema := &hcl.BodySchema{

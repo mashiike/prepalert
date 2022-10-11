@@ -1,11 +1,15 @@
 package queryrunner
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
+	"github.com/olekukonko/tablewriter"
+	"github.com/samber/lo"
+	"github.com/zclconf/go-cty/cty"
 )
 
 func DecodeBody(body hcl.Body, ctx *hcl.EvalContext) (PreparedQueries, hcl.Body, hcl.Diagnostics) {
@@ -156,4 +160,71 @@ func decodeBodyForQueryBlock(body hcl.Body, ctx *hcl.EvalContext, name string, q
 	preparedQuery, prepareDiags := queryRunner.Prepare(name, remain, ctx)
 	diags = append(diags, prepareDiags...)
 	return preparedQuery, diags
+}
+
+func (qr *QueryResult) MarshalCTYValue() cty.Value {
+	columns := cty.ListValEmpty(cty.String)
+	rows := cty.ListValEmpty(cty.List(cty.String))
+	if len(qr.Columns) > 0 {
+		columns = cty.ListVal(lo.Map(qr.Columns, func(column string, _ int) cty.Value {
+			return cty.StringVal(column)
+		}))
+	}
+	if len(qr.Rows) > 0 {
+		rows = cty.ListVal(lo.Map(qr.Rows, func(row []string, _ int) cty.Value {
+			if len(row) == 0 {
+				return cty.ListValEmpty(cty.String)
+			}
+			return cty.ListVal(lo.Map(row, func(v string, _ int) cty.Value {
+				return cty.StringVal(v)
+			}))
+		}))
+	}
+	return cty.ObjectVal(map[string]cty.Value{
+		"name":    cty.StringVal(qr.Name),
+		"query":   cty.StringVal(qr.Query),
+		"columns": columns,
+		"rows":    rows,
+		"table":   cty.StringVal(qr.ToTable()),
+		"markdown_table": cty.StringVal(qr.ToTable(
+			func(table *tablewriter.Table) {
+				table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+				table.SetCenterSeparator("|")
+				table.SetAutoFormatHeaders(false)
+				table.SetAutoWrapText(false)
+			},
+		)),
+		"borderless_table": cty.StringVal(qr.ToTable(
+			func(table *tablewriter.Table) {
+				table.SetCenterSeparator(" ")
+				table.SetAutoFormatHeaders(false)
+				table.SetAutoWrapText(false)
+				table.SetBorder(false)
+				table.SetColumnSeparator(" ")
+			},
+		)),
+		"vertical_table": cty.StringVal(qr.ToVertical()),
+		"json_lines":     cty.StringVal(qr.ToJSON()),
+	})
+}
+
+func TraversalQuery(traversal hcl.Traversal, queries PreparedQueries) (PreparedQuery, error) {
+	if traversal.IsRelative() {
+		return nil, errors.New("traversal is relative")
+	}
+	if traversal.RootName() != "query" {
+		return nil, fmt.Errorf("expected root name is `query` s, actual %s", traversal.RootName())
+	}
+	if len(traversal) < 2 {
+		return nil, errors.New("traversal length < 2")
+	}
+	attr, ok := traversal[1].(hcl.TraverseAttr)
+	if !ok {
+		return nil, errors.New("traversal[1] is not TraverseAttr")
+	}
+	query, ok := queries.Get(attr.Name)
+	if !ok {
+		return nil, fmt.Errorf("query.%s is not found", attr.Name)
+	}
+	return query, nil
 }

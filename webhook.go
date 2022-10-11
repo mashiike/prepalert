@@ -1,8 +1,8 @@
 package prepalert
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type WebhookBody struct {
@@ -23,6 +24,23 @@ type WebhookBody struct {
 	Host     *Host    `json:"host,omitempty"`
 	Service  *Service `json:"service,omitempty"`
 	Alert    *Alert   `json:"alert"`
+}
+
+func (body *WebhookBody) MarshalCTYValues() map[string]cty.Value {
+	values := map[string]cty.Value{
+		"org_name":  cty.StringVal(body.OrgName),
+		"event":     cty.StringVal(body.Event),
+		"image_url": cty.StringVal(body.Event),
+		"memo":      cty.StringVal(body.Memo),
+		"alert":     cty.ObjectVal(body.Alert.MarshalCTYValues()),
+	}
+	if body.Host != nil {
+		values["host"] = cty.ObjectVal(body.Host.MarshalCTYValues())
+	}
+	if body.Service != nil {
+		values["service"] = cty.ObjectVal(body.Service.MarshalCTYValues())
+	}
+	return values
 }
 
 type Host struct {
@@ -36,6 +54,27 @@ type Host struct {
 	Roles     []*Role `json:"roles"`
 }
 
+func (body *Host) MarshalCTYValues() map[string]cty.Value {
+	values := map[string]cty.Value{
+		"id":         cty.StringVal(body.ID),
+		"name":       cty.StringVal(body.Name),
+		"url":        cty.StringVal(body.URL),
+		"type":       cty.StringVal(body.Type),
+		"status":     cty.StringVal(body.Status),
+		"memo":       cty.StringVal(body.Memo),
+		"is_retired": cty.BoolVal(body.IsRetired),
+	}
+	if len(body.Roles) == 0 {
+		return values
+	}
+	roles := make([]cty.Value, 0, len(body.Roles))
+	for _, role := range body.Roles {
+		roles = append(roles, cty.ObjectVal(role.MarshalCTYValues()))
+	}
+	values["roles"] = cty.ListVal(roles)
+	return values
+}
+
 type Role struct {
 	Fullname    string `json:"fullname"`
 	ServiceName string `json:"serviceName"`
@@ -44,12 +83,41 @@ type Role struct {
 	RoleURL     string `json:"roleUrl"`
 }
 
+func (body *Role) MarshalCTYValues() map[string]cty.Value {
+	values := map[string]cty.Value{
+		"fullname":     cty.StringVal(body.Fullname),
+		"service_name": cty.StringVal(body.ServiceName),
+		"service_url":  cty.StringVal(body.ServiceURL),
+		"role_name":    cty.StringVal(body.RoleName),
+		"role_url":     cty.StringVal(body.RoleURL),
+	}
+	return values
+}
+
 type Service struct {
 	ID    string  `json:"id"`
 	Memo  string  `json:"memo"`
 	Name  string  `json:"name"`
 	OrgID string  `json:"orgId"`
 	Roles []*Role `json:"roles"`
+}
+
+func (body *Service) MarshalCTYValues() map[string]cty.Value {
+	values := map[string]cty.Value{
+		"id":     cty.StringVal(body.ID),
+		"name":   cty.StringVal(body.Name),
+		"memo":   cty.StringVal(body.Memo),
+		"org_id": cty.StringVal(body.OrgID),
+	}
+	if len(body.Roles) == 0 {
+		return values
+	}
+	roles := make([]cty.Value, 0, len(body.Roles))
+	for _, role := range body.Roles {
+		roles = append(roles, cty.ObjectVal(role.MarshalCTYValues()))
+	}
+	values["roles"] = cty.ListVal(roles)
+	return values
 }
 
 type Alert struct {
@@ -70,6 +138,27 @@ type Alert struct {
 	WarningThreshold  float64 `json:"warningThreshold"`
 }
 
+func (body *Alert) MarshalCTYValues() map[string]cty.Value {
+	values := map[string]cty.Value{
+		"opened_at":          cty.NumberIntVal(body.OpenedAt),
+		"closed_at":          cty.NumberIntVal(body.ClosedAt),
+		"created_at":         cty.NumberIntVal(body.CreatedAt),
+		"critical_threshold": cty.NumberFloatVal(body.CriticalThreshold),
+		"duration":           cty.NumberIntVal(body.Duration),
+		"is_open":            cty.BoolVal(body.IsOpen),
+		"metric_label":       cty.StringVal(body.MetricLabel),
+		"metric_value":       cty.NumberFloatVal(body.MetricValue),
+		"monitor_name":       cty.StringVal(body.MonitorName),
+		"monitor_operator":   cty.StringVal(body.MonitorOperator),
+		"status":             cty.StringVal(body.Status),
+		"trigger":            cty.StringVal(body.Trigger),
+		"id":                 cty.StringVal(body.ID),
+		"url":                cty.StringVal(body.URL),
+		"warning_threshold":  cty.NumberFloatVal(body.WarningThreshold),
+	}
+	return values
+}
+
 const maxDescriptionSize = 1024
 
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
@@ -78,7 +167,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	if ok {
 		reqID = fmt.Sprintf("%d", hctx.ReqID)
 	}
-	info, err := rule.BuildInfomation(ctx, body)
+	info, err := rule.BuildInfomation(ctx, app.evalCtx.NewChild(), body)
 	if err != nil {
 		return err
 	}
@@ -95,12 +184,25 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	var showDetailsURL string
 	var abbreviatedMessage string = "\n..."
 	if app.EnableBackend() {
-		var buf bytes.Buffer
-		if err := app.backend.ObjectKeyTemplate.Execute(&buf, body); err != nil {
-			return fmt.Errorf("execute object key template: %w", err)
+		evalCtx := app.evalCtx.NewChild()
+		evalCtx.Variables = map[string]cty.Value{
+			"runtime": cty.ObjectVal(map[string]cty.Value{
+				"event": cty.ObjectVal(body.MarshalCTYValues()),
+			}),
 		}
-		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, buf.String(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
-		u := app.backend.ViewerBaseURL.JoinPath(buf.String(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
+		expr := *app.backend.ObjectKeyTemplate
+		objectKeyTemplateValue, diags := expr.Value(evalCtx)
+		if diags.HasErrors() {
+			return fmt.Errorf("eval object key template: %w", diags)
+		}
+		if objectKeyTemplateValue.Type() != cty.String {
+			return errors.New("object key template is not string")
+		}
+		if !objectKeyTemplateValue.IsKnown() {
+			return errors.New("object key template is unknown")
+		}
+		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
+		u := app.backend.ViewerBaseURL.JoinPath(objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
 		showDetailsURL = u.String()
 		if m := fmt.Sprintf("\nshow details: %s", showDetailsURL); len(m) < maxDescriptionSize-len(baseMessage) {
 			abbreviatedMessage = m

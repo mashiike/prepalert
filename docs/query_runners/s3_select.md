@@ -4,7 +4,7 @@ sample configuration
 
 ```hcl
 prepalert {
-    required_version = ">=v0.2.0"
+    required_version = ">=v0.7.0"
     sqs_queue_name   = "prepalert"
     service          = "prod"
 }
@@ -16,7 +16,7 @@ query_runner "s3_select" "default" {
 query "alb_5xx_logs" {
   runner            = query_runner.s3_select.default
   bucket_name       = "your-bucket"
-  object_key_prefix = "alb/AWSLogs/0123456789012/elasticloadbalancing/ap-northeast-1/{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d` }}/"
+  object_key_prefix = "alb/AWSLogs/0123456789012/elasticloadbalancing/ap-northeast-1/${strftime("%Y/%m/%d", runtime.event.alert.opened_at)}/"
   compression_type  = "GZIP"
   csv {
     field_delimiter  = " "
@@ -25,18 +25,18 @@ query "alb_5xx_logs" {
   expression = file("get_alb_5xx_log.sql")
 }
 
-rule "alb_target_5xx" {
+rule "alb_5xx" {
     alert {
-        monitor_name = "ALB Target 5xx"
+        monitor_name = "ALB 5xx"
     }
 
     queries = [
-        query.alb_target_5xx_info,
+        query.alb_5xx_logs,
     ]
 
     infomation = <<EOT
 5xx info:
-{{ index .QueryResults `alb_target_5xx_info` | to_table }}
+${runtime.query_result.alb_5xx_logs.table}
 EOT
 }
 ```
@@ -53,7 +53,7 @@ When querying uncompressed json lines, the following is used
 query "logs" {
   runner            = query_runner.s3_select.default
   bucket_name       = "your-bucket"
-  object_key_prefix = "application-logs/{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d` }}/"
+  object_key_prefix = "application-logs/${strftime("%Y/%m/%d", runtime.event.alert.opened_at)}/"
   compression_type  = "NONE"
   json {
     type = "LINES"
@@ -69,7 +69,7 @@ in the case of Parquet
 query "logs" {
   runner            = query_runner.s3_select.default
   bucket_name       = "your-bucket"
-  object_key_prefix = "application-logs/{{ .Alert.OpenedAt | to_time | strftime `%Y/%m/%d` }}/"
+  object_key_prefix = "application-logs/${strftime("%Y/%m/%d", runtime.event.alert.opened_at)}/"
   compression_type  = "NONE"
   parquet {}
   expression = file("logs.sql")
