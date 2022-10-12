@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
-	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/mashiike/queryrunner"
 )
 
 type Config struct {

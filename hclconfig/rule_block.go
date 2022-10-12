@@ -3,7 +3,7 @@ package hclconfig
 import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
-	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/mashiike/queryrunner"
 	"github.com/zclconf/go-cty/cty"
 )
 

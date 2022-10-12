@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/mackerelio/mackerel-client-go"
-	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/mashiike/queryrunner"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -162,11 +162,7 @@ func (body *Alert) MarshalCTYValues() map[string]cty.Value {
 const maxDescriptionSize = 1024
 
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
-	reqID := "-"
-	hctx, ok := queryrunner.GetQueryRunningContext(ctx)
-	if ok {
-		reqID = fmt.Sprintf("%d", hctx.ReqID)
-	}
+	reqID := queryrunner.GetRequestID(ctx)
 	info, err := rule.BuildInfomation(ctx, app.evalCtx.NewChild(), body)
 	if err != nil {
 		return err
