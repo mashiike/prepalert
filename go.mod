@@ -23,7 +23,7 @@ require (
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
 	github.com/mashiike/hclconfig v0.5.0
 	github.com/mashiike/ls3viewer v0.2.0
-	github.com/mashiike/queryrunner v0.1.0
+	github.com/mashiike/queryrunner v0.1.1
 	github.com/samber/lo v1.32.0
 	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/stretchr/testify v1.8.0
@@ -65,7 +65,7 @@ require (
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-encoding v0.0.2 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pires/go-proxyproto v0.6.2 // indirect
@@ -83,13 +83,13 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
-	golang.org/x/exp v0.0.0-20220909182711-5c715a9e8561 // indirect
+	golang.org/x/exp v0.0.0-20221011201855-a3968a42eed6 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
-	golang.org/x/sys v0.0.0-20221006211917-84dc82d7e875 // indirect
+	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.3.8 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
