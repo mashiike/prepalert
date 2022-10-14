@@ -33,7 +33,8 @@ func (cfg *Config) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnosti
 	content, contentDiags := body.Content(schema)
 	diags = append(diags, contentDiags...)
 	diags = append(diags, hclconfig.RestrictOnlyOneBlock(content, "prepalert")...)
-	diags = append(diags, hclconfig.RestrictUniqueBlockLabels(content)...)
+	diags = append(diags, hclconfig.RestrictRequiredBlock(content, "prepalert")...)
+	diags = append(diags, hclconfig.RestrictUniqueBlockLabels(content, "rule")...)
 
 	for _, block := range content.Blocks {
 		switch block.Type {
