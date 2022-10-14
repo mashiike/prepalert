@@ -324,6 +324,8 @@ github.com/mashiike/queryrunner v0.2.0 h1:zZKJRbs3p+EIZnHlcntIBanpc/xw0QDGNaEzia
 github.com/mashiike/queryrunner v0.2.0/go.mod h1:Etyz9OP8od1eXX0lv+wxsl4vmuyMIQQnJg90GHHKnm4=
 github.com/mashiike/queryrunner v0.2.1 h1:ZJd6sM/e/a08fVQjqSfEWIg/itQGq5xKBUDHUs47EmM=
 github.com/mashiike/queryrunner v0.2.1/go.mod h1:DCTuNeV8El2gMM5eD8KRyY8SqKFeNvLBfmdnupZVmrk=
+github.com/mashiike/queryrunner v0.2.2 h1:GapMAhd3zz8dMMjeqm5cw70Xr0zrvMKcvAOS2pJVYNA=
+github.com/mashiike/queryrunner v0.2.2/go.mod h1:DCTuNeV8El2gMM5eD8KRyY8SqKFeNvLBfmdnupZVmrk=
 github.com/mattn/go-colorable v0.1.9 h1:sqDoxXbdeALODt0DAeJCVp38ps9ZogZEAXjus69YV3U=
 github.com/mattn/go-colorable v0.1.9/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=
 github.com/mattn/go-encoding v0.0.2 h1:OC1L+QXLJge9n7yIE3R5Os/UNasUeFvK3Sa4NjbDi6c=

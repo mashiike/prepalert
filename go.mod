@@ -23,7 +23,7 @@ require (
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
 	github.com/mashiike/hclconfig v0.7.0
 	github.com/mashiike/ls3viewer v0.2.0
-	github.com/mashiike/queryrunner v0.2.1
+	github.com/mashiike/queryrunner v0.2.2
 	github.com/samber/lo v1.32.0
 	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/stretchr/testify v1.8.0
