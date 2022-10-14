@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.7.0](https://github.com/mashiike/prepalert/compare/v0.6.1...v0.7.0) - 2022-10-14
+- install reviewdog by @mashiike in https://github.com/mashiike/prepalert/pull/39
+- update tagpr by @mashiike in https://github.com/mashiike/prepalert/pull/41
+- Refactoring with github.com/mashiike/hclconfig by @mashiike in https://github.com/mashiike/prepalert/pull/42
+- Feature/on opened by @mashiike in https://github.com/mashiike/prepalert/pull/43
+- Feature/no go template by @mashiike in https://github.com/mashiike/prepalert/pull/51
+- Bump github.com/aws/aws-sdk-go-v2/config from 1.17.5 to 1.17.8 by @dependabot in https://github.com/mashiike/prepalert/pull/44
+- Bump github.com/urfave/cli/v2 from 2.16.3 to 2.19.2 by @dependabot in https://github.com/mashiike/prepalert/pull/49
+- use github.com/mashiike/queryrunner by @mashiike in https://github.com/mashiike/prepalert/pull/56
+
 ## [v0.6.1](https://github.com/mashiike/prepalert/compare/v0.6.0...v0.6.1) - 2022-09-16
 - Feature/docs query runner by @mashiike in https://github.com/mashiike/prepalert/pull/36
 - update ls3viewer by @mashiike in https://github.com/mashiike/prepalert/pull/38
