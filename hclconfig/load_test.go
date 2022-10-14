@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
-	"github.com/mashiike/prepalert/queryrunner"
-	"github.com/mashiike/prepalert/queryrunner/redshiftdata"
+	"github.com/mashiike/queryrunner"
+	"github.com/mashiike/queryrunner/redshiftdata"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
 )

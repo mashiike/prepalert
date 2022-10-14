@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
@@ -25,7 +26,7 @@ import (
 	"github.com/mashiike/grat"
 	"github.com/mashiike/ls3viewer"
 	"github.com/mashiike/prepalert/hclconfig"
-	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/mashiike/queryrunner"
 )
 
 type App struct {
@@ -248,11 +249,7 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 	return app.ProcessRules(ctx, &body)
 }
 func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
-	reqID := "-"
-	info, ok := queryrunner.GetQueryRunningContext(ctx)
-	if ok {
-		reqID = fmt.Sprintf("%d", info.ReqID)
-	}
+	reqID := queryrunner.GetRequestID(ctx)
 	if body.Alert.IsOpen {
 		log.Printf("[when][%s] alert is not closed, fill closed at now time id=%s, status=%s monitor=%s", reqID, body.Alert.ID, body.Alert.Status, body.Alert.MonitorName)
 		body.Alert.ClosedAt = flextime.Now().Unix()
@@ -293,6 +290,19 @@ func (app *App) CheckBasicAuth(r *http.Request) bool {
 }
 
 func (app *App) WithQueryRunningContext(ctx context.Context, reqID uint64, message *events.SQSMessage) context.Context {
-	hctx := queryrunner.NewQueryRunningContext(app.sqsClient, app.queueUrl, reqID, message)
-	return queryrunner.WithQueryRunningContext(ctx, hctx)
+	ctx = queryrunner.WithRequestID(ctx, fmt.Sprintf("%d", reqID))
+	ctx = queryrunner.WithTimeoutExtender(ctx, queryrunner.TimeoutExtenderFunc(
+		func(ctx context.Context, timeout time.Duration) error {
+			_, err := app.sqsClient.ChangeMessageVisibility(ctx, &sqs.ChangeMessageVisibilityInput{
+				QueueUrl:          aws.String(app.queueUrl),
+				ReceiptHandle:     aws.String(message.ReceiptHandle),
+				VisibilityTimeout: int32(timeout.Seconds()),
+			})
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	))
+	return ctx
 }

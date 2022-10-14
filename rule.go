@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/hclconfig"
-	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/mashiike/queryrunner"
 	"github.com/zclconf/go-cty/cty"
 	"golang.org/x/sync/errgroup"
 )
@@ -84,11 +84,7 @@ func (rule *Rule) Match(body *WebhookBody) bool {
 }
 
 func (rule *Rule) BuildInfomation(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) (string, error) {
-	reqID := "-"
-	info, ok := queryrunner.GetQueryRunningContext(ctx)
-	if ok {
-		reqID = fmt.Sprintf("%d", info.ReqID)
-	}
+	reqID := queryrunner.GetRequestID(ctx)
 	eg, egctx := errgroup.WithContext(ctx)
 	runtimeVariables := map[string]cty.Value{
 		"params": rule.params,
@@ -102,7 +98,7 @@ func (rule *Rule) BuildInfomation(ctx context.Context, evalCtx *hcl.EvalContext,
 		_query := query
 		eg.Go(func() error {
 			log.Printf("[info][%s] start run query name=%s", reqID, _query.Name())
-			result, err := _query.Run(egctx, evalCtx)
+			result, err := _query.Run(egctx, evalCtx.Variables, nil)
 			if err != nil {
 				log.Printf("[error][%s]failed run query name=%s", reqID, _query.Name())
 				return fmt.Errorf("query `%s`:%w", _query.Name(), err)

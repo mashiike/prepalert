@@ -8,7 +8,7 @@ import (
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
-	"github.com/mashiike/prepalert/queryrunner"
+	"github.com/mashiike/queryrunner"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
 )

@@ -15,10 +15,10 @@ import (
 	"github.com/handlename/ssmwrap"
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
-	_ "github.com/mashiike/prepalert/queryrunner/cloudwatchlogsinsights"
-	_ "github.com/mashiike/prepalert/queryrunner/redshiftdata"
-	_ "github.com/mashiike/prepalert/queryrunner/s3select"
 	"github.com/mashiike/prepalert/wizard"
+	_ "github.com/mashiike/queryrunner/cloudwatchlogsinsights"
+	_ "github.com/mashiike/queryrunner/redshiftdata"
+	_ "github.com/mashiike/queryrunner/s3select"
 	"github.com/urfave/cli/v2"
 )
 
