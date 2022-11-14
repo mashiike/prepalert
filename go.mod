@@ -24,7 +24,7 @@ require (
 	github.com/mashiike/hclconfig v0.7.0
 	github.com/mashiike/ls3viewer v0.2.0
 	github.com/mashiike/queryrunner v0.2.2
-	github.com/samber/lo v1.32.0
+	github.com/samber/lo v1.34.0
 	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.19.2
