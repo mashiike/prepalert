@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.8.0](https://github.com/mashiike/prepalert/compare/v0.7.0...v0.8.0) - 2022-12-01
+- Feature/update alert memo by @mashiike in https://github.com/mashiike/prepalert/pull/72
+- change initial configure by @mashiike in https://github.com/mashiike/prepalert/pull/74
+- Bump github.com/urfave/cli/v2 from 2.19.2 to 2.23.5 by @dependabot in https://github.com/mashiike/prepalert/pull/66
+
 ## [v0.7.0](https://github.com/mashiike/prepalert/compare/v0.6.1...v0.7.0) - 2022-10-14
 - install reviewdog by @mashiike in https://github.com/mashiike/prepalert/pull/39
 - update tagpr by @mashiike in https://github.com/mashiike/prepalert/pull/41
