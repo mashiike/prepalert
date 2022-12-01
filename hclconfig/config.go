@@ -42,7 +42,9 @@ func (cfg *Config) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnosti
 			diags = append(diags, cfg.Prepalert.DecodeBody(block.Body, ctx)...)
 		case "rule":
 			rule := &RuleBlock{
-				Name: block.Labels[0],
+				Name:                block.Labels[0],
+				PostGraphAnnotation: true,
+				UpdateAlertMemo:     true,
 			}
 			diags = append(diags, rule.DecodeBody(block.Body, ctx, cfg.Queries)...)
 			cfg.Rules = append(cfg.Rules, rule)

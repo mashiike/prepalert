@@ -8,11 +8,13 @@ import (
 )
 
 type RuleBlock struct {
-	Name        string
-	Alert       AlertBlock
-	QueriesExpr hcl.Expression
-	ParamsExpr  hcl.Expression
-	Infomation  hcl.Expression
+	Name                string
+	Alert               AlertBlock
+	QueriesExpr         hcl.Expression
+	ParamsExpr          hcl.Expression
+	Infomation          hcl.Expression
+	UpdateAlertMemo     bool
+	PostGraphAnnotation bool
 
 	Params  cty.Value
 	Queries map[string]queryrunner.PreparedQuery
@@ -30,6 +32,12 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 			},
 			{
 				Name: "params",
+			},
+			{
+				Name: "post_graph_annotation",
+			},
+			{
+				Name: "update_alert_memo",
 			},
 		},
 		Blocks: []hcl.BlockHeaderSchema{
@@ -83,6 +91,16 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 			params, valueDiags := attr.Expr.Value(ctx)
 			diags = append(diags, valueDiags...)
 			b.Params = params
+		case "update_alert_memo":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.UpdateAlertMemo)...)
+			if diags.HasErrors() {
+				continue
+			}
+		case "post_graph_annotation":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.PostGraphAnnotation)...)
+			if diags.HasErrors() {
+				continue
+			}
 		}
 	}
 	return diags
