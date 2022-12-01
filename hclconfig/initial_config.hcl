@@ -17,7 +17,9 @@ rule "simple" {
   alert {
     any = true
   }
-  infomation = "How do you respond to alerts?"
+  infomation            = "How do you respond to alerts?"
+  update_alert_memo     = true
+  post_graph_annotation = true
 }
 
 // // Advanced configuration
