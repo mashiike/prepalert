@@ -18,8 +18,10 @@ rule "simple" {
   alert {
     any = true
   }
-  infomation = <<EOF
+  infomation                            = <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
 EOF
+  max_alert_memo_size                   = 1024
+  max_graph_annotation_description_size = 1024
 }

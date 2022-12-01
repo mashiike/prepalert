@@ -161,11 +161,6 @@ func (body *Alert) MarshalCTYValues() map[string]cty.Value {
 	return values
 }
 
-const (
-	maxDescriptionSize = 1024
-	maxMemoSize        = 80 * 1000
-)
-
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
 	reqID := queryrunner.GetRequestID(ctx)
 	info, err := rule.BuildInfomation(ctx, app.evalCtx.NewChild(), body)
@@ -214,13 +209,18 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	var errNum int32
 	if rule.UpdateAlertMemo() {
 		memo := info
-		if len(memo) > maxMemoSize {
+		maxSize := rule.MaxAlertMemoSize()
+		if len(memo) > maxSize {
 			if app.EnableBackend() {
 				log.Printf("[warn][%s] memo is too long length=%d, backend_url=%s", reqID, len(memo), showDetailsURL)
 			} else {
 				log.Printf("[warn][%s] memo is too long length=%d, full memo:%s", reqID, len(memo), memo)
 			}
-			memo = memo[0:maxMemoSize-len(abbreviatedMessage)] + abbreviatedMessage
+			if len(abbreviatedMessage) >= maxSize {
+				memo = abbreviatedMessage[0:maxSize]
+			} else {
+				memo = memo[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
+			}
 		}
 		wg.Add(1)
 		go func() {
@@ -232,13 +232,18 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		}()
 	}
 	if rule.PostGraphAnnotation() {
-		if len(description) > maxDescriptionSize {
+		maxSize := rule.MaxGraphAnnotationDescriptionSize()
+		if len(description) > maxSize {
 			if app.EnableBackend() {
 				log.Printf("[warn][%s] description is too long length=%d, backend_url=%s", reqID, len(description), showDetailsURL)
 			} else {
 				log.Printf("[warn][%s] description is too long length=%d, full description:%s", reqID, len(description), description)
 			}
-			description = description[0:maxDescriptionSize-len(abbreviatedMessage)] + abbreviatedMessage
+			if len(abbreviatedMessage) >= maxSize {
+				description = abbreviatedMessage[0:maxSize]
+			} else {
+				description = description[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
+			}
 		}
 		annotation := &mackerel.GraphAnnotation{
 			Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name()),

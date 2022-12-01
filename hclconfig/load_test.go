@@ -310,8 +310,10 @@ func TestLoadNoError(t *testing.T) {
 										},
 									},
 								},
-								PostGraphAnnotation: true,
-								UpdateAlertMemo:     true,
+								PostGraphAnnotation:               true,
+								UpdateAlertMemo:                   true,
+								MaxGraphAnnotationDescriptionSize: generics.Ptr(int(1024)),
+								MaxAlertMemoSize:                  generics.Ptr(int(1024)),
 							},
 						},
 					}, cfg)

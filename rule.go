@@ -16,16 +16,18 @@ import (
 )
 
 type Rule struct {
-	ruleName            string
-	monitorName         string
-	anyAlert            bool
-	onClosed            bool
-	onOpened            bool
-	queries             []queryrunner.PreparedQuery
-	infomation          hcl.Expression
-	params              cty.Value
-	postGraphAnnotation bool
-	updateAlertMemo     bool
+	ruleName                          string
+	monitorName                       string
+	anyAlert                          bool
+	onClosed                          bool
+	onOpened                          bool
+	queries                           []queryrunner.PreparedQuery
+	infomation                        hcl.Expression
+	params                            cty.Value
+	postGraphAnnotation               bool
+	updateAlertMemo                   bool
+	maxGraphAnnotationDescriptionSize *int
+	maxAlertMemoSize                  *int
 }
 
 func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
@@ -164,4 +166,36 @@ func (rule *Rule) PostGraphAnnotation() bool {
 
 func (rule *Rule) UpdateAlertMemo() bool {
 	return rule.updateAlertMemo
+}
+
+const (
+	maxDescriptionSize = 1024
+	maxMemoSize        = 80 * 1000
+	defualtMaxMemoSize = 1024
+)
+
+func (rule *Rule) MaxGraphAnnotationDescriptionSize() int {
+	if rule.maxGraphAnnotationDescriptionSize == nil {
+		return maxDescriptionSize
+	}
+	if *rule.maxGraphAnnotationDescriptionSize > maxDescriptionSize {
+		return maxDescriptionSize
+	}
+	if *rule.maxGraphAnnotationDescriptionSize <= 0 {
+		return 100
+	}
+	return *rule.maxGraphAnnotationDescriptionSize
+}
+
+func (rule *Rule) MaxAlertMemoSize() int {
+	if rule.maxAlertMemoSize == nil {
+		return defualtMaxMemoSize
+	}
+	if *rule.maxAlertMemoSize > maxMemoSize {
+		return maxMemoSize
+	}
+	if *rule.maxAlertMemoSize <= 0 {
+		return 100
+	}
+	return *rule.maxAlertMemoSize
 }
