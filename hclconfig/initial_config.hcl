@@ -15,11 +15,15 @@ prepalert {
 // Setup to post graph annotations describing fixed content no matter what alerts come in.
 rule "simple" {
   alert {
+    // For any alert, if a webhook comes in with the alert open, we will update the note.
     any = true
+    on_opened = true
+    on_closed = false
   }
   infomation            = "How do you respond to alerts?"
   update_alert_memo     = true
-  post_graph_annotation = true
+  max_alert_memo_size   = 10000  //If the size of the memo exceeds 10KB, a part of the memo will be omitted. This setting can be changed from 100Bytes ~ 80KB.
+  post_graph_annotation = false
 }
 
 // // Advanced configuration
@@ -50,6 +54,8 @@ rule "simple" {
 // rule "alb_target_5xx" {
 //   alert {
 //     monitor_name = "ALB Target 5xx"
+//     on_opened    = true
+//     on_closed    = false
 //   }
 //
 //   queries = [
@@ -60,4 +66,8 @@ rule "simple" {
 // 5xx info:
 // ${runtime.query_result.alb_target_5xx_info.table}
 // EOT
+//
+//   update_alert_memo     = true
+//   max_alert_memo_size   = 80000
+//   post_graph_annotation = true
 // }
