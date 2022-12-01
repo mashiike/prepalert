@@ -94,6 +94,8 @@ func TestLoadNoError(t *testing.T) {
 										},
 									},
 								},
+								PostGraphAnnotation: true,
+								UpdateAlertMemo:     true,
 							},
 						},
 					}, cfg)
@@ -142,6 +144,8 @@ func TestLoadNoError(t *testing.T) {
 										},
 									},
 								},
+								PostGraphAnnotation: false,
+								UpdateAlertMemo:     false,
 							},
 						},
 					}, cfg)
@@ -199,6 +203,8 @@ func TestLoadNoError(t *testing.T) {
 										},
 									},
 								},
+								PostGraphAnnotation: true,
+								UpdateAlertMemo:     true,
 							},
 							{
 								Name: "constant",
@@ -218,6 +224,8 @@ func TestLoadNoError(t *testing.T) {
 										},
 									},
 								},
+								PostGraphAnnotation: true,
+								UpdateAlertMemo:     true,
 							},
 						},
 					}, cfg)
@@ -302,6 +310,10 @@ func TestLoadNoError(t *testing.T) {
 										},
 									},
 								},
+								PostGraphAnnotation:               true,
+								UpdateAlertMemo:                   true,
+								MaxGraphAnnotationDescriptionSize: generics.Ptr(int(1024)),
+								MaxAlertMemoSize:                  generics.Ptr(int(1024)),
 							},
 						},
 					}, cfg)
