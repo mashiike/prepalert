@@ -16,14 +16,16 @@ import (
 )
 
 type Rule struct {
-	ruleName    string
-	monitorName string
-	anyAlert    bool
-	onClosed    bool
-	onOpened    bool
-	queries     []queryrunner.PreparedQuery
-	infomation  hcl.Expression
-	params      cty.Value
+	ruleName            string
+	monitorName         string
+	anyAlert            bool
+	onClosed            bool
+	onOpened            bool
+	queries             []queryrunner.PreparedQuery
+	infomation          hcl.Expression
+	params              cty.Value
+	postGraphAnnotation bool
+	updateAlertMemo     bool
 }
 
 func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
@@ -55,14 +57,16 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		queries = append(queries, query)
 	}
 	rule := &Rule{
-		ruleName:    cfg.Name,
-		monitorName: name,
-		anyAlert:    anyAlert,
-		onOpened:    onOpened,
-		onClosed:    onClosed,
-		queries:     queries,
-		infomation:  cfg.Infomation,
-		params:      cfg.Params,
+		ruleName:            cfg.Name,
+		monitorName:         name,
+		anyAlert:            anyAlert,
+		onOpened:            onOpened,
+		onClosed:            onClosed,
+		queries:             queries,
+		infomation:          cfg.Infomation,
+		params:              cfg.Params,
+		postGraphAnnotation: cfg.PostGraphAnnotation,
+		updateAlertMemo:     cfg.UpdateAlertMemo,
 	}
 	return rule, nil
 }
@@ -152,4 +156,12 @@ func (rule *Rule) RenderInfomation(evalCtx *hcl.EvalContext) (string, error) {
 
 func (rule *Rule) Name() string {
 	return rule.ruleName
+}
+
+func (rule *Rule) PostGraphAnnotation() bool {
+	return rule.postGraphAnnotation
+}
+
+func (rule *Rule) UpdateAlertMemo() bool {
+	return rule.updateAlertMemo
 }
