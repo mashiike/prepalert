@@ -36,4 +36,6 @@ rule "alb_target_5xx" {
 5xx info:
 ${runtime.query_result.alb_target_5xx_info.table}
 EOT
+    update_alert_memo     = false
+    post_graph_annotation = false
 }

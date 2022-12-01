@@ -144,8 +144,8 @@ func TestLoadNoError(t *testing.T) {
 										},
 									},
 								},
-								PostGraphAnnotation: true,
-								UpdateAlertMemo:     true,
+								PostGraphAnnotation: false,
+								UpdateAlertMemo:     false,
 							},
 						},
 					}, cfg)
