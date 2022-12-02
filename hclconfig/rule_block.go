@@ -12,7 +12,7 @@ type RuleBlock struct {
 	Alert                             AlertBlock
 	QueriesExpr                       hcl.Expression
 	ParamsExpr                        hcl.Expression
-	Infomation                        hcl.Expression
+	Information                       hcl.Expression
 	UpdateAlertMemo                   bool
 	PostGraphAnnotation               bool
 	MaxGraphAnnotationDescriptionSize *int
@@ -94,7 +94,7 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 				b.Queries[query.Name()] = query
 			}
 		case "information":
-			b.Infomation = attr.Expr
+			b.Information = attr.Expr
 		case "params":
 			params, valueDiags := attr.Expr.Value(ctx)
 			diags = append(diags, valueDiags...)

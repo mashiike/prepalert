@@ -65,7 +65,7 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		onOpened:            onOpened,
 		onClosed:            onClosed,
 		queries:             queries,
-		information:         cfg.Infomation,
+		information:         cfg.Information,
 		params:              cfg.Params,
 		postGraphAnnotation: cfg.PostGraphAnnotation,
 		updateAlertMemo:     cfg.UpdateAlertMemo,
@@ -89,7 +89,7 @@ func (rule *Rule) Match(body *WebhookBody) bool {
 	return body.Alert.MonitorName == rule.monitorName
 }
 
-func (rule *Rule) BuildInfomation(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) (string, error) {
+func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) (string, error) {
 	reqID := queryrunner.GetRequestID(ctx)
 	eg, egctx := errgroup.WithContext(ctx)
 	runtimeVariables := map[string]cty.Value{
@@ -136,10 +136,10 @@ func (rule *Rule) BuildInfomation(ctx context.Context, evalCtx *hcl.EvalContext,
 	evalCtx.Variables = map[string]cty.Value{
 		"runtime": cty.ObjectVal(runtimeVariables),
 	}
-	return rule.RenderInfomation(evalCtx)
+	return rule.RenderInformation(evalCtx)
 }
 
-func (rule *Rule) RenderInfomation(evalCtx *hcl.EvalContext) (string, error) {
+func (rule *Rule) RenderInformation(evalCtx *hcl.EvalContext) (string, error) {
 	value, diags := rule.information.Value(evalCtx)
 	if diags.HasErrors() {
 		return "", diags

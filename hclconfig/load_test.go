@@ -84,7 +84,7 @@ func TestLoadNoError(t *testing.T) {
 									Any: generics.Ptr(true),
 								},
 								Queries: make(map[string]queryrunner.PreparedQuery),
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("How do you respond to alerts?\n"),
@@ -126,7 +126,7 @@ func TestLoadNoError(t *testing.T) {
 									"hoge":    cty.StringVal("hoge"),
 									"version": cty.StringVal("current"),
 								}),
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("5xx info:\n"),
@@ -173,7 +173,7 @@ func TestLoadNoError(t *testing.T) {
 								Queries: map[string]queryrunner.PreparedQuery{
 									"alb_target_5xx_info": nil,
 								},
-								Infomation: &hclsyntax.FunctionCallExpr{
+								Information: &hclsyntax.FunctionCallExpr{
 									Name: "templatefile",
 									Args: []hclsyntax.Expression{
 										&hclsyntax.TemplateExpr{
@@ -211,7 +211,7 @@ func TestLoadNoError(t *testing.T) {
 								Alert: AlertBlock{
 									MonitorID: generics.Ptr("xxxxxxxxxxxx"),
 								},
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("prepalert: "),
@@ -300,7 +300,7 @@ func TestLoadNoError(t *testing.T) {
 									Any: generics.Ptr(true),
 								},
 								Queries: make(map[string]queryrunner.PreparedQuery),
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("How do you respond to alerts?\n"),
