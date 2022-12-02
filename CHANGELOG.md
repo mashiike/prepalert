@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.9.0](https://github.com/mashiike/prepalert/compare/v0.8.0...v0.9.0) - 2022-12-02
+- Bump github.com/handlename/ssmwrap from 1.2.0 to 1.2.1 by @dependabot in https://github.com/mashiike/prepalert/pull/75
+- Bump github.com/stretchr/testify from 1.8.0 to 1.8.1 by @dependabot in https://github.com/mashiike/prepalert/pull/76
+- Feature/fix typo by @mashiike in https://github.com/mashiike/prepalert/pull/78
+
 ## [v0.8.0](https://github.com/mashiike/prepalert/compare/v0.7.0...v0.8.0) - 2022-12-01
 - Feature/update alert memo by @mashiike in https://github.com/mashiike/prepalert/pull/72
 - change initial configure by @mashiike in https://github.com/mashiike/prepalert/pull/74
