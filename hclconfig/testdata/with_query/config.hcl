@@ -32,7 +32,7 @@ rule "alb_target_5xx" {
         hoge    = "hoge",
     }
 
-    infomation = <<EOT
+    information = <<EOT
 5xx info:
 ${runtime.query_result.alb_target_5xx_info.table}
 EOT

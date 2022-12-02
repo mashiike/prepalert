@@ -29,7 +29,7 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 				Name: "queries",
 			},
 			{
-				Name:     "infomation",
+				Name:     "information",
 				Required: true,
 			},
 			{
@@ -93,7 +93,7 @@ func (b *RuleBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext, queries quer
 				}
 				b.Queries[query.Name()] = query
 			}
-		case "infomation":
+		case "information":
 			b.Infomation = attr.Expr
 		case "params":
 			params, valueDiags := attr.Expr.Value(ctx)

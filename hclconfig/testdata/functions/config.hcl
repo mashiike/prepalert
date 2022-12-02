@@ -31,7 +31,7 @@ rule "alb_target_5xx" {
     query.alb_target_5xx_info,
   ]
 
-  infomation = templatefile("./infomation_template.txt",{
+  information = templatefile("./information_template.txt",{
     runtime = runtime
   })
 }
@@ -40,5 +40,5 @@ rule "constant" {
   alert {
     monitor_id = "xxxxxxxxxxxx"
   }
-  infomation = "prepalert: ${var.version}"
+  information = "prepalert: ${var.version}"
 }

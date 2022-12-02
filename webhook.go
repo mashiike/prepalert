@@ -167,7 +167,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	if err != nil {
 		return err
 	}
-	log.Printf("[debug][%s] infomation: %s", reqID, info)
+	log.Printf("[debug][%s] information: %s", reqID, info)
 	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
 	var showDetailsURL string
 	var abbreviatedMessage string = "\n..."

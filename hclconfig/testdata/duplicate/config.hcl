@@ -40,7 +40,7 @@ rule "alb_target_5xx" {
         query.alb_target_5xx_info,
     ]
 
-    infomation = <<EOF
+    information = <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
 EOF

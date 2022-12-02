@@ -33,7 +33,7 @@ rule "cloudwatch_test" {
   queries = [
     query.cw_logs,
   ]
-  infomation = runtime.query_result.cw_logs.vertical_table
+  information = runtime.query_result.cw_logs.vertical_table
 }
 ```
 

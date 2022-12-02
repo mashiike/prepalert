@@ -22,7 +22,7 @@ type Rule struct {
 	onClosed                          bool
 	onOpened                          bool
 	queries                           []queryrunner.PreparedQuery
-	infomation                        hcl.Expression
+	information                       hcl.Expression
 	params                            cty.Value
 	postGraphAnnotation               bool
 	updateAlertMemo                   bool
@@ -65,7 +65,7 @@ func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		onOpened:            onOpened,
 		onClosed:            onClosed,
 		queries:             queries,
-		infomation:          cfg.Infomation,
+		information:         cfg.Infomation,
 		params:              cfg.Params,
 		postGraphAnnotation: cfg.PostGraphAnnotation,
 		updateAlertMemo:     cfg.UpdateAlertMemo,
@@ -140,18 +140,18 @@ func (rule *Rule) BuildInfomation(ctx context.Context, evalCtx *hcl.EvalContext,
 }
 
 func (rule *Rule) RenderInfomation(evalCtx *hcl.EvalContext) (string, error) {
-	value, diags := rule.infomation.Value(evalCtx)
+	value, diags := rule.information.Value(evalCtx)
 	if diags.HasErrors() {
 		return "", diags
 	}
 	if value.Type() != cty.String {
-		return "", errors.New("infomation is not string")
+		return "", errors.New("information is not string")
 	}
 	if value.IsNull() {
-		return "", errors.New("infomation is nil")
+		return "", errors.New("information is nil")
 	}
 	if !value.IsKnown() {
-		return "", errors.New("infomation is unknown")
+		return "", errors.New("information is unknown")
 	}
 	return value.AsString(), nil
 }

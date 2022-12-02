@@ -85,7 +85,7 @@ rule "any_alert" {
         any = true
     }
 
-    infomation = <<EOF
+    information = <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
 (This area can use Go's template notation.)
