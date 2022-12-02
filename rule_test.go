@@ -31,7 +31,7 @@ func TestRuleRenderMemo(t *testing.T) {
 				Alert: hclconfig.AlertBlock{
 					MonitorName: generics.Ptr("hoge"),
 				},
-				Infomation: ParseExpression(t, `"${strftime_in_zone("%Y-%m-%d %H:%M:%S","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
+				Information: ParseExpression(t, `"${strftime_in_zone("%Y-%m-%d %H:%M:%S","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
 				ctx := baseCtx.NewChild()
@@ -52,7 +52,7 @@ func TestRuleRenderMemo(t *testing.T) {
 				Alert: hclconfig.AlertBlock{
 					MonitorName: generics.Ptr("hoge"),
 				},
-				Infomation: ParseExpression(t, `"${strftime_in_zone("%O%E%Q%1","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
+				Information: ParseExpression(t, `"${strftime_in_zone("%O%E%Q%1","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
 				ctx := baseCtx.NewChild()
@@ -73,7 +73,7 @@ func TestRuleRenderMemo(t *testing.T) {
 				Alert: hclconfig.AlertBlock{
 					MonitorName: generics.Ptr("hoge"),
 				},
-				Infomation: ParseExpression(t, `"${runtime.query_result.hoge_result.table}"`),
+				Information: ParseExpression(t, `"${runtime.query_result.hoge_result.table}"`),
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
 				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
@@ -105,7 +105,7 @@ func TestRuleRenderMemo(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			rule, err := prepalert.NewRule(nil, c.cfg)
 			require.NoError(t, err)
-			actual, err := rule.RenderInfomation(c.newCtx(t))
+			actual, err := rule.RenderInformation(c.newCtx(t))
 			if c.expectedError {
 				require.Error(t, err)
 			} else {

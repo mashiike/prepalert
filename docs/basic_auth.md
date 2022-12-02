@@ -20,7 +20,7 @@ rule "simple" {
     alert {
         any = true
     }
-    infomation = <<EOF
+    information = <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
 EOF

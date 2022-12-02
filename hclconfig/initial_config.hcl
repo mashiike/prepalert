@@ -20,10 +20,10 @@ rule "simple" {
     on_opened = true
     on_closed = false
   }
-  infomation            = "How do you respond to alerts?"
-  update_alert_memo     = true
-  max_alert_memo_size   = 10000  //If the size of the memo exceeds 10KB, a part of the memo will be omitted. This setting can be changed from 100Bytes ~ 80KB.
-  post_graph_annotation = false
+  information            = "How do you respond to alerts?"
+  update_alert_memo      = true
+  max_alert_memo_size    = 10000  //If the size of the memo exceeds 10KB, a part of the memo will be omitted. This setting can be changed from 100Bytes ~ 80KB.
+  post_graph_annotation  = false
 }
 
 // // Advanced configuration
@@ -62,7 +62,7 @@ rule "simple" {
 //     query.alb_target_5xx_info,
 //   ]
 //
-//   infomation = {{ "<<" }}EOT
+//   information = {{ "<<" }}EOT
 // 5xx info:
 // ${runtime.query_result.alb_target_5xx_info.table}
 // EOT

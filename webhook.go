@@ -163,11 +163,11 @@ func (body *Alert) MarshalCTYValues() map[string]cty.Value {
 
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
 	reqID := queryrunner.GetRequestID(ctx)
-	info, err := rule.BuildInfomation(ctx, app.evalCtx.NewChild(), body)
+	info, err := rule.BuildInformation(ctx, app.evalCtx.NewChild(), body)
 	if err != nil {
 		return err
 	}
-	log.Printf("[debug][%s] infomation: %s", reqID, info)
+	log.Printf("[debug][%s] information: %s", reqID, info)
 	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
 	var showDetailsURL string
 	var abbreviatedMessage string = "\n..."

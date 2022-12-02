@@ -34,7 +34,7 @@ rule "alb_5xx" {
         query.alb_5xx_logs,
     ]
 
-    infomation = <<EOT
+    information = <<EOT
 5xx info:
 ${runtime.query_result.alb_5xx_logs.table}
 EOT

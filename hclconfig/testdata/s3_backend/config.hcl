@@ -5,7 +5,7 @@ prepalert {
 
   s3_backend {
     # Upload information about alerts to S3 and set up a simplified view of the uploaded information.
-    bucket_name                 = "prepalert-infomation"
+    bucket_name                 = "prepalert-information"
     object_key_prefix           = "alerts/"
     viewer_base_url             = "http://localhost:8080"
     viewer_google_client_id     = env("GOOGLE_CLIENT_ID", "")
@@ -18,7 +18,7 @@ rule "simple" {
   alert {
     any = true
   }
-  infomation                            = <<EOF
+  information                            = <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
 EOF

@@ -84,7 +84,7 @@ func TestLoadNoError(t *testing.T) {
 									Any: generics.Ptr(true),
 								},
 								Queries: make(map[string]queryrunner.PreparedQuery),
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("How do you respond to alerts?\n"),
@@ -126,7 +126,7 @@ func TestLoadNoError(t *testing.T) {
 									"hoge":    cty.StringVal("hoge"),
 									"version": cty.StringVal("current"),
 								}),
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("5xx info:\n"),
@@ -173,13 +173,13 @@ func TestLoadNoError(t *testing.T) {
 								Queries: map[string]queryrunner.PreparedQuery{
 									"alb_target_5xx_info": nil,
 								},
-								Infomation: &hclsyntax.FunctionCallExpr{
+								Information: &hclsyntax.FunctionCallExpr{
 									Name: "templatefile",
 									Args: []hclsyntax.Expression{
 										&hclsyntax.TemplateExpr{
 											Parts: []hclsyntax.Expression{
 												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("./infomation_template.txt"),
+													Val: cty.StringVal("./information_template.txt"),
 												},
 											},
 										},
@@ -211,7 +211,7 @@ func TestLoadNoError(t *testing.T) {
 								Alert: AlertBlock{
 									MonitorID: generics.Ptr("xxxxxxxxxxxx"),
 								},
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("prepalert: "),
@@ -244,7 +244,7 @@ func TestLoadNoError(t *testing.T) {
 							SQSQueueName: "prepalert",
 							Service:      "prod",
 							S3Backend: &S3BackendBlock{
-								BucketName:      "prepalert-infomation",
+								BucketName:      "prepalert-information",
 								ObjectKeyPrefix: generics.Ptr("alerts/"),
 								ObjectKeyTemplate: generics.Ptr(hcl.Expression(&hclsyntax.FunctionCallExpr{
 									Name: "strftime",
@@ -300,7 +300,7 @@ func TestLoadNoError(t *testing.T) {
 									Any: generics.Ptr(true),
 								},
 								Queries: make(map[string]queryrunner.PreparedQuery),
-								Infomation: &hclsyntax.TemplateExpr{
+								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
 											Val: cty.StringVal("How do you respond to alerts?\n"),
@@ -358,7 +358,7 @@ func TestLoadError(t *testing.T) {
 				"testdata/invalid_schema/variable.hcl:1,1-9: Unsupported block type; Blocks of type \"variable\" are not expected here.",
 				"testdata/invalid_schema/config.hcl:1,11-11: Missing required argument; The argument \"sqs_queue_name\" is required, but no definition was found.",
 				"testdata/invalid_schema/config.hcl:3,5-22: Unsupported argument; An argument named \"invalid_attribute\" is not expected here.",
-				"testdata/invalid_schema/config.hcl:6,13-13: Missing required argument; The argument \"infomation\" is required, but no definition was found.",
+				"testdata/invalid_schema/config.hcl:6,13-13: Missing required argument; The argument \"information\" is required, but no definition was found.",
 				"testdata/invalid_schema/config.hcl:6,13-13: Missing required block; The block \"alert\" is required, but no definition was found. which alerts does this rule respond to?",
 				"testdata/invalid_schema/query.hcl:2,14-23: Invalid Query Runner; can not set constant value. please write as runner = \"query_runner.type.name\"",
 				"testdata/invalid_schema/query.hcl:6,14-9,6: Invalid Query Runner; can not set multiple query runners. please write as runner = \"query_runner.type.name\"",

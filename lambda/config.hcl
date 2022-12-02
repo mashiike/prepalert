@@ -17,5 +17,5 @@ rule "simple" {
   alert {
     any = true
   }
-  infomation = "How do you respond to alerts?"
+  information = "How do you respond to alerts?"
 }

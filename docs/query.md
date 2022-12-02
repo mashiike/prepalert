@@ -36,7 +36,7 @@ rule "simple" {
         query.<query_name>,
     ]
 
-    infomation = <<EOF
+    information = <<EOF
 query_result:
 ${runtime.query_result.<query_name>.table}
 EOF
@@ -44,7 +44,7 @@ EOF
 ```
 
 The queries attribute of a rule lists the queries to be executed.
-Then, using the runtime variables, the results of the query can be referenced in the infomation attribute.
+Then, using the runtime variables, the results of the query can be referenced in the information attribute.
 
 ### runtime variables
 

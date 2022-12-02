@@ -25,5 +25,5 @@ rule "any" {
   alert {
     any = true
   }
-  infomation = "hoge"
+  information = "hoge"
 }
