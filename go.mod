@@ -27,7 +27,7 @@ require (
 	github.com/samber/lo v1.36.0
 	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/stretchr/testify v1.8.1
-	github.com/urfave/cli/v2 v2.23.5
+	github.com/urfave/cli/v2 v2.23.7
 	github.com/zclconf/go-cty v1.12.1
 	golang.org/x/sync v0.1.0
 )
