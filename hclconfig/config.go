@@ -6,6 +6,10 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/queryrunner"
+
+	_ "github.com/mashiike/queryrunner/cloudwatchlogsinsights"
+	_ "github.com/mashiike/queryrunner/redshiftdata"
+	_ "github.com/mashiike/queryrunner/s3select"
 )
 
 type Config struct {
