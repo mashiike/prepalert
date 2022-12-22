@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.10.1](https://github.com/mashiike/prepalert/compare/v0.10.0...v0.10.1) - 2022-12-22
+- Bump github.com/aws/aws-sdk-go-v2/service/sqs from 1.19.15 to 1.19.17 by @dependabot in https://github.com/mashiike/prepalert/pull/88
+- Bump github.com/aws/aws-lambda-go from 1.35.0 to 1.36.0 by @dependabot in https://github.com/mashiike/prepalert/pull/82
+
 ## [v0.10.0](https://github.com/mashiike/prepalert/compare/v0.9.0...v0.10.0) - 2022-12-22
 - Bump github.com/urfave/cli/v2 from 2.23.5 to 2.23.7 by @dependabot in https://github.com/mashiike/prepalert/pull/84
 - Bump github.com/aws/aws-sdk-go-v2/feature/s3/manager from 1.11.42 to 1.11.43 by @dependabot in https://github.com/mashiike/prepalert/pull/83
