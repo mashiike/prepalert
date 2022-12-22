@@ -103,13 +103,13 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 }
 
 type RunOptions struct {
-	Mode      string
-	Address   string
-	Prefix    string
-	BatchSize int
+	Mode      string `help:"run mode" env:"PREPALERT_MODE" default:"http"`
+	Address   string `help:"run local address" env:"PREPALERT_ADDRESS" default:":8080"`
+	Prefix    string `help:"run server prefix" env:"PREPALERT_PREFIX" default:"/"`
+	BatchSize int    `help:"run local sqs batch size" env:"PREPALERT_BATCH_SIZE" default:"1"`
 }
 
-func (app *App) Run(ctx context.Context, opts RunOptions) error {
+func (app *App) Run(ctx context.Context, opts *RunOptions) error {
 	switch strings.ToLower(opts.Mode) {
 	case "webhook", "http":
 		if strings.EqualFold(opts.Mode, "webhook") {

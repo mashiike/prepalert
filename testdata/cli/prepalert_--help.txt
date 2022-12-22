@@ -1,0 +1,27 @@
+Usage: prepalert <command>
+
+A webhook server for prepare alert memo
+
+Flags:
+  -h, --help                      Show context-sensitive help.
+      --log-level="info"          output log-level ($PREPALERT_LOG_LEVEL)
+      --mackerel-apikey=STRING    for access mackerel API ($MACKEREL_APIKEY)
+      --config="."                config path ($PREPALERT_CONFIG)
+
+Commands:
+  run
+    run server (default command)
+
+  init
+    create inital config
+
+  validate
+    validate the configuration
+
+  exec <alert-id>
+    Generate a virtual webhook from past alert to execute the rule
+
+  version
+    Show version
+
+Run "prepalert <command> --help" for more information on a command.
