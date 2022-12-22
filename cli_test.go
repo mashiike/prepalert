@@ -16,6 +16,7 @@ import (
 func TestParseCLI(t *testing.T) {
 	os.Setenv("MACKEREL_APIKEY", "*******************")
 	os.Setenv("PREPALERT_CONFIG", "./testdata/")
+	os.Setenv("PREPALERT_MODE", "worker")
 	cases := []struct {
 		args        []string
 		expected    *prepalert.CLI
@@ -31,7 +32,7 @@ func TestParseCLI(t *testing.T) {
 				MackerelAPIKey: "*******************",
 				Config:         "./testdata/",
 				Run: &prepalert.RunOptions{
-					Mode:      "http",
+					Mode:      "worker",
 					Address:   ":8080",
 					Prefix:    "/",
 					BatchSize: 1,
@@ -44,14 +45,14 @@ func TestParseCLI(t *testing.T) {
 			checkOutput: true,
 		},
 		{
-			args: []string{"prepalert", "--config", ".", "run", "--mode", "worker", "--log-level", "debug"},
+			args: []string{"prepalert", "--config", ".", "run", "--mode", "http", "--log-level", "debug"},
 			cmd:  "run",
 			expected: &prepalert.CLI{
 				LogLevel:       "debug",
 				MackerelAPIKey: "*******************",
 				Config:         ".",
 				Run: &prepalert.RunOptions{
-					Mode:      "worker",
+					Mode:      "http",
 					Address:   ":8080",
 					Prefix:    "/",
 					BatchSize: 1,
@@ -67,7 +68,7 @@ func TestParseCLI(t *testing.T) {
 				MackerelAPIKey: "*******************",
 				Config:         ".",
 				Run: &prepalert.RunOptions{
-					Mode:      "http",
+					Mode:      "worker",
 					Address:   ":8080",
 					Prefix:    "/",
 					BatchSize: 1,
@@ -93,7 +94,7 @@ func TestParseCLI(t *testing.T) {
 				MackerelAPIKey: "*******************",
 				Config:         ".",
 				Run: &prepalert.RunOptions{
-					Mode:      "http",
+					Mode:      "worker",
 					Address:   ":8080",
 					Prefix:    "/",
 					BatchSize: 1,
@@ -111,7 +112,7 @@ func TestParseCLI(t *testing.T) {
 				MackerelAPIKey: "*******************",
 				Config:         ".",
 				Run: &prepalert.RunOptions{
-					Mode:      "http",
+					Mode:      "worker",
 					Address:   ":8080",
 					Prefix:    "/",
 					BatchSize: 1,
@@ -127,7 +128,7 @@ func TestParseCLI(t *testing.T) {
 				MackerelAPIKey: "*******************",
 				Config:         ".",
 				Run: &prepalert.RunOptions{
-					Mode:      "http",
+					Mode:      "worker",
 					Address:   ":8080",
 					Prefix:    "/",
 					BatchSize: 1,
