@@ -38,32 +38,33 @@ $ prepalert --coinfig <output config path> init
 ## Usage 
 
 ```
-NAME:
-   prepalert - A webhook server for prepare alert memo
+Usage: prepalert <command>
 
-USAGE:
-   prepalert -config <config file> [command options]
+A webhook server for prepare alert memo
 
-VERSION:
-   current
+Flags:
+  -h, --help                      Show context-sensitive help.
+      --log-level="info"          output log-level ($PREPALERT_LOG_LEVEL)
+      --mackerel-apikey=STRING    for access mackerel API ($MACKEREL_APIKEY)
+      --config="."                config path ($PREPALERT_CONFIG)
 
-COMMANDS:
-   exec      Generate a virtual webhook from past alert to execute the rule
-   init      create inital config
-   run       run server (default command)
-   validate  validate the configuration
-   help, h   Shows a list of commands or help for one command
+Commands:
+  run
+    run server (default command)
 
-GLOBAL OPTIONS:
-   --address value                    run address (default: ":8080") [$PREPALERT_ADDRESS]
-   --batch-size value                 run local sqs batch size (default: 1) [$PREPALERT_BATCH_SIZE]
-   --config value, -c value           config path (default: ".") [$CONFIG, $PREPALERT_CONFIG]
-   --help, -h                         show help (default: false)
-   --log-level value                  output log-level (default: "info") [$PREPALERT_LOG_LEVEL]
-   --mackerel-apikey value, -k value  for access mackerel API (default: *********) [$MACKEREL_APIKEY, $PREPALERT_MACKEREL_APIKEY]
-   --mode value                       run mode (default: "http") [$PREPALERT_MODE]
-   --prefix value                     run server prefix (default: "/") [$PREPALERT_PREFIX]
-   --version, -v                      print the version (default: false)
+  init
+    create inital config
+
+  validate
+    validate the configuration
+
+  exec <alert-id>
+    Generate a virtual webhook from past alert to execute the rule
+
+  version
+    Show version
+
+Run "prepalert <command> --help" for more information on a command.
 ```
 
 If the command is omitted, the run command is executed.
