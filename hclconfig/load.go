@@ -1,6 +1,8 @@
 package hclconfig
 
 import (
+	"log"
+
 	"github.com/mashiike/hclconfig"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -17,6 +19,7 @@ func Load(path string, version string, optFns ...func(loader *hclconfig.Loader))
 		"runtime": cty.UnknownVal(cty.DynamicPseudoType),
 	})
 	cfg := &Config{}
+	log.Println("[debug] try load config:", path)
 	if err := loader.Load(cfg, path); err != nil {
 		return nil, err
 	}

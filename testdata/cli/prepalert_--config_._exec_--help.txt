@@ -1,0 +1,12 @@
+Usage: prepalert exec <alert-id>
+
+Generate a virtual webhook from past alert to execute the rule
+
+Arguments:
+  <alert-id>    Mackerel AlertID
+
+Flags:
+  -h, --help                      Show context-sensitive help.
+      --log-level="info"          output log-level ($PREPALERT_LOG_LEVEL)
+      --mackerel-apikey=STRING    for access mackerel API ($MACKEREL_APIKEY)
+      --config="."                config path ($PREPALERT_CONFIG)
