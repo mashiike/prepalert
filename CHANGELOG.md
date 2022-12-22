@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.10.0](https://github.com/mashiike/prepalert/compare/v0.9.0...v0.10.0) - 2022-12-22
+- Bump github.com/urfave/cli/v2 from 2.23.5 to 2.23.7 by @dependabot in https://github.com/mashiike/prepalert/pull/84
+- Bump github.com/aws/aws-sdk-go-v2/feature/s3/manager from 1.11.42 to 1.11.43 by @dependabot in https://github.com/mashiike/prepalert/pull/83
+- change cli lib by @mashiike in https://github.com/mashiike/prepalert/pull/90
+- Bump github.com/samber/lo from 1.36.0 to 1.37.0 by @dependabot in https://github.com/mashiike/prepalert/pull/89
+- Bump github.com/aws/aws-sdk-go-v2 from 1.17.2 to 1.17.3 by @dependabot in https://github.com/mashiike/prepalert/pull/86
+- Bump github.com/mashiike/hclconfig from 0.7.0 to 0.8.0 by @dependabot in https://github.com/mashiike/prepalert/pull/87
+
 ## [v0.9.0](https://github.com/mashiike/prepalert/compare/v0.8.0...v0.9.0) - 2022-12-02
 - Bump github.com/handlename/ssmwrap from 1.2.0 to 1.2.1 by @dependabot in https://github.com/mashiike/prepalert/pull/75
 - Bump github.com/stretchr/testify from 1.8.0 to 1.8.1 by @dependabot in https://github.com/mashiike/prepalert/pull/76
