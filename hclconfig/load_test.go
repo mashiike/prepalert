@@ -368,6 +368,7 @@ func TestLoadError(t *testing.T) {
 			casename: "duplicate blocks",
 			path:     "testdata/duplicate",
 			expected: []string{
+				"testdata/duplicate/config.hcl:40,9-34: Invalid Relation; query.alb_target_5xx_info is not found: rule.queries depends on \"query\" block, please write as \"query.name\"",
 				"testdata/duplicate/config.hcl:12,1-39: Duplicate query_runner \"redshift_data\" configuration; A redshift_data query_runner named \"default\" was already declared at testdata/duplicate/config.hcl:7,1-39. query_runner names must unique per type in a configuration",
 				"testdata/duplicate/config.hcl:25,1-28: Duplicate query declaration; A query named \"alb_target_5xx_info\" was already declared at testdata/duplicate/config.hcl:16,1-28. query names must unique within a configuration",
 			},
