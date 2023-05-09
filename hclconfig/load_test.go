@@ -87,10 +87,7 @@ func TestLoadNoError(t *testing.T) {
 								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
-											Val: cty.StringVal("How do you respond to alerts?\n"),
-										},
-										&hclsyntax.LiteralValueExpr{
-											Val: cty.StringVal("Describe information about your alert response here.\n"),
+											Val: cty.StringVal("How do you respond to alerts?\nDescribe information about your alert response here.\n"),
 										},
 									},
 								},
@@ -251,30 +248,7 @@ func TestLoadNoError(t *testing.T) {
 									Args: []hclsyntax.Expression{
 										&hclsyntax.TemplateExpr{
 											Parts: []hclsyntax.Expression{
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("%"),
-												},
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("Y/"),
-												},
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("%"),
-												},
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("m/"),
-												},
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("%"),
-												},
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("d/"),
-												},
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("%"),
-												},
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("H/"),
-												},
+												&hclsyntax.LiteralValueExpr{Val: cty.StringVal("%Y/%m/%d/%H/")},
 											},
 										},
 										&hclsyntax.ScopeTraversalExpr{
@@ -303,10 +277,7 @@ func TestLoadNoError(t *testing.T) {
 								Information: &hclsyntax.TemplateExpr{
 									Parts: []hclsyntax.Expression{
 										&hclsyntax.LiteralValueExpr{
-											Val: cty.StringVal("How do you respond to alerts?\n"),
-										},
-										&hclsyntax.LiteralValueExpr{
-											Val: cty.StringVal("Describe information about your alert response here.\n"),
+											Val: cty.StringVal("How do you respond to alerts?\nDescribe information about your alert response here.\n"),
 										},
 									},
 								},
