@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.2](https://github.com/mashiike/prepalert/compare/v0.10.1...v0.10.2) - 2023-05-09
+- Bump actions/setup-go from 3 to 4 by @dependabot in https://github.com/mashiike/prepalert/pull/122
+- Bump go modules by @mashiike in https://github.com/mashiike/prepalert/pull/123
+- fix test for hcl by @mashiike in https://github.com/mashiike/prepalert/pull/125
+
 ## [v0.10.1](https://github.com/mashiike/prepalert/compare/v0.10.0...v0.10.1) - 2022-12-22
 - Bump github.com/aws/aws-sdk-go-v2/service/sqs from 1.19.15 to 1.19.17 by @dependabot in https://github.com/mashiike/prepalert/pull/88
 - Bump github.com/aws/aws-lambda-go from 1.35.0 to 1.36.0 by @dependabot in https://github.com/mashiike/prepalert/pull/82
