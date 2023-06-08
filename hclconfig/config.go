@@ -7,6 +7,7 @@ import (
 	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/queryrunner"
 
+	"github.com/hashicorp/hcl/v2/ext/dynblock"
 	_ "github.com/mashiike/queryrunner/cloudwatchlogsinsights"
 	_ "github.com/mashiike/queryrunner/redshiftdata"
 	_ "github.com/mashiike/queryrunner/s3select"
@@ -21,6 +22,7 @@ type Config struct {
 
 func (cfg *Config) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
 	cfg.EvalContext = ctx.NewChild()
+	body = dynblock.Expand(body, ctx)
 	queries, body, diags := queryrunner.DecodeBody(body, ctx)
 	cfg.Queries = queries
 	schema := &hcl.BodySchema{
