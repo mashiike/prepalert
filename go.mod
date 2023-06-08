@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hcl/v2 v2.16.2
 	github.com/kayac/go-katsubushi v1.7.0
-	github.com/mackerelio/mackerel-client-go v0.25.0
+	github.com/mackerelio/mackerel-client-go v0.26.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/grat v0.0.0-20220831070259-6c4c03aba4d5
 	github.com/mashiike/hclconfig v0.8.0
@@ -82,16 +82,12 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
-	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
-	golang.org/x/tools v0.9.0 // indirect
-	golang.org/x/tools/cmd/cover v0.1.0-deprecated // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
-	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
