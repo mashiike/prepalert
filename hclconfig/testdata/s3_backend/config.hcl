@@ -11,6 +11,7 @@ prepalert {
     viewer_google_client_id     = env("GOOGLE_CLIENT_ID", "")
     viewer_google_client_secret = env("GOOGLE_CLIENT_SECRET", "")
     viewer_session_encrypt_key  = env("SESSION_ENCRYPT_KEY", "")
+    only_detail_url_on_mackerel = false
   }
 }
 

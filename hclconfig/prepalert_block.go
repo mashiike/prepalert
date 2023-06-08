@@ -133,6 +133,7 @@ type S3BackendBlock struct {
 
 	ViewerBaseURL           *url.URL
 	ViewerSessionEncryptKey []byte
+	OnlyDetailURLOnMackerel bool
 }
 
 func (b *S3BackendBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Diagnostics {
@@ -166,6 +167,9 @@ func (b *S3BackendBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Dia
 			},
 			{
 				Name: "denied",
+			},
+			{
+				Name: "only_detail_url_on_mackerel",
 			},
 		},
 	}
@@ -238,6 +242,8 @@ func (b *S3BackendBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Dia
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Allowed)...)
 		case "denied":
 			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.Denied)...)
+		case "only_detail_url_on_mackerel":
+			diags = append(diags, hclconfig.DecodeExpression(attr.Expr, ctx, &b.OnlyDetailURLOnMackerel)...)
 		}
 	}
 	if b.ObjectKeyPrefix == nil {
