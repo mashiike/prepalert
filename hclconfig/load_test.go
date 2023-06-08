@@ -49,9 +49,10 @@ func diagnosticToString(diag *hcl.Diagnostic) string {
 }
 
 func TestLoadNoError(t *testing.T) {
-	os.Setenv("TEST_CLUSTER", "test")
-	os.Setenv("TEST_ENV", "env")
-	os.Setenv("SESSION_ENCRYPT_KEY", "passpasspasspass")
+	t.Setenv("TZ", "UTC")
+	t.Setenv("TEST_CLUSTER", "test")
+	t.Setenv("TEST_ENV", "env")
+	t.Setenv("SESSION_ENCRYPT_KEY", "passpasspasspass")
 	cases := []struct {
 		casename string
 		path     string
@@ -283,7 +284,7 @@ func TestLoadNoError(t *testing.T) {
 					}),
 				}
 				v, _ := (*cfg.Prepalert.S3Backend.ObjectKeyTemplate).Value(ctx)
-				require.Equal(t, "2021/01/07/15/", v.AsString())
+				require.Equal(t, "2021/01/07/06/", v.AsString())
 				v, _ = cfg.Rules[0].Information.Value(ctx)
 				require.Equal(t, "How do you respond to alerts?\nDescribe information about your alert response here.\n", v.AsString())
 				requireConfigEqual(t,
