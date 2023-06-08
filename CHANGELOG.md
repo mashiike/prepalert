@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.11.0](https://github.com/mashiike/prepalert/compare/v0.10.2...v0.11.0) - 2023-06-08
+- Bump github.com/mackerelio/mackerel-client-go from 0.25.0 to 0.26.0 by @dependabot in https://github.com/mashiike/prepalert/pull/126
+- Improved Presentation of Detailed Information in Mackerel by @mashiike in https://github.com/mashiike/prepalert/pull/128
+- configuration dynamic Blocks by @mashiike in https://github.com/mashiike/prepalert/pull/129
+
 ## [v0.10.2](https://github.com/mashiike/prepalert/compare/v0.10.1...v0.10.2) - 2023-05-09
 - Bump actions/setup-go from 3 to 4 by @dependabot in https://github.com/mashiike/prepalert/pull/122
 - Bump go modules by @mashiike in https://github.com/mashiike/prepalert/pull/123
