@@ -29,15 +29,8 @@ func requireConfigEqual(t *testing.T, cfg1 *Config, cfg2 *Config) {
 			hcl.TraverseAttr{},
 		),
 		cmpopts.IgnoreFields(Config{}, "Queries", "EvalContext"),
-		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr", "Queries"),
-		cmpopts.IgnoreFields(S3BackendBlock{}, "ViewerBaseURL", "ViewerSessionEncryptKey"),
-		cmpopts.IgnoreFields(hclsyntax.FunctionCallExpr{}, "NameRange", "OpenParenRange", "CloseParenRange"),
-		cmpopts.IgnoreFields(hclsyntax.LiteralValueExpr{}, "SrcRange"),
-		cmpopts.IgnoreFields(hclsyntax.TemplateExpr{}, "SrcRange"),
-		cmpopts.IgnoreFields(hclsyntax.ScopeTraversalExpr{}, "SrcRange"),
-		cmpopts.IgnoreFields(hclsyntax.ObjectConsExpr{}, "SrcRange", "OpenRange"),
-		cmpopts.IgnoreFields(hcl.TraverseRoot{}, "SrcRange"),
-		cmpopts.IgnoreFields(hcl.TraverseAttr{}, "SrcRange"),
+		cmpopts.IgnoreFields(RuleBlock{}, "QueriesExpr", "ParamsExpr", "Queries", "Information"),
+		cmpopts.IgnoreFields(S3BackendBlock{}, "ViewerBaseURL", "ViewerSessionEncryptKey", "ObjectKeyTemplate"),
 		cmpopts.EquateEmpty(),
 		cmp.Comparer(func(x, y cty.Value) bool {
 			return x.GoString() == y.GoString()
@@ -71,6 +64,8 @@ func TestLoadNoError(t *testing.T) {
 				require.Error(t, cfg.ValidateVersion("v0.0.0"))
 				require.NoError(t, cfg.ValidateVersion("v0.2.0"))
 				require.Equal(t, 1, len(cfg.Rules))
+				v, _ := cfg.Rules[0].Information.Value(cfg.EvalContext)
+				require.Equal(t, "How do you respond to alerts?\nDescribe information about your alert response here.\n", v.AsString())
 				requireConfigEqual(t,
 					&Config{
 						Prepalert: PrepalertBlock{
@@ -82,6 +77,55 @@ func TestLoadNoError(t *testing.T) {
 								Name: "simple",
 								Alert: AlertBlock{
 									Any: generics.Ptr(true),
+								},
+								Queries:             make(map[string]queryrunner.PreparedQuery),
+								PostGraphAnnotation: true,
+								UpdateAlertMemo:     true,
+							},
+						},
+					}, cfg)
+			},
+		},
+		{
+			casename: "dynamic config",
+			path:     "testdata/dynamic",
+			check: func(t *testing.T, cfg *Config) {
+				require.Error(t, cfg.ValidateVersion("v0.0.0"))
+				require.NoError(t, cfg.ValidateVersion("v0.11.0"))
+				require.Equal(t, 3, len(cfg.Rules))
+				for i, rule := range cfg.Rules {
+					v, _ := rule.Information.Value(cfg.EvalContext)
+					require.Equal(t, "How do you respond to alerts?\nDescribe information about your alert response here.\n", v.AsString(), fmt.Sprintf("rule[%d]", i))
+				}
+				requireConfigEqual(t,
+					&Config{
+						Prepalert: PrepalertBlock{
+							SQSQueueName: "prepalert",
+							Service:      "prod",
+						},
+						Rules: []*RuleBlock{
+							{
+								Name: "alb",
+								Alert: AlertBlock{
+									MonitorName: generics.Ptr("ALB"),
+								},
+								Queries:             make(map[string]queryrunner.PreparedQuery),
+								PostGraphAnnotation: true,
+								UpdateAlertMemo:     true,
+							},
+							{
+								Name: "rds",
+								Alert: AlertBlock{
+									MonitorName: generics.Ptr("RDS"),
+								},
+								Queries:             make(map[string]queryrunner.PreparedQuery),
+								PostGraphAnnotation: true,
+								UpdateAlertMemo:     true,
+							},
+							{
+								Name: "elasticache",
+								Alert: AlertBlock{
+									MonitorName: generics.Ptr("Elasticache"),
 								},
 								Queries: make(map[string]queryrunner.PreparedQuery),
 								Information: &hclsyntax.TemplateExpr{
@@ -104,6 +148,23 @@ func TestLoadNoError(t *testing.T) {
 			check: func(t *testing.T, cfg *Config) {
 				require.Error(t, cfg.ValidateVersion("v0.0.0"))
 				require.NoError(t, cfg.ValidateVersion("v0.2.0"))
+				require.Equal(t, 1, len(cfg.Rules))
+				ctx := cfg.EvalContext.NewChild()
+				ctx.Variables = map[string]cty.Value{
+					"var": cty.ObjectVal(map[string]cty.Value{
+						"version": cty.StringVal("current"),
+					}),
+					"runtime": cty.ObjectVal(map[string]cty.Value{
+						"query_result": cty.ObjectVal(map[string]cty.Value{
+							"alb_target_5xx_info": cty.ObjectVal(map[string]cty.Value{
+								"table": cty.StringVal("[[ alb_target_5xx_info ]]"),
+							}),
+						}),
+					}),
+				}
+				v, _ := cfg.Rules[0].Information.Value(ctx)
+				require.Equal(t, cty.String, v.Type())
+				require.Equal(t, "5xx info:\n[[ alb_target_5xx_info ]]\n", v.AsString())
 				requireConfigEqual(t,
 					&Config{
 						Prepalert: PrepalertBlock{
@@ -123,24 +184,6 @@ func TestLoadNoError(t *testing.T) {
 									"hoge":    cty.StringVal("hoge"),
 									"version": cty.StringVal("current"),
 								}),
-								Information: &hclsyntax.TemplateExpr{
-									Parts: []hclsyntax.Expression{
-										&hclsyntax.LiteralValueExpr{
-											Val: cty.StringVal("5xx info:\n"),
-										},
-										&hclsyntax.ScopeTraversalExpr{
-											Traversal: hcl.Traversal{
-												hcl.TraverseRoot{Name: "runtime"},
-												hcl.TraverseAttr{Name: "query_result"},
-												hcl.TraverseAttr{Name: "alb_target_5xx_info"},
-												hcl.TraverseAttr{Name: "table"},
-											},
-										},
-										&hclsyntax.LiteralValueExpr{
-											Val: cty.StringVal("\n"),
-										},
-									},
-								},
 								PostGraphAnnotation: false,
 								UpdateAlertMemo:     false,
 							},
@@ -154,6 +197,28 @@ func TestLoadNoError(t *testing.T) {
 			check: func(t *testing.T, cfg *Config) {
 				require.Error(t, cfg.ValidateVersion("0.0.0"))
 				require.NoError(t, cfg.ValidateVersion("0.2.0"))
+				actualInfomation := make([]string, len(cfg.Rules))
+				ctx := cfg.EvalContext.NewChild()
+				ctx.Variables = map[string]cty.Value{
+					"var": cty.ObjectVal(map[string]cty.Value{
+						"version": cty.StringVal("current"),
+					}),
+					"runtime": cty.ObjectVal(map[string]cty.Value{
+						"query_result": cty.ObjectVal(map[string]cty.Value{
+							"alb_target_5xx_info": cty.ObjectVal(map[string]cty.Value{
+								"table": cty.StringVal("[[ alb_target_5xx_info ]]"),
+							}),
+						}),
+					}),
+				}
+				for i, rule := range cfg.Rules {
+					v, _ := rule.Information.Value(ctx)
+					actualInfomation[i] = v.AsString()
+				}
+				require.EqualValues(t, []string{
+					"5xx info:\n[[ alb_target_5xx_info ]]\n",
+					"prepalert: current",
+				}, actualInfomation)
 				requireConfigEqual(t,
 					&Config{
 						Prepalert: PrepalertBlock{
@@ -169,36 +234,6 @@ func TestLoadNoError(t *testing.T) {
 								},
 								Queries: map[string]queryrunner.PreparedQuery{
 									"alb_target_5xx_info": nil,
-								},
-								Information: &hclsyntax.FunctionCallExpr{
-									Name: "templatefile",
-									Args: []hclsyntax.Expression{
-										&hclsyntax.TemplateExpr{
-											Parts: []hclsyntax.Expression{
-												&hclsyntax.LiteralValueExpr{
-													Val: cty.StringVal("./information_template.txt"),
-												},
-											},
-										},
-										&hclsyntax.ObjectConsExpr{
-											Items: []hclsyntax.ObjectConsItem{
-												{
-													KeyExpr: &hclsyntax.ObjectConsKeyExpr{
-														Wrapped: &hclsyntax.ScopeTraversalExpr{
-															Traversal: hcl.Traversal{
-																hcl.TraverseRoot{Name: "runtime"},
-															},
-														},
-													},
-													ValueExpr: &hclsyntax.ScopeTraversalExpr{
-														Traversal: hcl.Traversal{
-															hcl.TraverseRoot{Name: "runtime"},
-														},
-													},
-												},
-											},
-										},
-									},
 								},
 								PostGraphAnnotation: true,
 								UpdateAlertMemo:     true,
@@ -235,32 +270,30 @@ func TestLoadNoError(t *testing.T) {
 				require.Error(t, cfg.ValidateVersion("v0.0.0"))
 				require.NoError(t, cfg.ValidateVersion("v0.2.0"))
 				require.Equal(t, 1, len(cfg.Rules))
+				require.NotNil(t, cfg.Prepalert.S3Backend)
+				require.NotNil(t, cfg.Prepalert.S3Backend.ObjectKeyTemplate)
+				ctx := cfg.EvalContext.NewChild()
+				ctx.Variables = map[string]cty.Value{
+					"runtime": cty.ObjectVal(map[string]cty.Value{
+						"event": cty.ObjectVal(map[string]cty.Value{
+							"alert": cty.ObjectVal(map[string]cty.Value{
+								"opened_at": cty.NumberUIntVal(1610000000),
+							}),
+						}),
+					}),
+				}
+				v, _ := (*cfg.Prepalert.S3Backend.ObjectKeyTemplate).Value(ctx)
+				require.Equal(t, "2021/01/07/15/", v.AsString())
+				v, _ = cfg.Rules[0].Information.Value(ctx)
+				require.Equal(t, "How do you respond to alerts?\nDescribe information about your alert response here.\n", v.AsString())
 				requireConfigEqual(t,
 					&Config{
 						Prepalert: PrepalertBlock{
 							SQSQueueName: "prepalert",
 							Service:      "prod",
 							S3Backend: &S3BackendBlock{
-								BucketName:      "prepalert-information",
-								ObjectKeyPrefix: generics.Ptr("alerts/"),
-								ObjectKeyTemplate: generics.Ptr(hcl.Expression(&hclsyntax.FunctionCallExpr{
-									Name: "strftime",
-									Args: []hclsyntax.Expression{
-										&hclsyntax.TemplateExpr{
-											Parts: []hclsyntax.Expression{
-												&hclsyntax.LiteralValueExpr{Val: cty.StringVal("%Y/%m/%d/%H/")},
-											},
-										},
-										&hclsyntax.ScopeTraversalExpr{
-											Traversal: hcl.Traversal{
-												hcl.TraverseRoot{Name: "runtime"},
-												hcl.TraverseAttr{Name: "event"},
-												hcl.TraverseAttr{Name: "alert"},
-												hcl.TraverseAttr{Name: "opened_at"},
-											},
-										},
-									},
-								})),
+								BucketName:                    "prepalert-information",
+								ObjectKeyPrefix:               generics.Ptr("alerts/"),
 								ViewerBaseURLString:           "http://localhost:8080",
 								ViewerGoogleClientID:          generics.Ptr(""),
 								ViewerGoogleClientSecret:      generics.Ptr(""),
@@ -273,14 +306,7 @@ func TestLoadNoError(t *testing.T) {
 								Alert: AlertBlock{
 									Any: generics.Ptr(true),
 								},
-								Queries: make(map[string]queryrunner.PreparedQuery),
-								Information: &hclsyntax.TemplateExpr{
-									Parts: []hclsyntax.Expression{
-										&hclsyntax.LiteralValueExpr{
-											Val: cty.StringVal("How do you respond to alerts?\nDescribe information about your alert response here.\n"),
-										},
-									},
-								},
+								Queries:                           make(map[string]queryrunner.PreparedQuery),
 								PostGraphAnnotation:               true,
 								UpdateAlertMemo:                   true,
 								MaxGraphAnnotationDescriptionSize: generics.Ptr(int(1024)),
