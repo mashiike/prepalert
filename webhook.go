@@ -204,6 +204,9 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 			return fmt.Errorf("upload description failed: %w", err)
 		}
 		log.Printf("[info][%s] upload_location=%s", reqID, output.Location)
+		if app.backend.OnlyDetailURLOnMackerel {
+			description = showDetailsURL
+		}
 	}
 	var wg sync.WaitGroup
 	var errNum int32
