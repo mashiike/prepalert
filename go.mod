@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.67
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.33.1
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.23.0
-	github.com/fatih/color v1.13.0
+	github.com/fatih/color v1.15.0
 	github.com/fujiwara/logutils v1.1.0
 	github.com/fujiwara/ridge v0.6.1
 	github.com/google/go-cmp v0.5.9
@@ -62,7 +62,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
-	github.com/mattn/go-colorable v0.1.9 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-encoding v0.0.2 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
