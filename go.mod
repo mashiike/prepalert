@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.38.2
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.23.0
 	github.com/fatih/color v1.13.0
-	github.com/fujiwara/logutils v1.1.0
+	github.com/fujiwara/logutils v1.1.2
 	github.com/fujiwara/ridge v0.6.1
 	github.com/google/go-cmp v0.5.9
 	github.com/handlename/ssmwrap v1.2.1
