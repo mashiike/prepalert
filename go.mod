@@ -1,6 +1,6 @@
 module github.com/mashiike/prepalert
 
-go 1.19
+go 1.21
 
 require (
 	github.com/Songmu/flextime v0.1.0

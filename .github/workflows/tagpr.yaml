@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - id: tagpr
-        uses: Songmu/tagpr@main
+        uses: Songmu/tagpr@v1
       - name: Adding summary
         run: echo '### ${{steps.tagpr.outputs.tag}}' >> $GITHUB_STEP_SUMMARY
         if: ${{ steps.tagpr.outputs.tag != '' }}
