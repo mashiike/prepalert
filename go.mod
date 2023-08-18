@@ -1,6 +1,6 @@
 module github.com/mashiike/prepalert
 
-go 1.19
+go 1.21
 
 require (
 	github.com/Songmu/flextime v0.1.0
@@ -11,8 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.67
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.38.2
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.23.0
-	github.com/fatih/color v1.13.0
-	github.com/fujiwara/logutils v1.1.0
+	github.com/fatih/color v1.15.0
 	github.com/fujiwara/ridge v0.6.1
 	github.com/google/go-cmp v0.5.9
 	github.com/handlename/ssmwrap v1.2.1
@@ -25,6 +24,7 @@ require (
 	github.com/mashiike/hclconfig v0.8.0
 	github.com/mashiike/ls3viewer v0.2.0
 	github.com/mashiike/queryrunner v0.3.1
+	github.com/mashiike/slogutils v0.4.0
 	github.com/samber/lo v1.38.1
 	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/stretchr/testify v1.8.1
@@ -62,7 +62,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
-	github.com/mattn/go-colorable v0.1.9 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-encoding v0.0.2 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
@@ -84,7 +84,7 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

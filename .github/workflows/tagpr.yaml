@@ -12,12 +12,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - id: tagpr
-        uses: Songmu/tagpr@main
-      - name: Adding summary
-        run: echo '### ${{steps.tagpr.outputs.tag}}' >> $GITHUB_STEP_SUMMARY
+        uses: Songmu/tagpr@v1
+      - name: Checkout released
+        uses: actions/checkout@v3
         if: ${{ steps.tagpr.outputs.tag != '' }}
-      - uses: ./.github/actions/release
         with:
-          tag: ${{ steps.tagpr.outputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ steps.tagpr.outputs.tag }}
+      - name: Set up Go
+        uses: actions/setup-go@v3
         if: ${{ steps.tagpr.outputs.tag != '' }}
+        with:
+            go-version: "1.21"
+      - name: Run Go Releaser
+        uses: goreleaser/goreleaser-action@v1
+        if: ${{ steps.tagpr.outputs.tag != '' }}
+        with:
+          version: latest
+          args: release

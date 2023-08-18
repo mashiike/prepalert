@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/queryrunner"
+	"github.com/mashiike/slogutils"
 	"github.com/zclconf/go-cty/cty"
 	"golang.org/x/sync/errgroup"
 )
@@ -90,7 +91,6 @@ func (rule *Rule) Match(body *WebhookBody) bool {
 }
 
 func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) (string, error) {
-	reqID := queryrunner.GetRequestID(ctx)
 	eg, egctx := errgroup.WithContext(ctx)
 	runtimeVariables := map[string]cty.Value{
 		"params": rule.params,
@@ -103,13 +103,17 @@ func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext
 	for _, query := range rule.queries {
 		_query := query
 		eg.Go(func() error {
-			log.Printf("[info][%s] start run query name=%s", reqID, _query.Name())
+			egctxWithQueryName := slogutils.With(
+				egctx,
+				"query_name", _query.Name(),
+			)
+			slog.InfoContext(egctxWithQueryName, "start run query")
 			result, err := _query.Run(egctx, evalCtx.Variables, nil)
 			if err != nil {
-				log.Printf("[error][%s]failed run query name=%s", reqID, _query.Name())
+				slog.ErrorContext(egctxWithQueryName, "failed run query", "error", err.Error())
 				return fmt.Errorf("query `%s`:%w", _query.Name(), err)
 			}
-			log.Printf("[info][%s] end run query name=%s", reqID, _query.Name())
+			slog.InfoContext(egctxWithQueryName, "end run query")
 			queryResults.Store(_query.Name(), result)
 			return nil
 		})
@@ -121,12 +125,23 @@ func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext
 	queryResults.Range(func(key any, value any) bool {
 		name, ok := key.(string)
 		if !ok {
-			log.Printf("[warn][%s] key=%v is not string", reqID, key)
+			slog.WarnContext(ctx,
+				"failed fetch query results",
+				"error", "key is not string",
+				"key", fmt.Sprintf("%v", key),
+				"key_type", fmt.Sprintf("%T", key),
+			)
 			return false
 		}
 		queryResult, ok := value.(*queryrunner.QueryResult)
 		if !ok {
-			log.Printf("[warn][%s] value=%v is not *QueryResult", reqID, value)
+			slog.WarnContext(ctx,
+				"failed fetch query results",
+				"error", "value is not *QueryResult",
+				"key", key,
+				"value", fmt.Sprintf("%v", value),
+				"value_type", fmt.Sprintf("%T", value),
+			)
 			return false
 		}
 		queryResultVariables[name] = queryResult.MarshalCTYValue()

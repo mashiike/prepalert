@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/mackerelio/mackerel-client-go"
-	"github.com/mashiike/queryrunner"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -162,12 +161,11 @@ func (body *Alert) MarshalCTYValues() map[string]cty.Value {
 }
 
 func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
-	reqID := queryrunner.GetRequestID(ctx)
 	info, err := rule.BuildInformation(ctx, app.evalCtx.NewChild(), body)
 	if err != nil {
 		return err
 	}
-	log.Printf("[debug][%s] information: %s", reqID, info)
+	slog.DebugContext(ctx, "dump infomation", "infomation", info)
 	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
 	var showDetailsURL string
 	var abbreviatedMessage string = "\n..."
@@ -193,8 +191,12 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		u := app.backend.ViewerBaseURL.JoinPath(objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
 		showDetailsURL = u.String()
 		abbreviatedMessage = fmt.Sprintf("\nshow details: %s", showDetailsURL)
-		log.Printf("[debug][%s] show details url `%s`", reqID, showDetailsURL)
-		log.Printf("[debug][%s] try upload descriptsion to `s3://%s/%s`", reqID, app.backend.BucketName, objectKey)
+		slog.DebugContext(
+			ctx,
+			"try upload description",
+			"s3_url", fmt.Sprintf("s3://%s/%s", app.backend.BucketName, objectKey),
+			"show_details_url", showDetailsURL,
+		)
 		output, err := app.uploader.Upload(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(app.backend.BucketName),
 			Key:    aws.String(objectKey),
@@ -203,7 +205,7 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		if err != nil {
 			return fmt.Errorf("upload description failed: %w", err)
 		}
-		log.Printf("[info][%s] upload_location=%s", reqID, output.Location)
+		slog.InfoContext(ctx, "uploaded description", "s3_url", output.Location)
 		if app.backend.OnlyDetailURLOnMackerel {
 			description = showDetailsURL
 		}
@@ -215,9 +217,19 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		maxSize := rule.MaxAlertMemoSize()
 		if len(memo) > maxSize {
 			if app.EnableBackend() {
-				log.Printf("[warn][%s] memo is too long length=%d, backend_url=%s", reqID, len(memo), showDetailsURL)
+				slog.WarnContext(
+					ctx,
+					"alert memo is too long",
+					"length", len(memo),
+					"show_details_url", showDetailsURL,
+				)
 			} else {
-				log.Printf("[warn][%s] memo is too long length=%d, full memo:%s", reqID, len(memo), memo)
+				slog.WarnContext(
+					ctx,
+					"alert memo is too long",
+					"length", len(memo),
+					"full_memo", memo,
+				)
 			}
 			if len(abbreviatedMessage) >= maxSize {
 				memo = abbreviatedMessage[0:maxSize]
@@ -228,8 +240,8 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := app.UpdateAlertMemo(ctx, body, memo); err != nil {
-				log.Printf("[error][%s] %v", reqID, err)
+			if err := app.UpdateAlertMemo(ctx, body.Alert.ID, memo); err != nil {
+				slog.ErrorContext(ctx, "failed update alert memo", "error", err.Error())
 				atomic.AddInt32(&errNum, 1)
 			}
 		}()
@@ -238,9 +250,19 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		maxSize := rule.MaxGraphAnnotationDescriptionSize()
 		if len(description) > maxSize {
 			if app.EnableBackend() {
-				log.Printf("[warn][%s] description is too long length=%d, backend_url=%s", reqID, len(description), showDetailsURL)
+				slog.WarnContext(
+					ctx,
+					"graph anotation description is too long",
+					"length", len(description),
+					"show_details_url", showDetailsURL,
+				)
 			} else {
-				log.Printf("[warn][%s] description is too long length=%d, full description:%s", reqID, len(description), description)
+				slog.WarnContext(
+					ctx,
+					"graph anotation description is too long",
+					"length", len(description),
+					"full_description", description,
+				)
 			}
 			if len(abbreviatedMessage) >= maxSize {
 				description = abbreviatedMessage[0:maxSize]
@@ -258,8 +280,12 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := app.PostGraphAnnotation(ctx, body, annotation); err != nil {
-				log.Printf("[error][%s] %v", reqID, err)
+			if err := app.PostGraphAnnotation(ctx, annotation); err != nil {
+				slog.ErrorContext(
+					ctx,
+					"failed post graph annotation",
+					"error", err.Error(),
+				)
 				atomic.AddInt32(&errNum, 1)
 			}
 		}()
@@ -271,17 +297,25 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	return nil
 }
 
-func (app *App) PostGraphAnnotation(ctx context.Context, body *WebhookBody, params *mackerel.GraphAnnotation) error {
-	reqID := queryrunner.GetRequestID(ctx)
+func (app *App) PostGraphAnnotation(ctx context.Context, params *mackerel.GraphAnnotation) error {
 	findOffset := int64(15 * time.Minute / time.Second)
-	annotations, err := app.client.FindGraphAnnotations(app.service, body.Alert.OpenedAt-findOffset, body.Alert.ClosedAt+findOffset)
+	annotations, err := app.client.FindGraphAnnotations(app.service, params.From-findOffset, params.To+findOffset)
 	if err != nil {
 		return fmt.Errorf("find graph annotations: %w", err)
 	}
 	for _, annotation := range annotations {
-		log.Printf("[debug][%s] check annotation id=%s title=%s", reqID, annotation.ID, annotation.Title)
+		slog.DebugContext(
+			ctx,
+			"check annotation",
+			"annotation_id", annotation.ID,
+			"annotation_title", annotation.Title,
+		)
 		if annotation.Title == params.Title {
-			log.Printf("[info][%s] annotation is aleady exists, overwrite description: annotation_id=%s, alert_id=%s", reqID, annotation.ID, body.Alert.ID)
+			slog.InfoContext(
+				ctx,
+				"annotation is aleady exists, overwrite description",
+				"annotation_id", annotation.ID,
+			)
 			annotation.Description = params.Description
 			annotation.Service = params.Service
 			_, err := app.client.UpdateGraphAnnotation(annotation.ID, &annotation)
@@ -291,19 +325,29 @@ func (app *App) PostGraphAnnotation(ctx context.Context, body *WebhookBody, para
 			return nil
 		}
 	}
-	log.Printf("[info][%s] create new annotation: alert_id=%s", reqID, body.Alert.ID)
+	slog.InfoContext(
+		ctx,
+		"create new annotation",
+	)
 	output, err := app.client.CreateGraphAnnotation(params)
 	if err != nil {
 		return fmt.Errorf("create graph annotations: %w", err)
 	}
-	log.Printf("[info][%s] annotation created annotation_id=%s", reqID, output.ID)
+	slog.InfoContext(
+		ctx,
+		"annotation created",
+		"annotation_id", output.ID,
+	)
 	return nil
 }
 
-func (app *App) UpdateAlertMemo(ctx context.Context, body *WebhookBody, memo string) error {
-	reqID := queryrunner.GetRequestID(ctx)
-	log.Printf("[info][%s] update alert memo: alert_id=%s", reqID, body.Alert.ID)
-	_, err := app.client.UpdateAlert(body.Alert.ID, mackerel.UpdateAlertParam{
+func (app *App) UpdateAlertMemo(ctx context.Context, alertID string, memo string) error {
+	slog.InfoContext(
+		ctx,
+		"update alert memo",
+		"alert_id", alertID,
+	)
+	_, err := app.client.UpdateAlert(alertID, mackerel.UpdateAlertParam{
 		Memo: memo,
 	})
 	if err != nil {

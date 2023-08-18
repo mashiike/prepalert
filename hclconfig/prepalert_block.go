@@ -2,7 +2,7 @@ package hclconfig
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -92,13 +92,13 @@ func (b *PrepalertBlock) DecodeBody(body hcl.Body, ctx *hcl.EvalContext) hcl.Dia
 
 func (b *PrepalertBlock) ValidateVersion(version string) error {
 	if b.versionConstraints == nil {
-		log.Println("[warn] required_version is empty. Skip checking required_version.")
+		slog.Warn("required_version is empty. Skip checking required_version.")
 		return nil
 	}
 	versionParts := strings.SplitN(version, "-", 2)
 	v, err := gv.NewVersion(versionParts[0])
 	if err != nil {
-		log.Printf("[warn]: Invalid version format \"%s\". Skip checking required_version.", version)
+		slog.Warn("Invalid version format, Skip checking required_version.", "input_version_string", version)
 		// invalid version string (e.g. "current") always allowed
 		return nil
 	}
