@@ -41,7 +41,7 @@ func main() {
 					false, // in-casesensitive
 				),
 				func(r slog.Record) slog.Record {
-					if r.Level >= slog.LevelInfo {
+					if r.Level >= slog.LevelInfo && r.Level < slog.LevelError {
 						return r
 					}
 					fs := runtime.CallersFrames([]uintptr{r.PC})
