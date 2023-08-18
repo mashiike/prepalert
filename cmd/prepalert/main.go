@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -39,6 +40,22 @@ func main() {
 					},
 					false, // in-casesensitive
 				),
+				func(r slog.Record) slog.Record {
+					if r.Level >= slog.LevelInfo {
+						return r
+					}
+					fs := runtime.CallersFrames([]uintptr{r.PC})
+					f, _ := fs.Next()
+					r.Add(
+						slog.SourceKey,
+						&slog.Source{
+							Function: f.Function,
+							File:     f.File,
+							Line:     f.Line,
+						},
+					)
+					return r
+				},
 			},
 			Writer: os.Stderr,
 			HandlerOptions: &slog.HandlerOptions{
