@@ -34,14 +34,15 @@ func TestRuleRenderMemo(t *testing.T) {
 				Information: ParseExpression(t, `"${strftime_in_zone("%Y-%m-%d %H:%M:%S","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
-				ctx := baseCtx.NewChild()
 				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
-				ctx.Variables = map[string]cty.Value{
-					"runtime": cty.ObjectVal(map[string]cty.Value{
-						"event":        cty.ObjectVal(body.MarshalCTYValues()),
-						"query_reuslt": cty.ObjectVal(map[string]cty.Value{}),
-					}),
+				builder := prepalert.EvalContextBuilder{
+					Parent: baseCtx,
+					Runtime: &prepalert.RuntimeVariables{
+						Event: body,
+					},
 				}
+				ctx, err := builder.Build()
+				require.NoError(t, err)
 				return ctx
 			},
 			expectedMemo: "2016-09-06 11:45:12",
@@ -55,14 +56,15 @@ func TestRuleRenderMemo(t *testing.T) {
 				Information: ParseExpression(t, `"${strftime_in_zone("%O%E%Q%1","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
-				ctx := baseCtx.NewChild()
 				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
-				ctx.Variables = map[string]cty.Value{
-					"runtime": cty.ObjectVal(map[string]cty.Value{
-						"event":        cty.ObjectVal(body.MarshalCTYValues()),
-						"query_reuslt": cty.ObjectVal(map[string]cty.Value{}),
-					}),
+				builder := prepalert.EvalContextBuilder{
+					Parent: baseCtx,
+					Runtime: &prepalert.RuntimeVariables{
+						Event: body,
+					},
 				}
+				ctx, err := builder.Build()
+				require.NoError(t, err)
 				return ctx
 			},
 			expectedError: true,
@@ -77,12 +79,12 @@ func TestRuleRenderMemo(t *testing.T) {
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
 				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
-				ctx := baseCtx.NewChild()
-				ctx.Variables = map[string]cty.Value{
-					"runtime": cty.ObjectVal(map[string]cty.Value{
-						"event": cty.ObjectVal(body.MarshalCTYValues()),
-						"query_result": cty.ObjectVal(map[string]cty.Value{
-							"hoge_result": queryrunner.NewQueryResult(
+				builder := prepalert.EvalContextBuilder{
+					Parent: baseCtx,
+					Runtime: &prepalert.RuntimeVariables{
+						Event: body,
+						QueryResults: map[string]*prepalert.QueryResult{
+							"hoge_result": (*prepalert.QueryResult)(queryrunner.NewQueryResult(
 								"hoge_result",
 								"dummy",
 								[]string{"Name", "Sign", "Rating"},
@@ -92,10 +94,12 @@ func TestRuleRenderMemo(t *testing.T) {
 									{"C", "The Ugly", "120"},
 									{"D", "The Gopher", "800"},
 								},
-							).MarshalCTYValue(),
-						}),
-					}),
+							)),
+						},
+					},
 				}
+				ctx, err := builder.Build()
+				require.NoError(t, err)
 				return ctx
 			},
 			expectedMemo: string(LoadFile(t, "testdata/table.txt")),

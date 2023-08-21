@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mackerelio/mackerel-client-go"
-	"github.com/zclconf/go-cty/cty"
 )
 
 //go:generate mockgen -source=$GOFILE -destination=./mock/mock_$GOFILE -package=mock
@@ -97,13 +96,13 @@ func (svc *MackerelService) PostGraphAnnotation(ctx context.Context, params *mac
 }
 
 type WebhookBody struct {
-	OrgName  string   `json:"orgName"`
-	Event    string   `json:"event"`
-	ImageURL *string  `json:"imageUrl"`
-	Memo     string   `json:"memo"`
-	Host     *Host    `json:"host,omitempty"`
-	Service  *Service `json:"service,omitempty"`
-	Alert    *Alert   `json:"alert"`
+	OrgName  string   `json:"orgName" cty:"org_name"`
+	Event    string   `json:"event" cty:"event"`
+	ImageURL *string  `json:"imageUrl" cty:"image_url"`
+	Memo     string   `json:"memo" cty:"memo"`
+	Host     *Host    `json:"host,omitempty" cty:"host,omitempty"`
+	Service  *Service `json:"service,omitempty" cty:"service,omitempty"`
+	Alert    *Alert   `json:"alert" cty:"alert,omitempty"`
 }
 
 func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID string) (*WebhookBody, error) {
@@ -202,143 +201,47 @@ func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID 
 	return body, nil
 }
 
-func (body *WebhookBody) MarshalCTYValues() map[string]cty.Value {
-	values := map[string]cty.Value{
-		"org_name":  cty.StringVal(body.OrgName),
-		"event":     cty.StringVal(body.Event),
-		"image_url": cty.StringVal(body.Event),
-		"memo":      cty.StringVal(body.Memo),
-		"alert":     cty.ObjectVal(body.Alert.MarshalCTYValues()),
-	}
-	if body.Host != nil {
-		values["host"] = cty.ObjectVal(body.Host.MarshalCTYValues())
-	}
-	if body.Service != nil {
-		values["service"] = cty.ObjectVal(body.Service.MarshalCTYValues())
-	}
-	return values
-}
-
 type Host struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	URL       string  `json:"url"`
-	Type      string  `json:"type,omitempty"`
-	Status    string  `json:"status"`
-	Memo      string  `json:"memo"`
-	IsRetired bool    `json:"isRetired"`
-	Roles     []*Role `json:"roles"`
-}
-
-func (body *Host) MarshalCTYValues() map[string]cty.Value {
-	values := map[string]cty.Value{
-		"id":         cty.StringVal(body.ID),
-		"name":       cty.StringVal(body.Name),
-		"url":        cty.StringVal(body.URL),
-		"type":       cty.StringVal(body.Type),
-		"status":     cty.StringVal(body.Status),
-		"memo":       cty.StringVal(body.Memo),
-		"is_retired": cty.BoolVal(body.IsRetired),
-	}
-	if len(body.Roles) == 0 {
-		return values
-	}
-	roles := make([]cty.Value, 0, len(body.Roles))
-	for _, role := range body.Roles {
-		roles = append(roles, cty.ObjectVal(role.MarshalCTYValues()))
-	}
-	values["roles"] = cty.ListVal(roles)
-	return values
+	ID        string  `json:"id" cty:"id"`
+	Name      string  `json:"name" cty:"name"`
+	URL       string  `json:"url" cty:"url"`
+	Type      string  `json:"type,omitempty" cty:"type"`
+	Status    string  `json:"status" cty:"status"`
+	Memo      string  `json:"memo" cty:"memo"`
+	IsRetired bool    `json:"isRetired" cty:"is_retired"`
+	Roles     []*Role `json:"roles" cty:"roles,omitempty"`
 }
 
 type Role struct {
-	Fullname    string `json:"fullname"`
-	ServiceName string `json:"serviceName"`
-	ServiceURL  string `json:"serviceUrl"`
-	RoleName    string `json:"roleName"`
-	RoleURL     string `json:"roleUrl"`
-}
-
-func (body *Role) MarshalCTYValues() map[string]cty.Value {
-	values := map[string]cty.Value{
-		"fullname":     cty.StringVal(body.Fullname),
-		"service_name": cty.StringVal(body.ServiceName),
-		"service_url":  cty.StringVal(body.ServiceURL),
-		"role_name":    cty.StringVal(body.RoleName),
-		"role_url":     cty.StringVal(body.RoleURL),
-	}
-	return values
+	Fullname    string `json:"fullname" cty:"fullname"`
+	ServiceName string `json:"serviceName" cty:"service_name"`
+	ServiceURL  string `json:"serviceUrl" cty:"service_url"`
+	RoleName    string `json:"roleName" cty:"role_name"`
+	RoleURL     string `json:"roleUrl" cty:"role_url"`
 }
 
 type Service struct {
-	ID    string  `json:"id"`
-	Memo  string  `json:"memo"`
-	Name  string  `json:"name"`
-	OrgID string  `json:"orgId"`
-	Roles []*Role `json:"roles"`
-}
-
-func (body *Service) MarshalCTYValues() map[string]cty.Value {
-	values := map[string]cty.Value{
-		"id":     cty.StringVal(body.ID),
-		"name":   cty.StringVal(body.Name),
-		"memo":   cty.StringVal(body.Memo),
-		"org_id": cty.StringVal(body.OrgID),
-	}
-	if len(body.Roles) == 0 {
-		return values
-	}
-	roles := make([]cty.Value, 0, len(body.Roles))
-	for _, role := range body.Roles {
-		roles = append(roles, cty.ObjectVal(role.MarshalCTYValues()))
-	}
-	values["roles"] = cty.ListVal(roles)
-	return values
+	ID    string  `json:"id" cty:"id"`
+	Memo  string  `json:"memo" cty:"memo"`
+	Name  string  `json:"name" cty:"name"`
+	OrgID string  `json:"orgId" cty:"org_id"`
+	Roles []*Role `json:"roles" cty:"roles,omitempty"`
 }
 
 type Alert struct {
-	OpenedAt          int64    `json:"openedAt"`
-	ClosedAt          int64    `json:"closedAt"`
-	CreatedAt         int64    `json:"createdAt"`
-	CriticalThreshold *float64 `json:"criticalThreshold,omitempty"`
-	Duration          int64    `json:"duration"`
-	IsOpen            bool     `json:"isOpen"`
-	MetricLabel       string   `json:"metricLabel"`
-	MetricValue       float64  `json:"metricValue"`
-	MonitorName       string   `json:"monitorName"`
-	MonitorOperator   string   `json:"monitorOperator"`
-	Status            string   `json:"status"`
-	Trigger           string   `json:"trigger"`
-	ID                string   `json:"id"`
-	URL               string   `json:"url"`
-	WarningThreshold  *float64 `json:"warningThreshold,omitempty"`
-}
-
-func (body *Alert) MarshalCTYValues() map[string]cty.Value {
-	values := map[string]cty.Value{
-		"opened_at":        cty.NumberIntVal(body.OpenedAt),
-		"closed_at":        cty.NumberIntVal(body.ClosedAt),
-		"created_at":       cty.NumberIntVal(body.CreatedAt),
-		"duration":         cty.NumberIntVal(body.Duration),
-		"is_open":          cty.BoolVal(body.IsOpen),
-		"metric_label":     cty.StringVal(body.MetricLabel),
-		"metric_value":     cty.NumberFloatVal(body.MetricValue),
-		"monitor_name":     cty.StringVal(body.MonitorName),
-		"monitor_operator": cty.StringVal(body.MonitorOperator),
-		"status":           cty.StringVal(body.Status),
-		"trigger":          cty.StringVal(body.Trigger),
-		"id":               cty.StringVal(body.ID),
-		"url":              cty.StringVal(body.URL),
-	}
-	if body.CriticalThreshold == nil {
-		values["critical_threshold"] = cty.NullVal(cty.Number)
-	} else {
-		values["critical_threshold"] = cty.NumberFloatVal(*body.CriticalThreshold)
-	}
-	if body.WarningThreshold == nil {
-		values["warning_threshold"] = cty.NullVal(cty.Number)
-	} else {
-		values["warning_threshold"] = cty.NumberFloatVal(*body.WarningThreshold)
-	}
-	return values
+	OpenedAt          int64    `json:"openedAt" cty:"opened_at"`
+	ClosedAt          int64    `json:"closedAt" cty:"closed_at"`
+	CreatedAt         int64    `json:"createdAt" cty:"created_at"`
+	CriticalThreshold *float64 `json:"criticalThreshold,omitempty" cty:"critical_threshold,omitempty"`
+	Duration          int64    `json:"duration" cty:"duration"`
+	IsOpen            bool     `json:"isOpen" cty:"is_open"`
+	MetricLabel       string   `json:"metricLabel" cty:"metric_label"`
+	MetricValue       float64  `json:"metricValue" cty:"metric_value"`
+	MonitorName       string   `json:"monitorName" cty:"monitor_name"`
+	MonitorOperator   string   `json:"monitorOperator" cty:"monitor_operator"`
+	Status            string   `json:"status" cty:"status"`
+	Trigger           string   `json:"trigger" cty:"trigger"`
+	ID                string   `json:"id" cty:"id"`
+	URL               string   `json:"url" cty:"url"`
+	WarningThreshold  *float64 `json:"warningThreshold,omitempty" cty:"warning_threshold,omitempty"`
 }

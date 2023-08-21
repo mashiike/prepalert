@@ -311,11 +311,15 @@ func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) 
 	var showDetailsURL string
 	var abbreviatedMessage string = "\n..."
 	if app.EnableBackend() {
-		evalCtx := app.evalCtx.NewChild()
-		evalCtx.Variables = map[string]cty.Value{
-			"runtime": cty.ObjectVal(map[string]cty.Value{
-				"event": cty.ObjectVal(body.MarshalCTYValues()),
-			}),
+		builder := &EvalContextBuilder{
+			Parent: app.evalCtx,
+			Runtime: &RuntimeVariables{
+				Event: body,
+			},
+		}
+		evalCtx, err := builder.Build()
+		if err != nil {
+			return fmt.Errorf("eval context builder: %w", err)
 		}
 		expr := *app.backend.ObjectKeyTemplate
 		objectKeyTemplateValue, diags := expr.Value(evalCtx)

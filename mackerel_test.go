@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclconfig"
+	"github.com/mashiike/hclutil"
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/mock"
 	"github.com/stretchr/testify/require"
@@ -211,8 +212,10 @@ func TestWebnookBody__MarshalCTYValues(t *testing.T) {
 	require.False(t, diags.HasErrors())
 	ctx := hclconfig.NewEvalContext()
 	ctx = ctx.NewChild()
+	testEvent, err := hclutil.MarshalCTYValue(body)
+	require.NoError(t, err)
 	ctx.Variables = map[string]cty.Value{
-		"test_event": cty.ObjectVal(body.MarshalCTYValues()),
+		"test_event": testEvent,
 	}
 	value, diags := expr.Value(ctx)
 	require.False(t, diags.HasErrors())
@@ -255,7 +258,7 @@ func TestWebnookBody__MarshalCTYValues(t *testing.T) {
 		  "type": "unknown",
 		  "url": "https://mackerel.io/orgs/.../hosts/..."
 		},
-		"image_url": "alert",
+		"image_url": "https://mackerel.io/embed/public/.../....png",
 		"memo": "memo....",
 		"org_name": "Macker..."
 	  }`

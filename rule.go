@@ -92,12 +92,17 @@ func (rule *Rule) Match(body *WebhookBody) bool {
 
 func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) (string, error) {
 	eg, egctx := errgroup.WithContext(ctx)
-	runtimeVariables := map[string]cty.Value{
-		"params": rule.params,
-		"event":  cty.ObjectVal(body.MarshalCTYValues()),
+	builder := &EvalContextBuilder{
+		Parent: evalCtx,
+		Runtime: &RuntimeVariables{
+			Params:       rule.params,
+			Event:        body,
+			QueryResults: make(map[string]*QueryResult),
+		},
 	}
-	evalCtx.Variables = map[string]cty.Value{
-		"runtime": cty.ObjectVal(runtimeVariables),
+	evalCtx, err := builder.Build()
+	if err != nil {
+		return "", fmt.Errorf("eval context builder: %w", err)
 	}
 	var queryResults sync.Map
 	for _, query := range rule.queries {
@@ -121,7 +126,6 @@ func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext
 	if err := eg.Wait(); err != nil {
 		return "", err
 	}
-	queryResultVariables := make(map[string]cty.Value, len(rule.queries))
 	queryResults.Range(func(key any, value any) bool {
 		name, ok := key.(string)
 		if !ok {
@@ -144,12 +148,12 @@ func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext
 			)
 			return false
 		}
-		queryResultVariables[name] = queryResult.MarshalCTYValue()
+		builder.Runtime.QueryResults[name] = (*QueryResult)(queryResult)
 		return true
 	})
-	runtimeVariables["query_result"] = cty.ObjectVal(queryResultVariables)
-	evalCtx.Variables = map[string]cty.Value{
-		"runtime": cty.ObjectVal(runtimeVariables),
+	evalCtx, err = builder.Build()
+	if err != nil {
+		return "", err
 	}
 	return rule.RenderInformation(evalCtx)
 }
