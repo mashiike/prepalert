@@ -3,12 +3,16 @@ package prepalert
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Songmu/flextime"
@@ -28,10 +32,11 @@ import (
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/queryrunner"
 	"github.com/mashiike/slogutils"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type App struct {
-	client    *mackerel.Client
+	mkrSvc    *MackerelService
 	auth      *hclconfig.AuthBlock
 	backend   *hclconfig.S3BackendBlock
 	rules     []*Rule
@@ -45,6 +50,7 @@ type App struct {
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 	client := mackerel.NewClient(apikey)
+
 	rules := make([]*Rule, 0, len(cfg.Rules))
 	for i, ruleBlock := range cfg.Rules {
 		rule, err := NewRule(client, ruleBlock)
@@ -66,7 +72,7 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		return nil, fmt.Errorf("can not get sqs queu url:%w", err)
 	}
 	app := &App{
-		client:    client,
+		mkrSvc:    NewMackerelService(client),
 		auth:      cfg.Prepalert.Auth,
 		rules:     rules,
 		service:   cfg.Prepalert.Service,
@@ -129,7 +135,7 @@ func (app *App) Run(ctx context.Context, opts *RunOptions) error {
 }
 
 func (app *App) Exec(ctx context.Context, alertID string) error {
-	body, err := app.NewWebhookBody(ctx, alertID)
+	body, err := app.mkrSvc.NewEmulatedWebhookBody(ctx, alertID)
 	if err != nil {
 		return err
 	}
@@ -292,6 +298,143 @@ func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
 		}
 	}
 	slog.InfoContext(ctx, "finish process rules", "matched_rule_count", matchCount)
+	return nil
+}
+
+func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
+	info, err := rule.BuildInformation(ctx, app.evalCtx.NewChild(), body)
+	if err != nil {
+		return err
+	}
+	slog.DebugContext(ctx, "dump infomation", "infomation", info)
+	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
+	var showDetailsURL string
+	var abbreviatedMessage string = "\n..."
+	if app.EnableBackend() {
+		evalCtx := app.evalCtx.NewChild()
+		evalCtx.Variables = map[string]cty.Value{
+			"runtime": cty.ObjectVal(map[string]cty.Value{
+				"event": cty.ObjectVal(body.MarshalCTYValues()),
+			}),
+		}
+		expr := *app.backend.ObjectKeyTemplate
+		objectKeyTemplateValue, diags := expr.Value(evalCtx)
+		if diags.HasErrors() {
+			return fmt.Errorf("eval object key template: %w", diags)
+		}
+		if objectKeyTemplateValue.Type() != cty.String {
+			return errors.New("object key template is not string")
+		}
+		if !objectKeyTemplateValue.IsKnown() {
+			return errors.New("object key template is unknown")
+		}
+		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
+		u := app.backend.ViewerBaseURL.JoinPath(objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
+		showDetailsURL = u.String()
+		abbreviatedMessage = fmt.Sprintf("\nshow details: %s", showDetailsURL)
+		slog.DebugContext(
+			ctx,
+			"try upload description",
+			"s3_url", fmt.Sprintf("s3://%s/%s", app.backend.BucketName, objectKey),
+			"show_details_url", showDetailsURL,
+		)
+		output, err := app.uploader.Upload(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(app.backend.BucketName),
+			Key:    aws.String(objectKey),
+			Body:   strings.NewReader(description),
+		})
+		if err != nil {
+			return fmt.Errorf("upload description failed: %w", err)
+		}
+		slog.InfoContext(ctx, "uploaded description", "s3_url", output.Location)
+		if app.backend.OnlyDetailURLOnMackerel {
+			description = showDetailsURL
+		}
+	}
+	var wg sync.WaitGroup
+	var errNum int32
+	if rule.UpdateAlertMemo() {
+		memo := info
+		maxSize := rule.MaxAlertMemoSize()
+		if len(memo) > maxSize {
+			if app.EnableBackend() {
+				slog.WarnContext(
+					ctx,
+					"alert memo is too long",
+					"length", len(memo),
+					"show_details_url", showDetailsURL,
+				)
+			} else {
+				slog.WarnContext(
+					ctx,
+					"alert memo is too long",
+					"length", len(memo),
+					"full_memo", memo,
+				)
+			}
+			if len(abbreviatedMessage) >= maxSize {
+				memo = abbreviatedMessage[0:maxSize]
+			} else {
+				memo = memo[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
+			}
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := app.mkrSvc.UpdateAlertMemo(ctx, body.Alert.ID, memo); err != nil {
+				slog.ErrorContext(ctx, "failed update alert memo", "error", err.Error())
+				atomic.AddInt32(&errNum, 1)
+			}
+		}()
+	}
+	if rule.PostGraphAnnotation() {
+		maxSize := rule.MaxGraphAnnotationDescriptionSize()
+		if len(description) > maxSize {
+			if app.EnableBackend() {
+				slog.WarnContext(
+					ctx,
+					"graph anotation description is too long",
+					"length", len(description),
+					"show_details_url", showDetailsURL,
+				)
+			} else {
+				slog.WarnContext(
+					ctx,
+					"graph anotation description is too long",
+					"length", len(description),
+					"full_description", description,
+				)
+			}
+			if len(abbreviatedMessage) >= maxSize {
+				description = abbreviatedMessage[0:maxSize]
+			} else {
+				description = description[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
+			}
+		}
+		annotation := &mackerel.GraphAnnotation{
+			Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name()),
+			Description: description,
+			From:        body.Alert.OpenedAt,
+			To:          body.Alert.ClosedAt,
+			Service:     app.service,
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := app.mkrSvc.PostGraphAnnotation(ctx, annotation); err != nil {
+				slog.ErrorContext(
+					ctx,
+					"failed post graph annotation",
+					"error", err.Error(),
+				)
+				atomic.AddInt32(&errNum, 1)
+			}
+		}()
+	}
+	wg.Wait()
+	if errNum != 0 {
+		return fmt.Errorf("has %d errors", errNum)
+	}
 	return nil
 }
 
