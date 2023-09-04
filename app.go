@@ -50,10 +50,10 @@ type App struct {
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 	client := mackerel.NewClient(apikey)
-
+	svc := NewMackerelService(client)
 	rules := make([]*Rule, 0, len(cfg.Rules))
 	for i, ruleBlock := range cfg.Rules {
-		rule, err := NewRule(client, ruleBlock)
+		rule, err := NewRule(svc, ruleBlock)
 		if err != nil {
 			return nil, fmt.Errorf("rules[%d]:%w", i, err)
 		}
@@ -72,7 +72,7 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		return nil, fmt.Errorf("can not get sqs queu url:%w", err)
 	}
 	app := &App{
-		mkrSvc:    NewMackerelService(client),
+		mkrSvc:    svc,
 		auth:      cfg.Prepalert.Auth,
 		rules:     rules,
 		service:   cfg.Prepalert.Service,

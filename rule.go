@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/hashicorp/hcl/v2"
-	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/queryrunner"
 	"github.com/mashiike/slogutils"
@@ -17,6 +16,7 @@ import (
 )
 
 type Rule struct {
+	svc                               *MackerelService
 	ruleName                          string
 	monitorName                       string
 	anyAlert                          bool
@@ -31,15 +31,15 @@ type Rule struct {
 	maxAlertMemoSize                  *int
 }
 
-func NewRule(client *mackerel.Client, cfg *hclconfig.RuleBlock) (*Rule, error) {
+func NewRule(svc *MackerelService, cfg *hclconfig.RuleBlock) (*Rule, error) {
 	var name string
 	var anyAlert, onClosed, onOpened bool
 	if cfg.Alert.MonitorID != nil {
-		m, err := client.GetMonitor(*cfg.Alert.MonitorID)
+		var err error
+		name, err = svc.GetMonitorName(context.Background(), *cfg.Alert.MonitorID)
 		if err != nil {
-			return nil, fmt.Errorf("get monitor from mackerel:%w", err)
+			return nil, fmt.Errorf("get monitor name:%w", err)
 		}
-		name = m.MonitorName()
 	}
 	if cfg.Alert.MonitorName != nil {
 		name = *cfg.Alert.MonitorName

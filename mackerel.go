@@ -245,3 +245,12 @@ type Alert struct {
 	URL               string   `json:"url" cty:"url"`
 	WarningThreshold  *float64 `json:"warningThreshold,omitempty" cty:"warning_threshold,omitempty"`
 }
+
+func (svc *MackerelService) GetMonitorName(ctx context.Context, monitorID string) (string, error) {
+	slog.DebugContext(ctx, "call MackerelService.GetMonitorName", "monitor_id", monitorID)
+	monitor, err := svc.client.GetMonitor(monitorID)
+	if err != nil {
+		return "", fmt.Errorf("get monitor:%w", err)
+	}
+	return monitor.MonitorName(), nil
+}
