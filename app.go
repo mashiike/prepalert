@@ -3,23 +3,18 @@ package prepalert
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
@@ -28,41 +23,52 @@ import (
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/grat"
-	"github.com/mashiike/ls3viewer"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/queryrunner"
 	"github.com/mashiike/slogutils"
-	"github.com/zclconf/go-cty/cty"
 )
 
 type App struct {
-	mkrSvc    *MackerelService
-	auth      *hclconfig.AuthBlock
-	backend   *hclconfig.S3BackendBlock
-	rules     []*Rule
-	service   string
-	queueUrl  string
-	sqsClient *sqs.Client
-	uploader  *manager.Uploader
-	viewer    http.Handler
-	evalCtx   *hcl.EvalContext
+	mkrSvc              *MackerelService
+	backend             Backend
+	webhookClientID     string
+	webhookClientSecret string
+	rules               []*Rule
+	queueUrl            string
+	sqsClient           *sqs.Client
+	evalCtx             *hcl.EvalContext
 }
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 	client := mackerel.NewClient(apikey)
 	svc := NewMackerelService(client)
+	awsCfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("load aws default config:%w", err)
+	}
+
+	var backend Backend
+	switch {
+	case !cfg.Prepalert.S3Backend.IsEmpty():
+		s3Client := s3.NewFromConfig(awsCfg)
+		backend, err = NewS3Backend(s3Client, cfg.Prepalert.S3Backend, cfg.Prepalert.Auth)
+		if err != nil {
+			return nil, fmt.Errorf("initialize s3 backend:%w", err)
+		}
+	default:
+		backend = NewDiscardBackend()
+	}
+	slog.Info("setup backend", "backend", backend.String())
+
 	rules := make([]*Rule, 0, len(cfg.Rules))
 	for i, ruleBlock := range cfg.Rules {
-		rule, err := NewRule(svc, ruleBlock)
+		rule, err := NewRule(svc, backend, ruleBlock, cfg.Prepalert.Service)
 		if err != nil {
 			return nil, fmt.Errorf("rules[%d]:%w", i, err)
 		}
 		rules = append(rules, rule)
 	}
-	awsCfg, err := config.LoadDefaultConfig(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("load aws default config:%w", err)
-	}
+
 	sqsClient := sqs.NewFromConfig(awsCfg)
 	slog.Info("try get sqs queue url", "sqs_queue_name", cfg.Prepalert.SQSQueueName)
 	output, err := sqsClient.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
@@ -72,39 +78,14 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		return nil, fmt.Errorf("can not get sqs queu url:%w", err)
 	}
 	app := &App{
-		mkrSvc:    svc,
-		auth:      cfg.Prepalert.Auth,
-		rules:     rules,
-		service:   cfg.Prepalert.Service,
-		sqsClient: sqsClient,
-		queueUrl:  *output.QueueUrl,
-		evalCtx:   cfg.EvalContext,
-	}
-	if backend := cfg.Prepalert.S3Backend; !backend.IsEmpty() {
-		slog.Info("enable s3 backend", "s3_backet_name", backend.BucketName)
-		app.backend = backend
-		s3Client := s3.NewFromConfig(awsCfg)
-		app.uploader = manager.NewUploader(s3Client)
-		viewerOptFns := []func(*ls3viewer.Options){
-			ls3viewer.WithBaseURL(backend.ViewerBaseURL.String()),
-		}
-		if app.EnableBasicAuth() && !backend.EnableGoogleAuth() {
-			viewerOptFns = append(viewerOptFns, ls3viewer.WithBasicAuth(app.auth.ClientID, app.auth.ClientSecret))
-		}
-		if backend.EnableGoogleAuth() {
-			viewerOptFns = append(viewerOptFns, ls3viewer.WithGoogleOIDC(
-				*backend.ViewerGoogleClientID,
-				*backend.ViewerGoogleClientSecret,
-				backend.ViewerSessionEncryptKey,
-				backend.Allowed,
-				backend.Denied,
-			))
-		}
-		h, err := ls3viewer.New(backend.BucketName, *backend.ObjectKeyPrefix, viewerOptFns...)
-		if err != nil {
-			return nil, fmt.Errorf("initialize ls3viewer:%w", err)
-		}
-		app.viewer = h
+		mkrSvc:              svc,
+		backend:             backend,
+		webhookClientID:     cfg.Prepalert.Auth.ClientID,
+		webhookClientSecret: cfg.Prepalert.Auth.ClientSecret,
+		rules:               rules,
+		sqsClient:           sqsClient,
+		queueUrl:            *output.QueueUrl,
+		evalCtx:             cfg.EvalContext,
 	}
 	return app, nil
 }
@@ -123,9 +104,6 @@ func (app *App) Run(ctx context.Context, opts *RunOptions) error {
 			slog.WarnContext(ctx, "mode webhook is deprecated. change to http")
 		}
 		slog.InfoContext(ctx, "run as http", "address", opts.Address, "prefix", opts.Prefix)
-		if app.EnableBasicAuth() {
-			slog.InfoContext(ctx, "with basec auth", "client_id", app.auth.ClientID)
-		}
 		ridge.RunWithContext(ctx, opts.Address, opts.Prefix, app)
 	case "worker":
 		slog.InfoContext(ctx, "run as worker", "batch_size", opts.BatchSize)
@@ -178,12 +156,7 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 	slog.InfoContext(ctx, "accept HTTP request", "method", r.Method, "path", r.URL.Path)
 	if r.Method == http.MethodGet {
-		if !app.EnableBackend() {
-			slog.InfoContext(ctx, "backend is not enabled", "status", http.StatusMethodNotAllowed)
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-			return
-		}
-		app.viewer.ServeHTTP(w, r)
+		app.backend.ServeHTTP(w, r)
 		return
 	}
 	if app.EnableBasicAuth() && !app.CheckBasicAuth(r) {
@@ -290,10 +263,8 @@ func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
 			continue
 		}
 		slog.InfoContext(ctx, "match rule", "rule", rule.Name())
-		ctxWithRuleName := slogutils.With(ctx, "rule_name", rule.Name())
-		slog.InfoContext(ctxWithRuleName, "match rule")
 		matchCount++
-		if err := app.ProcessRule(ctxWithRuleName, rule, body); err != nil {
+		if err := rule.Render(ctx, app.evalCtx.NewChild(), body); err != nil {
 			return fmt.Errorf("failed process Mackerel webhook body:%s: %w", rule.Name(), err)
 		}
 	}
@@ -301,153 +272,8 @@ func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
 	return nil
 }
 
-func (app *App) ProcessRule(ctx context.Context, rule *Rule, body *WebhookBody) error {
-	info, err := rule.BuildInformation(ctx, app.evalCtx.NewChild(), body)
-	if err != nil {
-		return err
-	}
-	slog.DebugContext(ctx, "dump infomation", "infomation", info)
-	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
-	var showDetailsURL string
-	var abbreviatedMessage string = "\n..."
-	if app.EnableBackend() {
-		builder := &EvalContextBuilder{
-			Parent: app.evalCtx,
-			Runtime: &RuntimeVariables{
-				Event: body,
-			},
-		}
-		evalCtx, err := builder.Build()
-		if err != nil {
-			return fmt.Errorf("eval context builder: %w", err)
-		}
-		expr := *app.backend.ObjectKeyTemplate
-		objectKeyTemplateValue, diags := expr.Value(evalCtx)
-		if diags.HasErrors() {
-			return fmt.Errorf("eval object key template: %w", diags)
-		}
-		if objectKeyTemplateValue.Type() != cty.String {
-			return errors.New("object key template is not string")
-		}
-		if !objectKeyTemplateValue.IsKnown() {
-			return errors.New("object key template is unknown")
-		}
-		objectKey := filepath.Join(*app.backend.ObjectKeyPrefix, objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
-		u := app.backend.ViewerBaseURL.JoinPath(objectKeyTemplateValue.AsString(), fmt.Sprintf("%s_%s.txt", body.Alert.ID, rule.Name()))
-		showDetailsURL = u.String()
-		abbreviatedMessage = fmt.Sprintf("\nshow details: %s", showDetailsURL)
-		slog.DebugContext(
-			ctx,
-			"try upload description",
-			"s3_url", fmt.Sprintf("s3://%s/%s", app.backend.BucketName, objectKey),
-			"show_details_url", showDetailsURL,
-		)
-		output, err := app.uploader.Upload(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(app.backend.BucketName),
-			Key:    aws.String(objectKey),
-			Body:   strings.NewReader(description),
-		})
-		if err != nil {
-			return fmt.Errorf("upload description failed: %w", err)
-		}
-		slog.InfoContext(ctx, "uploaded description", "s3_url", output.Location)
-		if app.backend.OnlyDetailURLOnMackerel {
-			description = showDetailsURL
-		}
-	}
-	var wg sync.WaitGroup
-	var errNum int32
-	if rule.UpdateAlertMemo() {
-		memo := info
-		maxSize := rule.MaxAlertMemoSize()
-		if len(memo) > maxSize {
-			if app.EnableBackend() {
-				slog.WarnContext(
-					ctx,
-					"alert memo is too long",
-					"length", len(memo),
-					"show_details_url", showDetailsURL,
-				)
-			} else {
-				slog.WarnContext(
-					ctx,
-					"alert memo is too long",
-					"length", len(memo),
-					"full_memo", memo,
-				)
-			}
-			if len(abbreviatedMessage) >= maxSize {
-				memo = abbreviatedMessage[0:maxSize]
-			} else {
-				memo = memo[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
-			}
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := app.mkrSvc.UpdateAlertMemo(ctx, body.Alert.ID, memo); err != nil {
-				slog.ErrorContext(ctx, "failed update alert memo", "error", err.Error())
-				atomic.AddInt32(&errNum, 1)
-			}
-		}()
-	}
-	if rule.PostGraphAnnotation() {
-		maxSize := rule.MaxGraphAnnotationDescriptionSize()
-		if len(description) > maxSize {
-			if app.EnableBackend() {
-				slog.WarnContext(
-					ctx,
-					"graph anotation description is too long",
-					"length", len(description),
-					"show_details_url", showDetailsURL,
-				)
-			} else {
-				slog.WarnContext(
-					ctx,
-					"graph anotation description is too long",
-					"length", len(description),
-					"full_description", description,
-				)
-			}
-			if len(abbreviatedMessage) >= maxSize {
-				description = abbreviatedMessage[0:maxSize]
-			} else {
-				description = description[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
-			}
-		}
-		annotation := &mackerel.GraphAnnotation{
-			Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name()),
-			Description: description,
-			From:        body.Alert.OpenedAt,
-			To:          body.Alert.ClosedAt,
-			Service:     app.service,
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := app.mkrSvc.PostGraphAnnotation(ctx, annotation); err != nil {
-				slog.ErrorContext(
-					ctx,
-					"failed post graph annotation",
-					"error", err.Error(),
-				)
-				atomic.AddInt32(&errNum, 1)
-			}
-		}()
-	}
-	wg.Wait()
-	if errNum != 0 {
-		return fmt.Errorf("has %d errors", errNum)
-	}
-	return nil
-}
-
 func (app *App) EnableBasicAuth() bool {
-	return !app.auth.IsEmpty()
-}
-
-func (app *App) EnableBackend() bool {
-	return !app.backend.IsEmpty()
+	return app.webhookClientID != "" && app.webhookClientSecret != ""
 }
 
 func (app *App) CheckBasicAuth(r *http.Request) bool {
@@ -455,7 +281,7 @@ func (app *App) CheckBasicAuth(r *http.Request) bool {
 	if !ok {
 		return false
 	}
-	return clientID == app.auth.ClientID && clientSecret == app.auth.ClientSecret
+	return clientID == app.webhookClientID && clientSecret == app.webhookClientSecret
 }
 
 func (app *App) WithQueryRunningContext(ctx context.Context, message *events.SQSMessage) context.Context {

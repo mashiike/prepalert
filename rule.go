@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/queryrunner"
 	"github.com/mashiike/slogutils"
@@ -17,6 +20,7 @@ import (
 
 type Rule struct {
 	svc                               *MackerelService
+	backend                           Backend
 	ruleName                          string
 	monitorName                       string
 	anyAlert                          bool
@@ -29,9 +33,10 @@ type Rule struct {
 	updateAlertMemo                   bool
 	maxGraphAnnotationDescriptionSize *int
 	maxAlertMemoSize                  *int
+	service                           string
 }
 
-func NewRule(svc *MackerelService, cfg *hclconfig.RuleBlock) (*Rule, error) {
+func NewRule(svc *MackerelService, backend Backend, cfg *hclconfig.RuleBlock, service string) (*Rule, error) {
 	var name string
 	var anyAlert, onClosed, onOpened bool
 	if cfg.Alert.MonitorID != nil {
@@ -60,6 +65,8 @@ func NewRule(svc *MackerelService, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		queries = append(queries, query)
 	}
 	rule := &Rule{
+		svc:                 svc,
+		backend:             backend,
 		ruleName:            cfg.Name,
 		monitorName:         name,
 		anyAlert:            anyAlert,
@@ -70,6 +77,7 @@ func NewRule(svc *MackerelService, cfg *hclconfig.RuleBlock) (*Rule, error) {
 		params:              cfg.Params,
 		postGraphAnnotation: cfg.PostGraphAnnotation,
 		updateAlertMemo:     cfg.UpdateAlertMemo,
+		service:             service,
 	}
 	return rule, nil
 }
@@ -217,4 +225,109 @@ func (rule *Rule) MaxAlertMemoSize() int {
 		return 100
 	}
 	return *rule.maxAlertMemoSize
+}
+
+func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+	ctx = slogutils.With(ctx, "rule_name", rule.Name())
+	info, err := rule.BuildInformation(ctx, evalCtx, body)
+	if err != nil {
+		return err
+	}
+	slog.DebugContext(ctx, "dump infomation", "infomation", info)
+	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
+	showDetailsURL, uploaded, err := rule.backend.Upload(
+		ctx, evalCtx,
+		fmt.Sprintf("%s_%s", body.Alert.ID, rule.Name()),
+		strings.NewReader(description),
+	)
+	if err != nil {
+		return fmt.Errorf("upload to backend:%w", err)
+	}
+	var abbreviatedMessage string = "\n..."
+	var wg sync.WaitGroup
+	var errNum int32
+	if rule.UpdateAlertMemo() {
+		memo := info
+		maxSize := rule.MaxAlertMemoSize()
+		if len(memo) > maxSize {
+			if uploaded {
+				slog.WarnContext(
+					ctx,
+					"alert memo is too long",
+					"length", len(memo),
+					"show_details_url", showDetailsURL,
+				)
+			} else {
+				slog.WarnContext(
+					ctx,
+					"alert memo is too long",
+					"length", len(memo),
+					"full_memo", memo,
+				)
+			}
+			if len(abbreviatedMessage) >= maxSize {
+				memo = abbreviatedMessage[0:maxSize]
+			} else {
+				memo = memo[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
+			}
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := rule.svc.UpdateAlertMemo(ctx, body.Alert.ID, memo); err != nil {
+				slog.ErrorContext(ctx, "failed update alert memo", "error", err.Error())
+				atomic.AddInt32(&errNum, 1)
+			}
+		}()
+	}
+
+	if rule.PostGraphAnnotation() {
+		maxSize := rule.MaxGraphAnnotationDescriptionSize()
+		if len(description) > maxSize {
+			if uploaded {
+				slog.WarnContext(
+					ctx,
+					"graph anotation description is too long",
+					"length", len(description),
+					"show_details_url", showDetailsURL,
+				)
+			} else {
+				slog.WarnContext(
+					ctx,
+					"graph anotation description is too long",
+					"length", len(description),
+					"full_description", description,
+				)
+			}
+			if len(abbreviatedMessage) >= maxSize {
+				description = abbreviatedMessage[0:maxSize]
+			} else {
+				description = description[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
+			}
+		}
+		annotation := &mackerel.GraphAnnotation{
+			Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name()),
+			Description: description,
+			From:        body.Alert.OpenedAt,
+			To:          body.Alert.ClosedAt,
+			Service:     rule.service,
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := rule.svc.PostGraphAnnotation(ctx, annotation); err != nil {
+				slog.ErrorContext(
+					ctx,
+					"failed post graph annotation",
+					"error", err.Error(),
+				)
+				atomic.AddInt32(&errNum, 1)
+			}
+		}()
+	}
+	wg.Wait()
+	if errNum != 0 {
+		return fmt.Errorf("has %d errors", errNum)
+	}
+	return nil
 }

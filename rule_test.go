@@ -8,9 +8,11 @@ import (
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
+	"github.com/mashiike/prepalert/mock"
 	"github.com/mashiike/queryrunner"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
+	"go.uber.org/mock/gomock"
 )
 
 func TestRuleRenderMemo(t *testing.T) {
@@ -107,7 +109,13 @@ func TestRuleRenderMemo(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			rule, err := prepalert.NewRule(nil, c.cfg)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			client := mock.NewMockMackerelClient(ctrl)
+			svc := prepalert.NewMackerelService(client)
+			backend := prepalert.NewDiscardBackend()
+
+			rule, err := prepalert.NewRule(svc, backend, c.cfg, "test")
 			require.NoError(t, err)
 			actual, err := rule.RenderInformation(c.newCtx(t))
 			if c.expectedError {
