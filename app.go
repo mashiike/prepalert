@@ -78,14 +78,16 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		return nil, fmt.Errorf("can not get sqs queu url:%w", err)
 	}
 	app := &App{
-		mkrSvc:              svc,
-		backend:             backend,
-		webhookClientID:     cfg.Prepalert.Auth.ClientID,
-		webhookClientSecret: cfg.Prepalert.Auth.ClientSecret,
-		rules:               rules,
-		sqsClient:           sqsClient,
-		queueUrl:            *output.QueueUrl,
-		evalCtx:             cfg.EvalContext,
+		mkrSvc:    svc,
+		backend:   backend,
+		rules:     rules,
+		sqsClient: sqsClient,
+		queueUrl:  *output.QueueUrl,
+		evalCtx:   cfg.EvalContext,
+	}
+	if !cfg.Prepalert.Auth.IsEmpty() {
+		app.webhookClientID = cfg.Prepalert.Auth.ClientID
+		app.webhookClientSecret = cfg.Prepalert.Auth.ClientSecret
 	}
 	return app, nil
 }

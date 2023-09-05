@@ -15,7 +15,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestRuleRenderMemo(t *testing.T) {
+func TestRuleBuildInfomation(t *testing.T) {
 	baseCtx := libhclconfig.NewEvalContext("testdata")
 	baseCtx.Variables = map[string]cty.Value{
 		"runtime": cty.UnknownVal(cty.DynamicPseudoType),
@@ -117,7 +117,7 @@ func TestRuleRenderMemo(t *testing.T) {
 
 			rule, err := prepalert.NewRule(svc, backend, c.cfg, "test")
 			require.NoError(t, err)
-			actual, err := rule.RenderInformation(c.newCtx(t))
+			actual, err := rule.BuildInfomation(c.newCtx(t))
 			if c.expectedError {
 				require.Error(t, err)
 			} else {

@@ -15,7 +15,6 @@ import (
 	"github.com/mashiike/queryrunner"
 	"github.com/mashiike/slogutils"
 	"github.com/zclconf/go-cty/cty"
-	"golang.org/x/sync/errgroup"
 )
 
 type Rule struct {
@@ -97,92 +96,6 @@ func (rule *Rule) Match(body *WebhookBody) bool {
 	}
 	return body.Alert.MonitorName == rule.monitorName
 }
-
-func (rule *Rule) BuildInformation(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) (string, error) {
-	eg, egctx := errgroup.WithContext(ctx)
-	builder := &EvalContextBuilder{
-		Parent: evalCtx,
-		Runtime: &RuntimeVariables{
-			Params:       rule.params,
-			Event:        body,
-			QueryResults: make(map[string]*QueryResult),
-		},
-	}
-	evalCtx, err := builder.Build()
-	if err != nil {
-		return "", fmt.Errorf("eval context builder: %w", err)
-	}
-	var queryResults sync.Map
-	for _, query := range rule.queries {
-		_query := query
-		eg.Go(func() error {
-			egctxWithQueryName := slogutils.With(
-				egctx,
-				"query_name", _query.Name(),
-			)
-			slog.InfoContext(egctxWithQueryName, "start run query")
-			result, err := _query.Run(egctx, evalCtx.Variables, nil)
-			if err != nil {
-				slog.ErrorContext(egctxWithQueryName, "failed run query", "error", err.Error())
-				return fmt.Errorf("query `%s`:%w", _query.Name(), err)
-			}
-			slog.InfoContext(egctxWithQueryName, "end run query")
-			queryResults.Store(_query.Name(), result)
-			return nil
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return "", err
-	}
-	queryResults.Range(func(key any, value any) bool {
-		name, ok := key.(string)
-		if !ok {
-			slog.WarnContext(ctx,
-				"failed fetch query results",
-				"error", "key is not string",
-				"key", fmt.Sprintf("%v", key),
-				"key_type", fmt.Sprintf("%T", key),
-			)
-			return false
-		}
-		queryResult, ok := value.(*queryrunner.QueryResult)
-		if !ok {
-			slog.WarnContext(ctx,
-				"failed fetch query results",
-				"error", "value is not *QueryResult",
-				"key", key,
-				"value", fmt.Sprintf("%v", value),
-				"value_type", fmt.Sprintf("%T", value),
-			)
-			return false
-		}
-		builder.Runtime.QueryResults[name] = (*QueryResult)(queryResult)
-		return true
-	})
-	evalCtx, err = builder.Build()
-	if err != nil {
-		return "", err
-	}
-	return rule.RenderInformation(evalCtx)
-}
-
-func (rule *Rule) RenderInformation(evalCtx *hcl.EvalContext) (string, error) {
-	value, diags := rule.information.Value(evalCtx)
-	if diags.HasErrors() {
-		return "", diags
-	}
-	if value.Type() != cty.String {
-		return "", errors.New("information is not string")
-	}
-	if value.IsNull() {
-		return "", errors.New("information is nil")
-	}
-	if !value.IsKnown() {
-		return "", errors.New("information is unknown")
-	}
-	return value.AsString(), nil
-}
-
 func (rule *Rule) Name() string {
 	return rule.ruleName
 }
@@ -229,10 +142,104 @@ func (rule *Rule) MaxAlertMemoSize() int {
 
 func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
 	ctx = slogutils.With(ctx, "rule_name", rule.Name())
-	info, err := rule.BuildInformation(ctx, evalCtx, body)
-	if err != nil {
-		return err
+	var wg, queryWg sync.WaitGroup
+	resultCh := make(chan *queryrunner.QueryResult, len(rule.queries))
+	builder := EvalContextBuilder{
+		Parent: evalCtx,
+		Runtime: &RuntimeVariables{
+			Event:        body,
+			Params:       rule.params,
+			QueryResults: make(map[string]*QueryResult, len(rule.queries)),
+		},
 	}
+	queryEvalCtx, err := builder.Build()
+	if err != nil {
+		return fmt.Errorf("eval context builder: %w", err)
+	}
+	var queryErrorCount int32
+	for _, query := range rule.queries {
+		builder.Runtime.QueryResults[query.Name()] = (*QueryResult)(queryrunner.NewQueryResult(
+			query.Name(),
+			"",
+			[]string{"status"},
+			[][]string{{"running"}},
+		))
+		wg.Add(1)
+		queryWg.Add(1)
+		go func(query queryrunner.PreparedQuery) {
+			defer func() {
+				wg.Done()
+				queryWg.Done()
+			}()
+			egctxWithQueryName := slogutils.With(
+				ctx,
+				"query_name", query.Name(),
+			)
+			slog.InfoContext(egctxWithQueryName, "start run query")
+			result, err := query.Run(egctxWithQueryName, queryEvalCtx.Variables, nil)
+			if err != nil {
+				slog.ErrorContext(egctxWithQueryName, "failed run query", "error", err.Error())
+				atomic.AddInt32(&queryErrorCount, 1)
+				resultCh <- queryrunner.NewQueryResult(
+					query.Name(),
+					"",
+					[]string{"status", "error"},
+					[][]string{{"failed", err.Error()}},
+				)
+				return
+			}
+			slog.InfoContext(egctxWithQueryName, "end run query")
+			resultCh <- result
+		}(query)
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		queryWg.Wait()
+		close(resultCh)
+	}()
+	f := func() error {
+		evalCtx, err := builder.Build()
+		if err != nil {
+			return fmt.Errorf("eval context builder: %w", err)
+		}
+		info, err := rule.BuildInfomation(evalCtx)
+		if err != nil {
+			return fmt.Errorf("build information:%w", err)
+		}
+		if err := rule.render(ctx, evalCtx, body, info); err != nil {
+			return fmt.Errorf("render:%w", err)
+		}
+		return nil
+	}
+	wg.Add(1)
+	var bgRenderErr error
+	var isRender bool
+	go func() {
+		defer wg.Done()
+		for result := range resultCh {
+			builder.Runtime.QueryResults[result.Name] = (*QueryResult)(result)
+			if err := f(); err != nil {
+				bgRenderErr = fmt.Errorf("failed render:%w", err)
+			}
+			isRender = true
+		}
+	}()
+	wg.Wait()
+	if bgRenderErr != nil {
+		return bgRenderErr
+	}
+	if queryErrorCount > 0 {
+		return fmt.Errorf("%s rule render failed", rule.Name())
+	}
+	if !isRender {
+		return f()
+	}
+	return nil
+}
+
+func (rule *Rule) render(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody, info string) error {
 	slog.DebugContext(ctx, "dump infomation", "infomation", info)
 	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
 	showDetailsURL, uploaded, err := rule.backend.Upload(
@@ -330,4 +337,21 @@ func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext, body *We
 		return fmt.Errorf("has %d errors", errNum)
 	}
 	return nil
+}
+
+func (rule *Rule) BuildInfomation(evalCtx *hcl.EvalContext) (string, error) {
+	value, diags := rule.information.Value(evalCtx)
+	if diags.HasErrors() {
+		return "", diags
+	}
+	if value.Type() != cty.String {
+		return "", errors.New("information is not string")
+	}
+	if value.IsNull() {
+		return "", errors.New("information is nil")
+	}
+	if !value.IsKnown() {
+		return "", errors.New("information is unknown")
+	}
+	return value.AsString(), nil
 }
