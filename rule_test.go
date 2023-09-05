@@ -8,12 +8,14 @@ import (
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/internal/generics"
+	"github.com/mashiike/prepalert/mock"
 	"github.com/mashiike/queryrunner"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
+	"go.uber.org/mock/gomock"
 )
 
-func TestRuleRenderMemo(t *testing.T) {
+func TestRuleBuildInfomation(t *testing.T) {
 	baseCtx := libhclconfig.NewEvalContext("testdata")
 	baseCtx.Variables = map[string]cty.Value{
 		"runtime": cty.UnknownVal(cty.DynamicPseudoType),
@@ -34,14 +36,15 @@ func TestRuleRenderMemo(t *testing.T) {
 				Information: ParseExpression(t, `"${strftime_in_zone("%Y-%m-%d %H:%M:%S","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
-				ctx := baseCtx.NewChild()
 				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
-				ctx.Variables = map[string]cty.Value{
-					"runtime": cty.ObjectVal(map[string]cty.Value{
-						"event":        cty.ObjectVal(body.MarshalCTYValues()),
-						"query_reuslt": cty.ObjectVal(map[string]cty.Value{}),
-					}),
+				builder := prepalert.EvalContextBuilder{
+					Parent: baseCtx,
+					Runtime: &prepalert.RuntimeVariables{
+						Event: body,
+					},
 				}
+				ctx, err := builder.Build()
+				require.NoError(t, err)
 				return ctx
 			},
 			expectedMemo: "2016-09-06 11:45:12",
@@ -55,14 +58,15 @@ func TestRuleRenderMemo(t *testing.T) {
 				Information: ParseExpression(t, `"${strftime_in_zone("%O%E%Q%1","Asia/Tokyo",runtime.event.alert.opened_at)}"`),
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
-				ctx := baseCtx.NewChild()
 				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
-				ctx.Variables = map[string]cty.Value{
-					"runtime": cty.ObjectVal(map[string]cty.Value{
-						"event":        cty.ObjectVal(body.MarshalCTYValues()),
-						"query_reuslt": cty.ObjectVal(map[string]cty.Value{}),
-					}),
+				builder := prepalert.EvalContextBuilder{
+					Parent: baseCtx,
+					Runtime: &prepalert.RuntimeVariables{
+						Event: body,
+					},
 				}
+				ctx, err := builder.Build()
+				require.NoError(t, err)
 				return ctx
 			},
 			expectedError: true,
@@ -77,12 +81,12 @@ func TestRuleRenderMemo(t *testing.T) {
 			},
 			newCtx: func(t *testing.T) *hcl.EvalContext {
 				body := LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json")
-				ctx := baseCtx.NewChild()
-				ctx.Variables = map[string]cty.Value{
-					"runtime": cty.ObjectVal(map[string]cty.Value{
-						"event": cty.ObjectVal(body.MarshalCTYValues()),
-						"query_result": cty.ObjectVal(map[string]cty.Value{
-							"hoge_result": queryrunner.NewQueryResult(
+				builder := prepalert.EvalContextBuilder{
+					Parent: baseCtx,
+					Runtime: &prepalert.RuntimeVariables{
+						Event: body,
+						QueryResults: map[string]*prepalert.QueryResult{
+							"hoge_result": (*prepalert.QueryResult)(queryrunner.NewQueryResult(
 								"hoge_result",
 								"dummy",
 								[]string{"Name", "Sign", "Rating"},
@@ -92,10 +96,12 @@ func TestRuleRenderMemo(t *testing.T) {
 									{"C", "The Ugly", "120"},
 									{"D", "The Gopher", "800"},
 								},
-							).MarshalCTYValue(),
-						}),
-					}),
+							)),
+						},
+					},
 				}
+				ctx, err := builder.Build()
+				require.NoError(t, err)
 				return ctx
 			},
 			expectedMemo: string(LoadFile(t, "testdata/table.txt")),
@@ -103,9 +109,15 @@ func TestRuleRenderMemo(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			rule, err := prepalert.NewRule(nil, c.cfg)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			client := mock.NewMockMackerelClient(ctrl)
+			svc := prepalert.NewMackerelService(client)
+			backend := prepalert.NewDiscardBackend()
+
+			rule, err := prepalert.NewRule(svc, backend, c.cfg, "test")
 			require.NoError(t, err)
-			actual, err := rule.RenderInformation(c.newCtx(t))
+			actual, err := rule.BuildInfomation(c.newCtx(t))
 			if c.expectedError {
 				require.Error(t, err)
 			} else {
