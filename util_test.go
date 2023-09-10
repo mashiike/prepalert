@@ -1,6 +1,7 @@
 package prepalert_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -20,6 +21,12 @@ func LoadFile(t *testing.T, path string) []byte {
 	bs, err := io.ReadAll(fp)
 	require.NoError(t, err)
 	return bs
+}
+
+func LoadFileAsReader(t *testing.T, path string) io.Reader {
+	t.Helper()
+	bs := LoadFile(t, path)
+	return bytes.NewReader(bs)
 }
 
 func LoadJSON[V any](t *testing.T, path string) V {

@@ -4,25 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Songmu/flextime"
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
-	"github.com/fujiwara/ridge"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
-	"github.com/mashiike/grat"
+	"github.com/mashiike/canyon"
 	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/queryrunner"
 	"github.com/mashiike/slogutils"
@@ -34,22 +28,25 @@ type App struct {
 	webhookClientID     string
 	webhookClientSecret string
 	rules               []*Rule
+	queueName           string
 	queueUrl            string
 	sqsClient           *sqs.Client
 	evalCtx             *hcl.EvalContext
 }
 
 func New(apikey string, cfg *hclconfig.Config) (*App, error) {
-	client := mackerel.NewClient(apikey)
-	svc := NewMackerelService(client)
-	awsCfg, err := config.LoadDefaultConfig(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("load aws default config:%w", err)
-	}
+	return NewWithMackerelClient(mackerel.NewClient(apikey), cfg)
+}
 
+func NewWithMackerelClient(client MackerelClient, cfg *hclconfig.Config) (*App, error) {
+	svc := NewMackerelService(client)
 	var backend Backend
 	switch {
 	case !cfg.Prepalert.S3Backend.IsEmpty():
+		awsCfg, err := config.LoadDefaultConfig(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("load aws default config:%w", err)
+		}
 		s3Client := s3.NewFromConfig(awsCfg)
 		backend, err = NewS3Backend(s3Client, cfg.Prepalert.S3Backend, cfg.Prepalert.Auth)
 		if err != nil {
@@ -68,21 +65,11 @@ func New(apikey string, cfg *hclconfig.Config) (*App, error) {
 		}
 		rules = append(rules, rule)
 	}
-
-	sqsClient := sqs.NewFromConfig(awsCfg)
-	slog.Info("try get sqs queue url", "sqs_queue_name", cfg.Prepalert.SQSQueueName)
-	output, err := sqsClient.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
-		QueueName: aws.String(cfg.Prepalert.SQSQueueName),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("can not get sqs queu url:%w", err)
-	}
 	app := &App{
 		mkrSvc:    svc,
 		backend:   backend,
 		rules:     rules,
-		sqsClient: sqsClient,
-		queueUrl:  *output.QueueUrl,
+		queueName: cfg.Prepalert.SQSQueueName,
 		evalCtx:   cfg.EvalContext,
 	}
 	if !cfg.Prepalert.Auth.IsEmpty() {
@@ -100,18 +87,23 @@ type RunOptions struct {
 }
 
 func (app *App) Run(ctx context.Context, opts *RunOptions) error {
-	switch strings.ToLower(opts.Mode) {
-	case "webhook", "http":
-		if strings.EqualFold(opts.Mode, "webhook") {
-			slog.WarnContext(ctx, "mode webhook is deprecated. change to http")
-		}
-		slog.InfoContext(ctx, "run as http", "address", opts.Address, "prefix", opts.Prefix)
-		ridge.RunWithContext(ctx, opts.Address, opts.Prefix, app)
-	case "worker":
-		slog.InfoContext(ctx, "run as worker", "batch_size", opts.BatchSize)
-		return grat.RunWithContext(ctx, app.queueUrl, opts.BatchSize, app.HandleSQS)
+	canyonOpts := []canyon.Option{
+		canyon.WithCanyonEnv("PREPALERT_CANYON_"),
+		canyon.WithServerAddress(opts.Address, opts.Prefix),
+		canyon.WithWorkerBatchSize(opts.BatchSize),
 	}
-	return nil
+
+	switch strings.ToLower(opts.Mode) {
+	case "http", "webhook":
+		slog.InfoContext(ctx, "disable worker", "mode", opts.Mode)
+		canyonOpts = append(canyonOpts, canyon.WithDisableWorker())
+	case "worker":
+		slog.InfoContext(ctx, "disable server", "mode", opts.Mode)
+		canyonOpts = append(canyonOpts, canyon.WithDisableServer())
+	default:
+		// nothing to do
+	}
+	return canyon.RunWithContext(ctx, app.queueName, app, canyonOpts...)
 }
 
 func (app *App) Exec(ctx context.Context, alertID string) error {
@@ -129,9 +121,15 @@ func must[T any](t T, err error) T {
 	return t
 }
 
-var generator = must(katsubushi.NewGenerator(1))
+type RequestIDGenerator interface {
+	NextID() (uint64, error)
+}
 
-const requestIDAttributeKey = "RequestID"
+const (
+	HeaderRequestID = "Prepalert-Request-ID"
+)
+
+var DefaultRequestIDGeneartor RequestIDGenerator = must(katsubushi.NewGenerator(1))
 
 func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
@@ -141,9 +139,28 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"x_amzn_trace_id", r.Header.Get("X-Amzn-Trace-Id"),
 		"x_amz_cf_id", r.Header.Get("X-Amz-Cf-Id"),
 	)
-	reqID, err := generator.NextID()
+	if canyon.IsWorker(r) {
+		if reqIDstr := r.Header.Get(HeaderRequestID); reqIDstr != "" {
+			reqID, err := strconv.ParseUint(reqIDstr, 10, 64)
+			if err != nil {
+				canyon.Logger(r).WarnContext(
+					ctx,
+					"can not parse request id",
+					"status", http.StatusBadRequest,
+					"method", r.Method,
+					"path", r.URL.Path,
+				)
+			} else {
+				ctx = queryrunner.WithRequestID(ctx, fmt.Sprintf("%d", reqID))
+				ctx = slogutils.With(ctx, "request_id", reqID)
+			}
+		}
+		app.serveHTTPAsWorker(w, r.WithContext(ctx))
+		return
+	}
+	reqID, err := DefaultRequestIDGeneartor.NextID()
 	if err != nil {
-		slog.ErrorContext(
+		canyon.Logger(r).ErrorContext(
 			ctx,
 			"can not generate request id",
 			"status", http.StatusInternalServerError,
@@ -153,94 +170,57 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("X-Request-ID", fmt.Sprintf("%d", reqID))
+	w.Header().Set(HeaderRequestID, fmt.Sprintf("%d", reqID))
+	r.Header.Set(HeaderRequestID, fmt.Sprintf("%d", reqID)) // set for worker
 	ctx = slogutils.With(ctx, "request_id", reqID)
-	r = r.WithContext(ctx)
-	slog.InfoContext(ctx, "accept HTTP request", "method", r.Method, "path", r.URL.Path)
+	app.serveHTTPAsWebhookServer(w, r.WithContext(ctx))
+}
+
+func (app *App) serveHTTPAsWebhookServer(w http.ResponseWriter, r *http.Request) {
+	logger := canyon.Logger(r)
+	ctx := r.Context()
+	logger.InfoContext(ctx, "accept Webhook Server HTTP request", "method", r.Method, "path", r.URL.Path)
 	if r.Method == http.MethodGet {
 		app.backend.ServeHTTP(w, r)
 		return
 	}
 	if app.EnableBasicAuth() && !app.CheckBasicAuth(r) {
-		slog.InfoContext(ctx, "basic auth failed, request BasicAuth challenge", "status", http.StatusUnauthorized)
+		logger.InfoContext(ctx, "basic auth failed, request BasicAuth challenge", "status", http.StatusUnauthorized)
 		w.Header().Add("WWW-Authenticate", `Basic realm="SECRET AREA"`)
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 	if r.Method != http.MethodPost {
-		slog.InfoContext(ctx, "method not allowed", "status", http.StatusMethodNotAllowed)
+		logger.InfoContext(ctx, "method not allowed", "status", http.StatusMethodNotAllowed)
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	bs, err := io.ReadAll(r.Body)
+	messageId, err := canyon.SendToWorker(r, nil)
 	if err != nil {
-		slog.InfoContext(ctx, "can not read body", "status", http.StatusBadRequest, "error", err.Error())
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-	output, err := app.sqsClient.SendMessage(r.Context(), &sqs.SendMessageInput{
-		MessageBody: aws.String(string(bs)),
-		QueueUrl:    aws.String(app.queueUrl),
-		MessageAttributes: map[string]types.MessageAttributeValue{
-			requestIDAttributeKey: {
-				DataType:    aws.String("Number"),
-				StringValue: aws.String(fmt.Sprintf("%d", reqID)),
-			},
-		},
-	})
-	if err != nil {
-		slog.InfoContext(ctx, "can not send sqs message", "status", http.StatusInternalServerError, "error", err.Error())
+		logger.InfoContext(ctx, "can not send to worker", "status", http.StatusInternalServerError, "error", err.Error())
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	slog.InfoContext(ctx, "send sqs message", "status", http.StatusOK, "message_id", *output.MessageId)
+	logger.InfoContext(ctx, "send to worker", "status", http.StatusOK, "sqs_message_id", messageId)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintln(w, http.StatusText(http.StatusOK))
 }
 
-func (app *App) HandleSQS(ctx context.Context, event *events.SQSEvent) (*grat.BatchItemFailureResponse, error) {
-	resp := &grat.BatchItemFailureResponse{}
-	for _, message := range event.Records {
-		ctxWithMetadata := slogutils.With(
-			ctx,
-			"message_id", message.MessageId,
-			"request_id", getRequestIDFromSQSMessage(&message),
-		)
-		if err := app.handleSQSMessage(ctxWithMetadata, &message); err != nil {
-			if len(event.Records) == 1 {
-				return nil, err
-			}
-			slog.WarnContext(ctxWithMetadata, "handle message failed", "error", err.Error())
-			resp.BatchItemFailures = append(resp.BatchItemFailures, grat.BatchItemFailureItem{
-				ItemIdentifier: message.MessageId,
-			})
-		}
-	}
-	return resp, nil
-}
-
-func getRequestIDFromSQSMessage(message *events.SQSMessage) uint64 {
-	if message.MessageAttributes != nil {
-		if attr, ok := message.MessageAttributes[requestIDAttributeKey]; ok {
-			if strings.EqualFold(attr.DataType, "number") && attr.StringValue != nil {
-				reqID, err := strconv.ParseUint(*attr.StringValue, 10, 64)
-				if err != nil {
-					slog.Warn("message attribute parse faield", "id", message.MessageId, "error", err.Error())
-				}
-				return reqID
-			}
-		}
-	}
-	return 0
-}
-
-func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage) error {
-	slog.InfoContext(ctx, "handle sqs message")
-	decoder := json.NewDecoder(strings.NewReader(message.Body))
+func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
+	logger := canyon.Logger(r)
+	ctx := r.Context()
+	logger.InfoContext(
+		ctx, "accept Worker request",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"sqs_message_id", r.Header.Get(canyon.HeaderSQSMessageId),
+	)
+	decoder := json.NewDecoder(r.Body)
 	var body WebhookBody
 	if err := decoder.Decode(&body); err != nil {
-		slog.ErrorContext(ctx, "can not parse sqs message as Mackerel webhook body", "error", err.Error())
-		return err
+		logger.ErrorContext(ctx, "can not parse request body as Mackerel webhook body", "error", err.Error())
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 	ctx = slogutils.With(
 		ctx,
@@ -248,9 +228,15 @@ func (app *App) handleSQSMessage(ctx context.Context, message *events.SQSMessage
 		"alsert_status", body.Alert.Status,
 		"monitor", body.Alert.MonitorName,
 	)
-	slog.InfoContext(ctx, "parse sqs message as Mackerel webhook body")
-	ctx = app.WithQueryRunningContext(ctx, message)
-	return app.ProcessRules(ctx, &body)
+	logger.InfoContext(ctx, "parse request body as Mackerel webhook body")
+	if err := app.ProcessRules(ctx, &body); err != nil {
+		logger.ErrorContext(ctx, "failed process Mackerel webhook body", "error", err.Error())
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	logger.InfoContext(ctx, "finish process Mackerel webhook body")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, http.StatusText(http.StatusOK))
 }
 
 func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
@@ -284,23 +270,4 @@ func (app *App) CheckBasicAuth(r *http.Request) bool {
 		return false
 	}
 	return clientID == app.webhookClientID && clientSecret == app.webhookClientSecret
-}
-
-func (app *App) WithQueryRunningContext(ctx context.Context, message *events.SQSMessage) context.Context {
-	reqID := getRequestIDFromSQSMessage(message)
-	ctx = queryrunner.WithRequestID(ctx, fmt.Sprintf("%d", reqID))
-	ctx = queryrunner.WithTimeoutExtender(ctx, queryrunner.TimeoutExtenderFunc(
-		func(ctx context.Context, timeout time.Duration) error {
-			_, err := app.sqsClient.ChangeMessageVisibility(ctx, &sqs.ChangeMessageVisibilityInput{
-				QueueUrl:          aws.String(app.queueUrl),
-				ReceiptHandle:     aws.String(message.ReceiptHandle),
-				VisibilityTimeout: int32(timeout.Seconds()),
-			})
-			if err != nil {
-				return err
-			}
-			return nil
-		},
-	))
-	return ctx
 }
