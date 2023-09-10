@@ -80,7 +80,7 @@ func NewWithMackerelClient(client MackerelClient, cfg *hclconfig.Config) (*App, 
 }
 
 type RunOptions struct {
-	Mode      string `help:"run mode" env:"PREPALERT_MODE" default:"http"`
+	Mode      string `help:"run mode" env:"PREPALERT_MODE" default:"all" enum:"all,http,worker,webhook"`
 	Address   string `help:"run local address" env:"PREPALERT_ADDRESS" default:":8080"`
 	Prefix    string `help:"run server prefix" env:"PREPALERT_PREFIX" default:"/"`
 	BatchSize int    `help:"run local sqs batch size" env:"PREPALERT_BATCH_SIZE" default:"1"`
