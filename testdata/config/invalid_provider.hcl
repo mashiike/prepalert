@@ -8,4 +8,4 @@ prepalert {
   }
 }
 
-provider "invalid" {}
+provider "invaliod" {}

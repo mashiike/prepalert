@@ -3,8 +3,4 @@ query "hoge" {
 }
 
 query "fuga" {
-    runner = [
-        query_runner.hoge.hoge,
-        query_runner.fuga.fuga,
-    ]
 }

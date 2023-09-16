@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -57,11 +58,26 @@ func NewQueryResultWithJSONLines(name string, query string, lines ...map[string]
 			}
 		}
 	}
+	sort.SliceStable(columns, func(i, j int) bool {
+		if strings.HasPrefix(columns[i], "time") {
+			if !strings.HasPrefix(columns[j], "time") {
+				return true
+			}
+		}
+		if columnsMap[columns[i]] > columnsMap[columns[j]] {
+			return false
+		}
+		return columns[i] > columns[j]
+	})
+	columnsIndex := make(map[string]int)
+	for i, c := range columns {
+		columnsIndex[c] = i
+	}
 	rows := make([][]json.RawMessage, 0)
 	for _, line := range lines {
 		row := make([]json.RawMessage, len(columns))
 		for k, v := range line {
-			if i, ok := columnsMap[k]; ok {
+			if i, ok := columnsIndex[k]; ok {
 				row[i] = v
 			}
 		}

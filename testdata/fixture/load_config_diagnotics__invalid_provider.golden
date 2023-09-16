@@ -7,8 +7,8 @@ required_version is not validated because version is "current"
 
 Error: Provider creation failed
 
-  on testdata/config/invalid_provider.hcl line 11, in provider "invalid":
-  11: provider "invalid" {}
+  on testdata/config/invalid_provider.hcl line 11, in provider "invaliod":
+  11: provider "invaliod" {}
 
-unknown provider type "invalid"
+unknown provider type "invaliod"
 
