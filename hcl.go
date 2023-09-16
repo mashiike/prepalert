@@ -3,6 +3,7 @@ package prepalert
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
@@ -13,10 +14,29 @@ import (
 	"github.com/zclconf/go-cty/cty/function"
 )
 
-func (app *App) LoadConfig(dir string) error {
+type LoadConfigOptions struct {
+	DiagnosticDestination io.Writer
+	Color                 *bool
+	Width                 *uint
+}
+
+func (app *App) LoadConfig(dir string, optFns ...func(*LoadConfigOptions)) error {
+	opt := &LoadConfigOptions{}
+	for _, optFn := range optFns {
+		optFn(opt)
+	}
 	body, writer, diags := hclutil.Parse(dir)
 	if diags.HasErrors() {
 		return writer.WriteDiagnostics(diags)
+	}
+	if opt.DiagnosticDestination != nil {
+		writer.SetOutput(opt.DiagnosticDestination)
+	}
+	if opt.Color != nil {
+		writer.SetColor(*opt.Color)
+	}
+	if opt.Width != nil {
+		writer.SetWidth(*opt.Width)
 	}
 	app.diagWriter = writer
 	evalCtx := hclutil.NewEvalContext(

@@ -1,0 +1,21 @@
+Error: Missing name for query
+
+  on testdata/config/invalid_schema/query.hcl line 1, in query "hoge":
+   1: query "hoge" {
+
+All query blocks must have 2 labels (type, name).
+
+Error: Missing name for query
+
+  on testdata/config/invalid_schema/query.hcl line 5, in query "fuga":
+   5: query "fuga" {
+
+All query blocks must have 2 labels (type, name).
+
+Error: Unsupported block type
+
+  on testdata/config/invalid_schema/variable.hcl line 1, in variable "hoge":
+   1: variable "hoge" {
+
+Blocks of type "variable" are not expected here.
+

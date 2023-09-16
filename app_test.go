@@ -1,6 +1,7 @@
 package prepalert_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Songmu/flextime"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/canyon"
@@ -221,4 +223,45 @@ func TestAppLoadConfig__WithS3Backend(t *testing.T) {
 	require.True(t, backend.EnableGoogleAuth())
 	rules := app.Rules()
 	require.Len(t, rules, 1)
+}
+
+func TestAppLoadConfig__Dynamic(t *testing.T) {
+	app, err := prepalert.New("dummy-api-key")
+	require.NoError(t, err)
+	err = app.LoadConfig("testdata/config/dynamic.hcl")
+	require.NoError(t, err)
+	require.Equal(t, "prepalert", app.SQSQueueName())
+	require.ElementsMatch(t, []string{}, app.ProviderList())
+	require.ElementsMatch(t, []string{}, app.QueryList())
+	require.False(t, app.EnableBasicAuth())
+	rules := app.Rules()
+	require.Len(t, rules, 3)
+	require.Len(t, rules[0].DependsOnQueries(), 0)
+}
+
+func TestAppLoadConfig__Invalid(t *testing.T) {
+	g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
+	cases := []struct {
+		name string
+		path string
+	}{
+		{"invalid_schema", "testdata/config/invalid_schema/"},
+		{"invalid_duplicate", "testdata/config/invalid_duplicate.hcl"},
+		{"invalid_provider", "testdata/config/invalid_provider.hcl"},
+		{"invalid_version", "testdata/config/invalid_version.hcl"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app, err := prepalert.New("dummy-api-key")
+			require.NoError(t, err)
+			var buf bytes.Buffer
+			err = app.LoadConfig(tc.path, func(lco *prepalert.LoadConfigOptions) {
+				lco.DiagnosticDestination = &buf
+				lco.Color = aws.Bool(false)
+				lco.Width = aws.Uint(88)
+			})
+			require.Error(t, err)
+			g.Assert(t, "load_config_diagnotics__"+tc.name, buf.Bytes())
+		})
+	}
 }
