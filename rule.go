@@ -105,7 +105,7 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 		switch attr.Name {
 		case "when":
 			rule.when = attr.Expr
-			v, err := hclutil.MarshalCTYValue(dummyWebhook)
+			v, err := hclutil.MarshalCTYValue(rule.svcFunc().NewExampleWebhookBody())
 			if err != nil {
 				diags = diags.Append(&hcl.Diagnostic{
 					Severity: hcl.DiagError,
@@ -116,39 +116,11 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 				continue
 			}
 			tempEvalCtx := hclutil.WithValue(evalCtx, webhookHCLPrefix, v)
-			d, err := rule.when.Value(tempEvalCtx)
-			if err != nil {
+			if _, err := rule.match(tempEvalCtx); err != nil {
 				diags = diags.Append(&hcl.Diagnostic{
 					Severity: hcl.DiagError,
 					Summary:  "failed evaluate when expression",
 					Detail:   err.Error(),
-					Subject:  attr.Range.Ptr(),
-				})
-				continue
-			}
-			if !d.IsKnown() {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  "when expression is unknown",
-					Detail:   d.GoString(),
-					Subject:  attr.Range.Ptr(),
-				})
-				continue
-			}
-			if d.IsNull() {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  "when expression is null",
-					Detail:   d.GoString(),
-					Subject:  attr.Range.Ptr(),
-				})
-				continue
-			}
-			if d.Type() != cty.Bool {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  "when expression is not bool",
-					Detail:   d.GoString(),
 					Subject:  attr.Range.Ptr(),
 				})
 				continue
@@ -318,24 +290,29 @@ func (rule *Rule) DependsOnQueries() []string {
 }
 
 func (rule *Rule) Match(evalCtx *hcl.EvalContext) bool {
-	match, err := rule.when.Value(evalCtx)
+	isMatch, err := rule.match(evalCtx)
 	if err != nil {
 		slog.Error("failed evaluate when expression", "error", err.Error())
 		return false
 	}
+	return isMatch
+}
+
+func (rule *Rule) match(evalCtx *hcl.EvalContext) (bool, error) {
+	match, err := rule.when.Value(evalCtx)
+	if err != nil {
+		return false, fmt.Errorf("failed evaluate when expression: %w", err)
+	}
 	if !match.IsKnown() {
-		slog.Error("when expression is unknown", "value", match.GoString())
-		return false
+		return false, errors.New("when expression is unknown")
 	}
 	if match.IsNull() {
-		slog.Error("when expression is null", "value", match.GoString())
-		return false
+		return false, errors.New("when expression is null")
 	}
 	if match.Type() != cty.Bool {
-		slog.Error("when expression is not bool", "value", match.GoString())
-		return false
+		return false, errors.New("when expression is not bool")
 	}
-	return match.True()
+	return match.True(), nil
 }
 
 func (rule *Rule) Name() string {
