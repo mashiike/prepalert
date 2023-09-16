@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -40,6 +41,33 @@ func New(apikey string) (*App, error) {
 		backend: NewDiscardBackend(),
 	}
 	return app.SetMackerelClient(mackerel.NewClient(apikey)), nil
+}
+
+func (app *App) Close() error {
+	var errs []error
+	if c, ok := app.backend.(io.Closer); ok {
+		if err := c.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	for _, provider := range app.providers {
+		if c, ok := provider.(io.Closer); ok {
+			if err := c.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	for _, query := range app.queries {
+		if c, ok := query.(io.Closer); ok {
+			if err := c.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }
 
 func (app *App) SetMackerelClient(client MackerelClient) *App {

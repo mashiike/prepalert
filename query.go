@@ -19,11 +19,16 @@ import (
 type ProviderParameter struct {
 	Type   string
 	Name   string
-	Params map[string]cty.Value
+	Params json.RawMessage
+	params map[string]cty.Value
 }
 
 func (p *ProviderParameter) String() string {
 	return fmt.Sprintf("%s.%s", p.Type, p.Name)
+}
+
+type Query interface {
+	Run(ctx context.Context, evalCtx *hcl.EvalContext) (*QueryResult, error)
 }
 
 type Provider interface {
@@ -31,14 +36,41 @@ type Provider interface {
 }
 
 type ProviderFactory func(*ProviderParameter) (Provider, error)
+type GenericProviderFactory[T Provider] func(*ProviderParameter) (T, error)
 
-type Query interface {
-	Run(ctx context.Context, evalCtx *hcl.EvalContext) (*QueryResult, error)
+var (
+	providersMu       sync.RWMutex
+	providerFactories = map[string]ProviderFactory{}
+)
+
+func RegisterProvider[T Provider](typeName string, factory GenericProviderFactory[T]) {
+	providersMu.Lock()
+	defer providersMu.Unlock()
+	providerFactories[typeName] = func(pp *ProviderParameter) (Provider, error) {
+		return factory(pp)
+	}
+}
+
+func UnregisterProvider(typeName string) {
+	providersMu.Lock()
+	defer providersMu.Unlock()
+	delete(providerFactories, typeName)
+}
+
+func NewProvider(param *ProviderParameter) (Provider, error) {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
+	factory, ok := providerFactories[param.Type]
+	if !ok {
+		return nil, fmt.Errorf("unknown provider type %q", param.Type)
+	}
+	return factory(param)
 }
 
 type QueryResult struct {
 	Name    string              `cty:"name" json:"name"`
 	Query   string              `cty:"query" json:"query"`
+	Params  []interface{}       `cty:"params" json:"params,omitempty"`
 	Columns []string            `cty:"columns" json:"columns"`
 	Rows    [][]json.RawMessage `cty:"rows" json:"rows"`
 }
@@ -50,10 +82,10 @@ func NewQueryResultWithJSONLines(name string, query string, lines ...map[string]
 	}
 	columns := make([]string, 0)
 	columnsMap := make(map[string]int)
-	for _, line := range lines {
+	for i, line := range lines {
 		for k := range line {
 			if _, ok := columnsMap[k]; !ok {
-				columnsMap[k] = len(columns)
+				columnsMap[k] = i
 				columns = append(columns, k)
 			}
 		}
@@ -174,37 +206,6 @@ func (qr *QueryResult) ToJSONLines() string {
 	return builder.String()
 }
 
-var (
-	providersMu       sync.RWMutex
-	providerFactories = map[string]ProviderFactory{}
-)
-
-func RegisterProvider(typeName string, factory ProviderFactory) {
-	providersMu.Lock()
-	defer providersMu.Unlock()
-	providerFactories[typeName] = factory
-}
-
-func UnregisterProvider(typeName string) {
-	providersMu.Lock()
-	defer providersMu.Unlock()
-	delete(providerFactories, typeName)
-}
-
-func NewProvider(param *ProviderParameter) (Provider, error) {
-	providersMu.RLock()
-	defer providersMu.RUnlock()
-	factory, ok := providerFactories[param.Type]
-	if !ok {
-		return nil, fmt.Errorf("unknown provider type %q", param.Type)
-	}
-	return factory(param)
-}
-
-type ProviderDefinition interface {
-	NewProvider(*ProviderParameter) (Provider, error)
-}
-
 type ProviderParameters []*ProviderParameter
 
 func (p ProviderParameters) MarshalCTYValue() (cty.Value, error) {
@@ -213,7 +214,7 @@ func (p ProviderParameters) MarshalCTYValue() (cty.Value, error) {
 		if values[provider.Type] == nil {
 			values[provider.Type] = make(map[string]cty.Value)
 		}
-		values[provider.Type][provider.Name] = cty.ObjectVal(provider.Params)
+		values[provider.Type][provider.Name] = cty.ObjectVal(provider.params)
 	}
 	types := make(map[string]cty.Value)
 	for k, v := range values {

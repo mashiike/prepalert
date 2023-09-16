@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Songmu/flextime"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/canyon"

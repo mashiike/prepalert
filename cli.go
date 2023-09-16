@@ -66,6 +66,7 @@ func RunCLI(ctx context.Context, args []string, setLogLevel func(string)) error 
 	if err != nil {
 		return err
 	}
+	defer app.Close()
 	switch cmd {
 	case "run":
 		return app.Run(ctx, cli.Run)

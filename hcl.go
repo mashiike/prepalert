@@ -1,6 +1,7 @@
 package prepalert
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -211,7 +212,7 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 		pp := &ProviderParameter{
 			Type:   block.Labels[0],
 			Name:   "default",
-			Params: make(map[string]cty.Value),
+			params: make(map[string]cty.Value),
 		}
 		attrs, attrDiags := block.Body.JustAttributes()
 		if attrDiags.HasErrors() {
@@ -225,9 +226,20 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 			default:
 				value, valueDiags := attr.Expr.Value(app.evalCtx)
 				diags = diags.Extend(valueDiags)
-				pp.Params[name] = value
+				pp.params[name] = value
 			}
 		}
+		var jsonParams json.RawMessage
+		if err := hclutil.UnmarshalCTYValue(cty.ObjectVal(pp.params), &jsonParams); err != nil {
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  `Provider creation failed`,
+				Detail:   err.Error(),
+				Subject:  block.TypeRange.Ptr(),
+			})
+			continue
+		}
+		pp.Params = jsonParams
 		provider, err := NewProvider(pp)
 		if err != nil {
 			diags = diags.Append(&hcl.Diagnostic{
