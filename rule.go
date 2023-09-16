@@ -173,6 +173,48 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 				})
 				continue
 			}
+			for _, attr := range attrs {
+				switch attr.Name {
+				case "max_size":
+					v, err := attr.Expr.Value(evalCtx)
+					if err != nil {
+						diags = diags.Append(&hcl.Diagnostic{
+							Severity: hcl.DiagError,
+							Summary:  "failed evaluate max_size attribute",
+							Detail:   err.Error(),
+							Subject:  attr.Range.Ptr(),
+						})
+						continue
+					}
+					var maxSize int
+					if err := hclutil.UnmarshalCTYValue(v, &maxSize); err != nil {
+						diags = diags.Append(&hcl.Diagnostic{
+							Severity: hcl.DiagError,
+							Summary:  "failed unmarshal max_size attribute",
+							Detail:   err.Error(),
+							Subject:  attr.Range.Ptr(),
+						})
+						continue
+					}
+					if maxSize <= 0 || maxSize > maxMemoSize {
+						diags = diags.Append(&hcl.Diagnostic{
+							Severity: hcl.DiagError,
+							Summary:  "max_size attribute must be positive integer",
+							Detail:   fmt.Sprintf("max_size: %d", maxSize),
+							Subject:  attr.Range.Ptr(),
+						})
+						continue
+					}
+					rule.maxAlertMemoSize = &maxSize
+				case "memo":
+				default:
+					diags = diags.Append(&hcl.Diagnostic{
+						Severity: hcl.DiagError,
+						Summary:  fmt.Sprintf("unknown attribute %q", attr.Name),
+						Subject:  attr.Range.Ptr(),
+					})
+				}
+			}
 			rule.updateAlertMemo = true
 			refarences := hclutil.VariablesReffarances(rule.information)
 			for _, ref := range refarences {
@@ -211,6 +253,7 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 					})
 					continue
 				}
+				rule.postGraphAnnotation = true
 			} else {
 				diags = diags.Append(&hcl.Diagnostic{
 					Severity: hcl.DiagError,
@@ -219,7 +262,48 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 				})
 				continue
 			}
-
+			for _, attr := range attrs {
+				switch attr.Name {
+				case "max_size":
+					v, err := attr.Expr.Value(evalCtx)
+					if err != nil {
+						diags = diags.Append(&hcl.Diagnostic{
+							Severity: hcl.DiagError,
+							Summary:  "failed evaluate max_size attribute",
+							Detail:   err.Error(),
+							Subject:  attr.Range.Ptr(),
+						})
+						continue
+					}
+					var maxSize int
+					if err := hclutil.UnmarshalCTYValue(v, &maxSize); err != nil {
+						diags = diags.Append(&hcl.Diagnostic{
+							Severity: hcl.DiagError,
+							Summary:  "failed unmarshal max_size attribute",
+							Detail:   err.Error(),
+							Subject:  attr.Range.Ptr(),
+						})
+						continue
+					}
+					if maxSize <= 0 || maxSize > maxDescriptionSize {
+						diags = diags.Append(&hcl.Diagnostic{
+							Severity: hcl.DiagError,
+							Summary:  "max_size attribute must be positive integer",
+							Detail:   fmt.Sprintf("max_size: %d", maxSize),
+							Subject:  attr.Range.Ptr(),
+						})
+						continue
+					}
+					rule.maxGraphAnnotationDescriptionSize = &maxSize
+				case "service":
+				default:
+					diags = diags.Append(&hcl.Diagnostic{
+						Severity: hcl.DiagError,
+						Summary:  fmt.Sprintf("unknown attribute %q", attr.Name),
+						Subject:  attr.Range.Ptr(),
+					})
+				}
+			}
 		}
 	}
 	return nil
