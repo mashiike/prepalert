@@ -2,6 +2,8 @@ package prepalert
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -103,6 +105,17 @@ type WebhookBody struct {
 	Host     *Host    `json:"host,omitempty" cty:"host,omitempty"`
 	Service  *Service `json:"service,omitempty" cty:"service,omitempty"`
 	Alert    *Alert   `json:"alert" cty:"alert,omitempty"`
+}
+
+//go:embed example_webhook.json
+var exampleWebhookJSON []byte
+
+func (svc *MackerelService) NewExampleWebhookBody() *WebhookBody {
+	var body WebhookBody
+	if err := json.Unmarshal(exampleWebhookJSON, &body); err != nil {
+		panic(err)
+	}
+	return &body
 }
 
 func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID string) (*WebhookBody, error) {

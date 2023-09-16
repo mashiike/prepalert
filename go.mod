@@ -20,7 +20,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/canyon v0.3.1
 	github.com/mashiike/hclconfig v0.8.0
-	github.com/mashiike/hclutil v0.2.0
+	github.com/mashiike/hclutil v0.5.0
 	github.com/mashiike/ls3viewer v0.2.0
 	github.com/mashiike/queryrunner v0.3.1
 	github.com/mashiike/slogutils v0.4.0
@@ -81,7 +81,6 @@ require (
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/thanhpk/randstr v1.0.6 // indirect
 	github.com/zclconf/go-cty-yaml v1.0.3 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/crypto v0.13.0 // indirect

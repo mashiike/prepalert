@@ -9,93 +9,251 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
-	"github.com/mashiike/prepalert/hclconfig"
-	"github.com/mashiike/queryrunner"
-	"github.com/mashiike/slogutils"
+	"github.com/mashiike/hclutil"
 	"github.com/zclconf/go-cty/cty"
 )
 
 type Rule struct {
-	svc                               *MackerelService
-	backend                           Backend
-	ruleName                          string
-	monitorName                       string
-	anyAlert                          bool
-	onClosed                          bool
-	onOpened                          bool
-	queries                           []queryrunner.PreparedQuery
-	information                       hcl.Expression
-	params                            cty.Value
-	postGraphAnnotation               bool
-	updateAlertMemo                   bool
 	maxGraphAnnotationDescriptionSize *int
 	maxAlertMemoSize                  *int
-	service                           string
+
+	svcFunc             func() *MackerelService
+	backend             Backend
+	ruleName            string
+	when                hcl.Expression
+	information         hcl.Expression
+	updateAlertMemo     bool
+	postGraphAnnotation bool
+	service             string
+	dependsOnQueries    map[string]struct{}
 }
 
-func NewRule(svc *MackerelService, backend Backend, cfg *hclconfig.RuleBlock, service string) (*Rule, error) {
-	var name string
-	var anyAlert, onClosed, onOpened bool
-	if cfg.Alert.MonitorID != nil {
-		var err error
-		name, err = svc.GetMonitorName(context.Background(), *cfg.Alert.MonitorID)
-		if err != nil {
-			return nil, fmt.Errorf("get monitor name:%w", err)
+const (
+	webhookHCLPrefix = "webhook"
+)
+
+func NewRule(svcFunc func() *MackerelService, backend Backend, ruleName string) *Rule {
+	return &Rule{
+		svcFunc:          svcFunc,
+		backend:          backend,
+		ruleName:         ruleName,
+		dependsOnQueries: make(map[string]struct{}),
+	}
+}
+
+var dummyWebhook = &WebhookBody{
+	Alert: &Alert{
+		ID:                "dummy",
+		URL:               "https://example.com",
+		Status:            "ok",
+		OpenedAt:          0,
+		ClosedAt:          0,
+		CreatedAt:         0,
+		CriticalThreshold: aws.Float64(0),
+		WarningThreshold:  aws.Float64(0),
+		Duration:          0,
+		IsOpen:            false,
+		MonitorName:       "dummy",
+	},
+	Host: &Host{},
+	Service: &Service{
+		Name: "dummy",
+		Roles: []*Role{
+			{
+				Fullname: "dummy",
+			},
+		},
+	},
+}
+
+func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagnostics {
+	var diags hcl.Diagnostics
+	schema := &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{
+				Name:     "when",
+				Required: true,
+			},
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type: "update_alert",
+			},
+			{
+				Type: "post_graph_annotation",
+			},
+		},
+	}
+	content, diags := body.Content(schema)
+	if diags.HasErrors() {
+		return diags
+	}
+	diags = diags.Extend(hclutil.RestrictBlock(content, []hclutil.BlockRestrictionSchema{
+		{
+			Type:   "update_alert",
+			Unique: true,
+		},
+		{
+			Type:   "post_graph_annotation",
+			Unique: true,
+		},
+	}...))
+	for _, attr := range content.Attributes {
+		switch attr.Name {
+		case "when":
+			rule.when = attr.Expr
+			v, err := hclutil.MarshalCTYValue(dummyWebhook)
+			if err != nil {
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "failed marshal dummy webhook",
+					Detail:   err.Error(),
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
+			tempEvalCtx := hclutil.WithValue(evalCtx, webhookHCLPrefix, v)
+			d, err := rule.when.Value(tempEvalCtx)
+			if err != nil {
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "failed evaluate when expression",
+					Detail:   err.Error(),
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
+			if !d.IsKnown() {
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "when expression is unknown",
+					Detail:   d.GoString(),
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
+			if d.IsNull() {
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "when expression is null",
+					Detail:   d.GoString(),
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
+			if d.Type() != cty.Bool {
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "when expression is not bool",
+					Detail:   d.GoString(),
+					Subject:  attr.Range.Ptr(),
+				})
+				continue
+			}
 		}
 	}
-	if cfg.Alert.MonitorName != nil {
-		name = *cfg.Alert.MonitorName
+	for _, block := range content.Blocks {
+		switch block.Type {
+		case "update_alert":
+			attrs, attrDiags := block.Body.JustAttributes()
+			diags = diags.Extend(attrDiags)
+			if attrDiags.HasErrors() {
+				continue
+			}
+			if memoAttr, ok := attrs["memo"]; ok {
+				rule.information = memoAttr.Expr
+			} else {
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "update_alert block must have memo attribute",
+					Subject:  block.DefRange.Ptr(),
+				})
+				continue
+			}
+			rule.updateAlertMemo = true
+			refarences := hclutil.VariablesReffarances(rule.information)
+			for _, ref := range refarences {
+				if !strings.HasPrefix(ref, "query.") {
+					continue
+				}
+				parts := strings.Split(ref, ".")
+				if len(parts) < 3 {
+					continue
+				}
+				rule.dependsOnQueries[strings.Join(parts[:3], ".")] = struct{}{}
+			}
+		case "post_graph_annotation":
+			attrs, attrDiags := block.Body.JustAttributes()
+			diags = diags.Extend(attrDiags)
+			if attrDiags.HasErrors() {
+				continue
+			}
+			if serviceAttr, ok := attrs["service"]; ok {
+				serviceVal, err := serviceAttr.Expr.Value(evalCtx)
+				if err != nil {
+					diags = diags.Append(&hcl.Diagnostic{
+						Severity: hcl.DiagError,
+						Summary:  "failed evaluate service attribute",
+						Detail:   err.Error(),
+						Subject:  serviceAttr.Range.Ptr(),
+					})
+					continue
+				}
+				if err := hclutil.UnmarshalCTYValue(serviceVal, &rule.service); err != nil {
+					diags = diags.Append(&hcl.Diagnostic{
+						Severity: hcl.DiagError,
+						Summary:  "failed unmarshal service attribute",
+						Detail:   err.Error(),
+						Subject:  serviceAttr.Range.Ptr(),
+					})
+					continue
+				}
+			} else {
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "post_graph_annotation block must have service attribute",
+					Subject:  block.DefRange.Ptr(),
+				})
+				continue
+			}
+
+		}
 	}
-	if cfg.Alert.Any != nil {
-		anyAlert = *cfg.Alert.Any
-	}
-	if cfg.Alert.OnOpened != nil {
-		onOpened = *cfg.Alert.OnOpened
-	}
-	if cfg.Alert.OnClosed != nil {
-		onClosed = *cfg.Alert.OnClosed
-	} else {
-		onClosed = true
-	}
-	queries := make([]queryrunner.PreparedQuery, 0, len(cfg.Queries))
-	for _, query := range cfg.Queries {
+	return nil
+}
+
+func (rule *Rule) DependsOnQueries() []string {
+	queries := make([]string, 0, len(rule.dependsOnQueries))
+	for query := range rule.dependsOnQueries {
 		queries = append(queries, query)
 	}
-	rule := &Rule{
-		svc:                 svc,
-		backend:             backend,
-		ruleName:            cfg.Name,
-		monitorName:         name,
-		anyAlert:            anyAlert,
-		onOpened:            onOpened,
-		onClosed:            onClosed,
-		queries:             queries,
-		information:         cfg.Information,
-		params:              cfg.Params,
-		postGraphAnnotation: cfg.PostGraphAnnotation,
-		updateAlertMemo:     cfg.UpdateAlertMemo,
-		service:             service,
-	}
-	return rule, nil
+	return queries
 }
 
-func (rule *Rule) Match(body *WebhookBody) bool {
-	if rule.anyAlert {
-		return true
+func (rule *Rule) Match(evalCtx *hcl.EvalContext) bool {
+	match, err := rule.when.Value(evalCtx)
+	if err != nil {
+		slog.Error("failed evaluate when expression", "error", err.Error())
+		return false
 	}
-	if body.Alert.IsOpen {
-		if !rule.onOpened {
-			return false
-		}
-	} else {
-		if !rule.onClosed {
-			return false
-		}
+	if !match.IsKnown() {
+		slog.Error("when expression is unknown", "value", match.GoString())
+		return false
 	}
-	return body.Alert.MonitorName == rule.monitorName
+	if match.IsNull() {
+		slog.Error("when expression is null", "value", match.GoString())
+		return false
+	}
+	if match.Type() != cty.Bool {
+		slog.Error("when expression is not bool", "value", match.GoString())
+		return false
+	}
+	return match.True()
 }
+
 func (rule *Rule) Name() string {
 	return rule.ruleName
 }
@@ -140,106 +298,28 @@ func (rule *Rule) MaxAlertMemoSize() int {
 	return *rule.maxAlertMemoSize
 }
 
-func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
-	ctx = slogutils.With(ctx, "rule_name", rule.Name())
-	var wg, queryWg sync.WaitGroup
-	resultCh := make(chan *queryrunner.QueryResult, len(rule.queries))
-	builder := EvalContextBuilder{
-		Parent: evalCtx,
-		Runtime: &RuntimeVariables{
-			Event:        body,
-			Params:       rule.params,
-			QueryResults: make(map[string]*QueryResult, len(rule.queries)),
-		},
+func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext) (string, error) {
+	value, diags := rule.information.Value(evalCtx)
+	if diags.HasErrors() {
+		return "", diags
 	}
-	queryEvalCtx, err := builder.Build()
-	if err != nil {
-		return fmt.Errorf("eval context builder: %w", err)
+	if value.Type() != cty.String {
+		return "", errors.New("information is not string")
 	}
-	var queryErrorCount int32
-	for _, query := range rule.queries {
-		builder.Runtime.QueryResults[query.Name()] = (*QueryResult)(queryrunner.NewQueryResult(
-			query.Name(),
-			"",
-			[]string{"status"},
-			[][]string{{"running"}},
-		))
-		wg.Add(1)
-		queryWg.Add(1)
-		go func(query queryrunner.PreparedQuery) {
-			defer func() {
-				wg.Done()
-				queryWg.Done()
-			}()
-			egctxWithQueryName := slogutils.With(
-				ctx,
-				"query_name", query.Name(),
-			)
-			slog.InfoContext(egctxWithQueryName, "start run query")
-			result, err := query.Run(egctxWithQueryName, queryEvalCtx.Variables, nil)
-			if err != nil {
-				slog.ErrorContext(egctxWithQueryName, "failed run query", "error", err.Error())
-				atomic.AddInt32(&queryErrorCount, 1)
-				resultCh <- queryrunner.NewQueryResult(
-					query.Name(),
-					"",
-					[]string{"status", "error"},
-					[][]string{{"failed", err.Error()}},
-				)
-				return
-			}
-			slog.InfoContext(egctxWithQueryName, "end run query")
-			resultCh <- result
-		}(query)
+	if value.IsNull() {
+		return "", errors.New("information is nil")
 	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		queryWg.Wait()
-		close(resultCh)
-	}()
-	f := func() error {
-		evalCtx, err := builder.Build()
-		if err != nil {
-			return fmt.Errorf("eval context builder: %w", err)
-		}
-		info, err := rule.BuildInfomation(evalCtx)
-		if err != nil {
-			return fmt.Errorf("build information:%w", err)
-		}
-		if err := rule.render(ctx, evalCtx, body, info); err != nil {
-			return fmt.Errorf("render:%w", err)
-		}
-		return nil
+	if !value.IsKnown() {
+		return "", errors.New("information is unknown")
 	}
-	wg.Add(1)
-	var bgRenderErr error
-	var isRender bool
-	go func() {
-		defer wg.Done()
-		for result := range resultCh {
-			builder.Runtime.QueryResults[result.Name] = (*QueryResult)(result)
-			if err := f(); err != nil {
-				bgRenderErr = fmt.Errorf("failed render:%w", err)
-			}
-			isRender = true
-		}
-	}()
-	wg.Wait()
-	if bgRenderErr != nil {
-		return bgRenderErr
-	}
-	if queryErrorCount > 0 {
-		return fmt.Errorf("%s rule render failed", rule.Name())
-	}
-	if !isRender {
-		return f()
-	}
-	return nil
+	return value.AsString(), nil
 }
 
-func (rule *Rule) render(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody, info string) error {
+func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+	info, err := rule.Render(ctx, evalCtx)
+	if err != nil {
+		return fmt.Errorf("render information: %w", err)
+	}
 	slog.DebugContext(ctx, "dump infomation", "infomation", info)
 	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
 	showDetailsURL, uploaded, err := rule.backend.Upload(
@@ -281,7 +361,7 @@ func (rule *Rule) render(ctx context.Context, evalCtx *hcl.EvalContext, body *We
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := rule.svc.UpdateAlertMemo(ctx, body.Alert.ID, memo); err != nil {
+			if err := rule.svcFunc().UpdateAlertMemo(ctx, body.Alert.ID, memo); err != nil {
 				slog.ErrorContext(ctx, "failed update alert memo", "error", err.Error())
 				atomic.AddInt32(&errNum, 1)
 			}
@@ -322,7 +402,7 @@ func (rule *Rule) render(ctx context.Context, evalCtx *hcl.EvalContext, body *We
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := rule.svc.PostGraphAnnotation(ctx, annotation); err != nil {
+			if err := rule.svcFunc().PostGraphAnnotation(ctx, annotation); err != nil {
 				slog.ErrorContext(
 					ctx,
 					"failed post graph annotation",
@@ -337,21 +417,4 @@ func (rule *Rule) render(ctx context.Context, evalCtx *hcl.EvalContext, body *We
 		return fmt.Errorf("has %d errors", errNum)
 	}
 	return nil
-}
-
-func (rule *Rule) BuildInfomation(evalCtx *hcl.EvalContext) (string, error) {
-	value, diags := rule.information.Value(evalCtx)
-	if diags.HasErrors() {
-		return "", diags
-	}
-	if value.Type() != cty.String {
-		return "", errors.New("information is not string")
-	}
-	if value.IsNull() {
-		return "", errors.New("information is nil")
-	}
-	if !value.IsKnown() {
-		return "", errors.New("information is unknown")
-	}
-	return value.AsString(), nil
 }

@@ -1,16 +1,18 @@
 prepalert {
     required_version = ">=v0.2.0"
     sqs_queue_name   = "prepalert"
-    service          = "prod"
 }
 
-rule "simple" {
-    alert {
-        any = true
-    }
-    information = <<EOF
+locals {
+    default_message =  <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
 EOF
-    post_graph_annotation = false
+}
+
+rule "simple" {
+    when = (runtime.event.org_name == "Macker...")
+    update_alert {
+        memo = local.default_message
+    }
 }

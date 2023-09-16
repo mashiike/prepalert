@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/mashiike/prepalert/hclconfig"
 	"github.com/mashiike/prepalert/wizard"
 )
 
@@ -60,11 +59,11 @@ func RunCLI(ctx context.Context, args []string, setLogLevel func(string)) error 
 		fmt.Printf("prepalert %s\n", Version)
 		return nil
 	}
-	cfg, err := hclconfig.Load(cli.Config, Version)
+	app, err := New(cli.MackerelAPIKey)
 	if err != nil {
 		return err
 	}
-	app, err := New(cli.MackerelAPIKey, cfg)
+	err = app.LoadConfig(cli.Config)
 	if err != nil {
 		return err
 	}

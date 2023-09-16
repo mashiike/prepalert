@@ -1,0 +1,39 @@
+{
+  "orgName": "test-org",
+  "event": "alert",
+  "imageUrl": null,
+  "memo": "",
+  "host": {
+    "id": "zzzzzzzzzzz",
+    "name": "test-instance",
+    "url": "https://mackerel.io/orgs/test-org/hosts/zzzzzzzzzzz",
+    "status": "working",
+    "memo": "",
+    "isRetired": false,
+    "roles": [
+      {
+        "fullname": "prod: Instance",
+        "serviceName": "prod",
+        "serviceUrl": "https://mackerel.io/orgs/test-org/services/prod",
+        "roleName": "Instance",
+        "roleUrl": "https://mackerel.io/orgs/test-org/services/prod#role=Instance"
+      }
+    ]
+  },
+  "alert": {
+    "openedAt": 1691323531,
+    "closedAt": 1691323831,
+    "createdAt": 1691323531000,
+    "duration": 3,
+    "isOpen": false,
+    "metricLabel": "custom.host.metric",
+    "metricValue": 0.5,
+    "monitorName": "test-monitor",
+    "monitorOperator": "\u003e",
+    "status": "ok",
+    "trigger": "monitor",
+    "id": "xxxxxxxxxxx",
+    "url": "https://mackerel.io/orgs/test-org/alerts/xxxxxxxxxxx",
+    "warningThreshold": 5
+  }
+}
