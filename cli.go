@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/mashiike/prepalert/wizard"
 )
 
 type CLI struct {
@@ -52,16 +51,16 @@ func RunCLI(ctx context.Context, args []string, setLogLevel func(string)) error 
 		return err
 	}
 	setLogLevel(cli.LogLevel)
-	switch cmd {
-	case "init":
-		return wizard.Run(ctx, Version, cli.MackerelAPIKey, cli.Config)
-	case "version":
-		fmt.Printf("prepalert %s\n", Version)
-		return nil
-	}
 	app, err := New(cli.MackerelAPIKey)
 	if err != nil {
 		return err
+	}
+	switch cmd {
+	case "init":
+		return app.Init(ctx, cli.Config)
+	case "version":
+		fmt.Printf("prepalert %s\n", Version)
+		return nil
 	}
 	err = app.LoadConfig(cli.Config)
 	if err != nil {

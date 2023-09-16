@@ -14,7 +14,7 @@ func TestGenerateInitialConfig(t *testing.T) {
 	t.Cleanup(func() {
 		prepalert.Version = originalVersion
 	})
-	actual, err := prepalert.GenerateInitialConfig("test-sqs")
+	actual, err := prepalert.GenerateInitialConfig("test-sqs", "test-org")
 	require.NoError(t, err)
 	g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture"), goldie.WithNameSuffix(".golden.hcl"))
 	g.Assert(t, "generate_initial_config", actual)
