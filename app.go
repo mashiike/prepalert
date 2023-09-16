@@ -51,6 +51,10 @@ func (app *App) SQSQueueName() string {
 	return app.queueName
 }
 
+func (app *App) MackerelService() *MackerelService {
+	return app.mkrSvc
+}
+
 func (app *App) Rules() []*Rule {
 	return app.rules
 }

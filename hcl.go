@@ -336,6 +336,9 @@ func (app *App) decodeRuleBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 }
 
 func (app *App) NewEvalContext(body *WebhookBody) (*hcl.EvalContext, error) {
+	if app.evalCtx == nil {
+		app.evalCtx = hclutil.NewEvalContext()
+	}
 	webhook, err := hclutil.MarshalCTYValue(body)
 	if err != nil {
 		return app.evalCtx.NewChild(), fmt.Errorf("failed marshal Mackerel webhook body to cty value: %w", err)
@@ -473,6 +476,60 @@ func (app *App) WithPrepalertFunctions(evalCtx *hcl.EvalContext) *hcl.EvalContex
 					return cty.BoolVal(false), errors.New("args is not string")
 				}
 				return cty.BoolVal(strings.HasSuffix(args[0].AsString(), args[1].AsString())), nil
+			},
+		}),
+		"get_monitor": function.New(&function.Spec{
+			Params: []function.Parameter{
+				{
+					Name: "alert",
+					Type: cty.Object(map[string]cty.Type{
+						"trigger": cty.String,
+						"id":      cty.String,
+					}),
+				},
+			},
+			Type: function.StaticReturnType(cty.Object(map[string]cty.Type{
+				"id":   cty.String,
+				"name": cty.String,
+				"type": cty.String,
+			})),
+			Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
+				var alert Alert
+				if err := hclutil.UnmarshalCTYValue(args[0], &alert); err != nil {
+					return cty.UnknownVal(cty.Object(map[string]cty.Type{
+						"id":   cty.String,
+						"name": cty.String,
+						"type": cty.String,
+					})), fmt.Errorf("failed unmarshal alert: %w", err)
+				}
+				if alert.Trigger != "monitor" {
+					return cty.ObjectVal(map[string]cty.Value{
+						"id":   cty.NullVal(cty.String),
+						"name": cty.NullVal(cty.String),
+						"type": cty.NullVal(cty.String),
+					}), nil
+				}
+				a, err := app.mkrSvc.client.GetAlert(alert.ID)
+				if err != nil {
+					return cty.UnknownVal(cty.Object(map[string]cty.Type{
+						"id":   cty.String,
+						"name": cty.String,
+						"type": cty.String,
+					})), fmt.Errorf("failed get alert: %w", err)
+				}
+				m, err := app.mkrSvc.client.GetMonitor(a.MonitorID)
+				if err != nil {
+					return cty.UnknownVal(cty.Object(map[string]cty.Type{
+						"id":   cty.String,
+						"name": cty.String,
+						"type": cty.String,
+					})), fmt.Errorf("failed get monitor: %w", err)
+				}
+				return cty.ObjectVal(map[string]cty.Value{
+					"id":   cty.StringVal(m.MonitorID()),
+					"name": cty.StringVal(m.MonitorName()),
+					"type": cty.StringVal(m.MonitorType()),
+				}), nil
 			},
 		}),
 	}
