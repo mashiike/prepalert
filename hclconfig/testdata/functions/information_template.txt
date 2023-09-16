@@ -1,2 +1,0 @@
-5xx info:
-${runtime.query_result.alb_target_5xx_info.table}
