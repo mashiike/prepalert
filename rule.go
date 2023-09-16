@@ -376,7 +376,11 @@ func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext) (string,
 	return value.AsString(), nil
 }
 
-func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
+	body, err := WebhookFromEvalContext(evalCtx)
+	if err != nil {
+		return err
+	}
 	info, err := rule.Render(ctx, evalCtx)
 	if err != nil {
 		return fmt.Errorf("render information: %w", err)

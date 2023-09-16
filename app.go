@@ -314,7 +314,7 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 				"status": cty.StringVal("success"),
 				"result": vresult,
 			}))
-			if err := rule.Execute(ctx, evalCtx, body); err != nil {
+			if err := rule.Execute(ctx, evalCtx); err != nil {
 				slog.ErrorContext(egctxWithQueryName, "failed execute rule", "error", err.Error())
 				errs = append(errs, err)
 				return
@@ -329,7 +329,7 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 	if len(dependsOn) > 0 {
 		return nil
 	}
-	return rule.Execute(ctx, evalCtx, body)
+	return rule.Execute(ctx, evalCtx)
 }
 
 func (app *App) EnableBasicAuth() bool {

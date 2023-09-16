@@ -358,6 +358,14 @@ func (app *App) NewEvalContext(body *WebhookBody) (*hcl.EvalContext, error) {
 	return hclutil.WithValue(app.evalCtx, webhookHCLPrefix, webhook), nil
 }
 
+func WebhookFromEvalContext(evalCtx *hcl.EvalContext) (*WebhookBody, error) {
+	var body WebhookBody
+	if err := hclutil.UnmarshalCTYValue(evalCtx.Variables[webhookHCLPrefix], &body); err != nil {
+		return nil, fmt.Errorf("failed unmarshal webhook body: %w", err)
+	}
+	return &body, nil
+}
+
 func newConvertFunctionForQueryResult(
 	description string,
 	f func(qr *QueryResult) (string, error),
