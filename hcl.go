@@ -1,6 +1,7 @@
 package prepalert
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/ext/dynblock"
 	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclutil"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/function"
@@ -22,6 +24,10 @@ type LoadConfigOptions struct {
 }
 
 func (app *App) LoadConfig(dir string, optFns ...func(*LoadConfigOptions)) error {
+	app.loadingConfig = true
+	defer func() {
+		app.loadingConfig = false
+	}()
 	opt := &LoadConfigOptions{}
 	for _, optFn := range optFns {
 		optFn(opt)
@@ -514,6 +520,13 @@ func (app *App) WithPrepalertFunctions(evalCtx *hcl.EvalContext) *hcl.EvalContex
 				"type": cty.String,
 			})),
 			Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
+				if app.loadingConfig {
+					return cty.ObjectVal(map[string]cty.Value{
+						"id":   cty.NullVal(cty.String),
+						"name": cty.NullVal(cty.String),
+						"type": cty.NullVal(cty.String),
+					}), nil
+				}
 				var alert Alert
 				if err := hclutil.UnmarshalCTYValue(args[0], &alert); err != nil {
 					return cty.UnknownVal(cty.Object(map[string]cty.Type{
@@ -529,21 +542,21 @@ func (app *App) WithPrepalertFunctions(evalCtx *hcl.EvalContext) *hcl.EvalContex
 						"type": cty.NullVal(cty.String),
 					}), nil
 				}
-				a, err := app.mkrSvc.client.GetAlert(alert.ID)
+				m, err := app.mkrSvc.GetMonitorByAlertID(context.Background(), alert.ID)
 				if err != nil {
+					var mkrErr *mackerel.APIError
+					if errors.As(err, &mkrErr) && mkrErr.StatusCode == 404 {
+						return cty.ObjectVal(map[string]cty.Value{
+							"id":   cty.NullVal(cty.String),
+							"name": cty.NullVal(cty.String),
+							"type": cty.NullVal(cty.String),
+						}), nil
+					}
 					return cty.UnknownVal(cty.Object(map[string]cty.Type{
 						"id":   cty.String,
 						"name": cty.String,
 						"type": cty.String,
 					})), fmt.Errorf("failed get alert: %w", err)
-				}
-				m, err := app.mkrSvc.client.GetMonitor(a.MonitorID)
-				if err != nil {
-					return cty.UnknownVal(cty.Object(map[string]cty.Type{
-						"id":   cty.String,
-						"name": cty.String,
-						"type": cty.String,
-					})), fmt.Errorf("failed get monitor: %w", err)
 				}
 				return cty.ObjectVal(map[string]cty.Value{
 					"id":   cty.StringVal(m.MonitorID()),

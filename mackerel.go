@@ -118,6 +118,18 @@ func (svc *MackerelService) NewExampleWebhookBody() *WebhookBody {
 	return &body
 }
 
+func (svc *MackerelService) GetMonitorByAlertID(ctx context.Context, alertID string) (mackerel.Monitor, error) {
+	alert, err := svc.client.GetAlert(alertID)
+	if err != nil {
+		return nil, fmt.Errorf("get alert:%w", err)
+	}
+	monitor, err := svc.client.GetMonitor(alert.MonitorID)
+	if err != nil {
+		return nil, fmt.Errorf("get monitor:%w", err)
+	}
+	return monitor, nil
+}
+
 func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID string) (*WebhookBody, error) {
 	org, err := svc.client.GetOrg()
 	if err != nil {

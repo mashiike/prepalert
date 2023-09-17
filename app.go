@@ -34,6 +34,7 @@ type App struct {
 	queries             map[string]Query
 	diagWriter          *hclutil.DiagnosticsWriter
 	evalCtx             *hcl.EvalContext
+	loadingConfig       bool
 }
 
 func New(apikey string) (*App, error) {

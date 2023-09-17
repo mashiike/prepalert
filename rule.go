@@ -309,20 +309,23 @@ func (rule *Rule) match(evalCtx *hcl.EvalContext) (bool, error) {
 	if match.IsNull() {
 		return false, errors.New("when expression is null")
 	}
-	switch match.Type() {
-	case cty.Bool:
+	t := match.Type()
+	if t == cty.Bool {
 		return match.True(), nil
-	case cty.List(cty.Bool):
+	}
+	if t == cty.List(cty.Bool) || t.IsTupleType() {
 		// when expression is list of bool, all of them must be true
 		for _, b := range match.AsValueSlice() {
+			if b.Type() != cty.Bool {
+				return false, errors.New("when expression allows [bool, list(bool), tuple(bool)]")
+			}
 			if b.False() {
 				return false, nil
 			}
 		}
 		return true, nil
-	default:
-		return false, errors.New("when expression is not bool or list of bool")
 	}
+	return false, errors.New("when expression allows [bool, list(bool), tuple(bool)]")
 }
 
 func (rule *Rule) Name() string {
