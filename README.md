@@ -88,6 +88,7 @@ EOF
 }
 
 rule "simple" {
+    // rule execute when org_name is "Macker..." and alert id is "4gx..."
     when = [
         webhook.org_name == "Macker...",
         get_monitor(webhook.alert).id == "4gx...",
