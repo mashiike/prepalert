@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.21.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.39
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.83
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.23.5
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.13
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.38.5
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.5
@@ -18,6 +19,7 @@ require (
 	github.com/mackerelio/mackerel-client-go v0.26.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/canyon v0.3.1
+	github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5
 	github.com/mashiike/hclconfig v0.8.0
 	github.com/mashiike/hclutil v0.5.0
 	github.com/mashiike/ls3viewer v0.2.0

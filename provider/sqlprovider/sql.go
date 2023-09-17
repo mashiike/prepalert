@@ -55,8 +55,10 @@ func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: p.StatementAttributeName, Required: true},
-			{Name: p.ParametersAttributeName, Required: false},
 		},
+	}
+	if p.ParametersAttributeName != "" {
+		schema.Attributes = append(schema.Attributes, hcl.AttributeSchema{Name: p.ParametersAttributeName, Required: false})
 	}
 	content, diags := body.Content(schema)
 	if diags.HasErrors() {
@@ -115,6 +117,10 @@ func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.Q
 		}
 		params = append(params, v)
 	}
+	return q.RunWithParamters(ctx, evalCtx, params)
+}
+
+func (q *Query) RunWithParamters(ctx context.Context, evalCtx *hcl.EvalContext, params []interface{}) (*prepalert.QueryResult, error) {
 	value, diags := q.Statement.Value(evalCtx)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("sqlprovider.Query.Run: Evalute statement: %w", diags)

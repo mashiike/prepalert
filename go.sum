@@ -43,6 +43,8 @@ github.com/aws/aws-sdk-go-v2/internal/ini v1.3.42 h1:GPUcE/Yq7Ur8YSUk6lVkoIMWnJN
 github.com/aws/aws-sdk-go-v2/internal/ini v1.3.42/go.mod h1:rzfdUlfA+jdgLDmPKjd3Chq9V7LVLYo1Nz++Wb91aRo=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.4 h1:6lJvvkQ9HmbHZ4h/IEwclwv2mrTW8Uq1SOB/kXy0mfw=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.4/go.mod h1:1PrKYwxTM+zjpw9Y41KFtoJCQrJ34Z47Y4VgVbfndjo=
+github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.23.5 h1:/rXnxd9VGnTc5fLuSFKkWCy+kDP6CxXAIMvfJQEfx8U=
+github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.23.5/go.mod h1:5v2ZNXCSwG73rx0k3sCuB1Ju8sbEbG0iUlxCA7D8sV8=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.14 h1:m0QTSI6pZYJTk5WSKx3fm5cNW/DCicVzULBgU/6IyD0=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.14/go.mod h1:dDilntgHy9WnHXsh7dDtUPgHKEfTJIBUTHM8OWm0f/0=
 github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.1.36 h1:eev2yZX7esGRjqRbnVk1UxMLw4CyVZDpZXRCcy75oQk=
@@ -144,6 +146,8 @@ github.com/manifoldco/promptui v0.9.0 h1:3V4HzJk1TtXW1MTZMP7mdlwbBpIinw3HztaIlYt
 github.com/manifoldco/promptui v0.9.0/go.mod h1:ka04sppxSGFAtxX0qhlYQjISsg9mR4GWtQEhdbn6Pgg=
 github.com/mashiike/canyon v0.3.1 h1:9E2N7iHRaqTtnA/IinMTX82zdiE7iQ+U/sUNIlsyzxc=
 github.com/mashiike/canyon v0.3.1/go.mod h1:IUoJ+1JKccjn91shvmTU6cjpzz6Xx2fMpi0H24mYsPM=
+github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5 h1:Cr+0t85xfrwUsN1Oj8FrZuzFjwzQvPktsTxM+XNtGPU=
+github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5/go.mod h1:M9Ugk0o4HcnH6zyd1VIiQFLjriqtQijvpsBhqPD4ico=
 github.com/mashiike/hclconfig v0.8.0 h1:FSKVIIK2L8pKyiGlqsbEIGFTXww5gBHa9vmFssryQh4=
 github.com/mashiike/hclconfig v0.8.0/go.mod h1:979vPY+2ims/MtsN6RXgLwniTlASj1pQ5fYapSCDoWs=
 github.com/mashiike/hclutil v0.5.0 h1:kp2HSdLf4r0PzTdl846zkfCPn4122O7p2R05uwFoniY=

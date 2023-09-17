@@ -1,4 +1,4 @@
-package sqlprovider
+package providertest
 
 import (
 	"context"

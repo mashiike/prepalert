@@ -12,6 +12,7 @@ import (
 
 	"github.com/Songmu/flextime"
 	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider/providertest"
 	"github.com/mashiike/prepalert/provider/sqlprovider"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -97,9 +98,9 @@ func TestProvider(t *testing.T) {
 sql = "SELECT * FROM ${var.table} WHERE access_at = ?"
 params = [strftime("%Y-%m-%d", now())]
 `)
-	q, err := sqlprovider.NewQuery(p, "test-query", hclBody, nil)
+	q, err := providertest.NewQuery(p, "test-query", hclBody, nil)
 	require.NoError(t, err)
-	result, err := sqlprovider.RunQuery(context.Background(), q, map[string]interface{}{
+	result, err := providertest.RunQuery(context.Background(), q, map[string]interface{}{
 		"var": map[string]interface{}{
 			"table": "logs",
 		},

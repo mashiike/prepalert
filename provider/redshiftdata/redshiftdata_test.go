@@ -12,8 +12,8 @@ import (
 	awsredshiftdata "github.com/aws/aws-sdk-go-v2/service/redshiftdata"
 	"github.com/aws/aws-sdk-go-v2/service/redshiftdata/types"
 	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider/providertest"
 	"github.com/mashiike/prepalert/provider/redshiftdata"
-	"github.com/mashiike/prepalert/provider/sqlprovider"
 	redshiftdatasqldriver "github.com/mashiike/redshift-data-sql-driver"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -129,9 +129,9 @@ params = {
 	start_at = "2020-01-01"
 }
 `)
-	q, err := sqlprovider.NewQuery(p, "test-query", hclBody, nil)
+	q, err := providertest.NewQuery(p, "test-query", hclBody, nil)
 	require.NoError(t, err)
-	qr, err := sqlprovider.RunQuery(context.Background(), q, map[string]interface{}{
+	qr, err := providertest.RunQuery(context.Background(), q, map[string]interface{}{
 		"var": map[string]interface{}{
 			"table": "logs",
 		},
