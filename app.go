@@ -299,14 +299,24 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
-				slog.ErrorContext(egctxWithQueryName, "failed run query", "error", err.Error())
+				var diags hcl.Diagnostics
+				slog.DebugContext(
+					egctxWithQueryName,
+					"failed run query",
+					"error", err.Error(),
+					"errType", fmt.Sprintf("%T", err),
+				)
+				if errors.As(err, &diags) {
+					app.diagWriter.WriteDiagnostics(diags)
+				}
+				errs = append(errs, err)
+				slog.WarnContext(egctxWithQueryName, "failed run query")
 				v.Status = "failed"
 				v.Error = err.Error()
 				evalCtx, err = provider.WithQury(evalCtx, v)
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
 				}
-				errs = append(errs, err)
 				return
 			}
 			v.Status = "success"
