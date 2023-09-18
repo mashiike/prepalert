@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
@@ -369,7 +370,17 @@ func (app *App) NewEvalContext(body *WebhookBody) (*hcl.EvalContext, error) {
 
 func WebhookFromEvalContext(evalCtx *hcl.EvalContext) (*WebhookBody, error) {
 	var body WebhookBody
-	if err := hclutil.UnmarshalCTYValue(evalCtx.Variables[webhookHCLPrefix], &body); err != nil {
+	if evalCtx == nil {
+		return nil, errors.New("evalCtx is nil")
+	}
+	v, ok := evalCtx.Variables[webhookHCLPrefix]
+	if !ok {
+		return nil, errors.New("webhook body not found")
+	}
+	js, _ := hclutil.DumpCTYValue(v)
+	slog.Debug("dump webhook body", "detail", js)
+	if err := hclutil.UnmarshalCTYValue(v, &body); err != nil {
+
 		return nil, fmt.Errorf("failed unmarshal webhook body: %w", err)
 	}
 	return &body, nil

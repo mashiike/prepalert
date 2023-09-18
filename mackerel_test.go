@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mackerelio/mackerel-client-go"
-	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/hclutil"
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/mock"
@@ -177,7 +176,7 @@ func TestWebnookBody__MarshalCTYValues(t *testing.T) {
 	body := LoadJSON[prepalert.WebhookBody](t, "example_webhook.json")
 	expr, diags := hclsyntax.ParseExpression([]byte("jsonencode(test_event)"), "test.hcl", hcl.InitialPos)
 	require.False(t, diags.HasErrors())
-	ctx := hclconfig.NewEvalContext()
+	ctx := hclutil.NewEvalContext()
 	ctx = ctx.NewChild()
 	testEvent, err := hclutil.MarshalCTYValue(body)
 	require.NoError(t, err)

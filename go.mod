@@ -2,6 +2,8 @@ module github.com/mashiike/prepalert
 
 go 1.21.0
 
+replace github.com/mashiike/hclutil => ../hclutil
+
 require (
 	github.com/Songmu/flextime v0.1.0
 	github.com/alecthomas/kong v0.8.0
@@ -20,8 +22,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mashiike/canyon v0.3.1
 	github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5
-	github.com/mashiike/hclconfig v0.8.0
-	github.com/mashiike/hclutil v0.5.0
+	github.com/mashiike/hclutil v0.5.1
 	github.com/mashiike/ls3viewer v0.2.0
 	github.com/mashiike/redshift-data-sql-driver v0.1.0
 	github.com/mashiike/s3-select-sql-driver v0.3.0
@@ -32,7 +33,6 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/zclconf/go-cty v1.14.0
 	go.uber.org/mock v0.2.0
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 )
 
 require (
@@ -87,6 +87,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/crypto v0.13.0 // indirect
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/oauth2 v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect

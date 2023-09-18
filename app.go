@@ -310,7 +310,7 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 					app.diagWriter.WriteDiagnostics(diags)
 				}
 				errs = append(errs, err)
-				slog.WarnContext(egctxWithQueryName, "failed run query")
+				slog.WarnContext(egctxWithQueryName, "failed run query", "reason", err.Error())
 				v.Status = "failed"
 				v.Error = err.Error()
 				evalCtx, err = provider.WithQury(evalCtx, v)

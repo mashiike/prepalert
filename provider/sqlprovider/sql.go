@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclutil"
 	"github.com/mashiike/prepalert/provider"
-	"golang.org/x/exp/slog"
 )
 
 type Provider struct {
@@ -148,7 +148,7 @@ func (q *Query) RunWithParamters(ctx context.Context, evalCtx *hcl.EvalContext, 
 	if err := hclutil.UnmarshalCTYValue(value, &statement); err != nil {
 		return nil, fmt.Errorf("sqlprovider.Query.Run UnmarshalCTYValue: %w", err)
 	}
-	slog.InfoContext(ctx, "sqlprovider.Query.Run", "statement", statement, "params", params)
+	slog.DebugContext(ctx, "sqlprovider.Query.Run", "statement", statement, "params", params)
 	rows, err := q.Provider.DB.QueryContext(ctx, statement, params...)
 	if err != nil {
 		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
@@ -158,5 +158,6 @@ func (q *Query) RunWithParamters(ctx context.Context, evalCtx *hcl.EvalContext, 
 	if err != nil {
 		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
 	}
+	slog.DebugContext(ctx, "dump QueryResult", "query_result", qr.ToMarkdownTable())
 	return qr, nil
 }
