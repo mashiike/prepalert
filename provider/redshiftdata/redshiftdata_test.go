@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsredshiftdata "github.com/aws/aws-sdk-go-v2/service/redshiftdata"
 	"github.com/aws/aws-sdk-go-v2/service/redshiftdata/types"
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/providertest"
 	"github.com/mashiike/prepalert/provider/redshiftdata"
 	redshiftdatasqldriver "github.com/mashiike/redshift-data-sql-driver"
@@ -111,7 +111,7 @@ func TestProvider(t *testing.T) {
 			}, nil
 		},
 	).Times(1)
-	p, err := redshiftdata.NewProvider(&prepalert.ProviderParameter{
+	p, err := redshiftdata.NewProvider(&provider.ProviderParameter{
 		Type: "redshift_data",
 		Name: "default",
 		Params: json.RawMessage(`{
@@ -137,7 +137,7 @@ params = {
 		},
 	})
 	require.NoError(t, err)
-	require.EqualValues(t, &prepalert.QueryResult{
+	require.EqualValues(t, &provider.QueryResult{
 		Name:  "test-query",
 		Query: "SELECT * FROM logs WHERE access_at = :start_at",
 		Params: []interface{}{

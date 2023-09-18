@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Songmu/flextime"
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/providertest"
 	"github.com/mashiike/prepalert/provider/sqlprovider"
 	"github.com/stretchr/testify/require"
@@ -106,7 +106,7 @@ params = [strftime("%Y-%m-%d", now())]
 		},
 	})
 	require.NoError(t, err)
-	require.EqualValues(t, &prepalert.QueryResult{
+	require.EqualValues(t, &provider.QueryResult{
 		Name:    "test-query",
 		Query:   "SELECT * FROM logs WHERE access_at = ?",
 		Params:  []interface{}{"2020-01-01"},

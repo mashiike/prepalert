@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	cloudwatchlogsinsightsdriver "github.com/mashiike/cloudwatch-logs-insights-driver"
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/cloudwatchlogsinsights"
 	"github.com/mashiike/prepalert/provider/providertest"
 	"github.com/stretchr/testify/require"
@@ -43,7 +43,7 @@ func TestProvider(t *testing.T) {
 		require.ElementsMatch(t, []string{"test-log-group"}, cfg.LogGroupNames)
 		return mockClient, nil
 	}
-	p, err := cloudwatchlogsinsights.NewProvider(&prepalert.ProviderParameter{
+	p, err := cloudwatchlogsinsights.NewProvider(&provider.ProviderParameter{
 		Type: "cloudwach_logs_insights",
 		Name: "default",
 		Params: json.RawMessage(`{
@@ -113,7 +113,7 @@ log_group_names = [
 		},
 	})
 	require.NoError(t, err)
-	require.EqualValues(t, &prepalert.QueryResult{
+	require.EqualValues(t, &provider.QueryResult{
 		Name:  "test-query",
 		Query: "fields @timestamp, @message | limit 10",
 		Params: []interface{}{

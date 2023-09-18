@@ -19,6 +19,7 @@ import (
 	"github.com/mashiike/hclutil"
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/mock"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
@@ -106,7 +107,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 	defer ctrl.Finish()
 	mockProvider := mock.NewMockProvider(ctrl)
 	mockServelessProvider := mock.NewMockProvider(ctrl)
-	prepalert.RegisterProvider("redshift_data", func(pp *prepalert.ProviderParameter) (prepalert.Provider, error) {
+	provider.RegisterProvider("redshift_data", func(pp *provider.ProviderParameter) (provider.Provider, error) {
 		require.Equal(t, "redshift_data", pp.Type)
 		switch pp.Name {
 		case "default":
@@ -118,7 +119,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 		}
 	})
 	t.Cleanup(func() {
-		prepalert.UnregisterProvider("redshift_data")
+		provider.UnregisterProvider("redshift_data")
 	})
 	mockQuery := mock.NewMockQuery(ctrl)
 	mockProvider.EXPECT().NewQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockQuery, nil).Times(1)
@@ -148,11 +149,11 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 	t.Run("AsWorker", func(t *testing.T) {
 		g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
 		mockQuery.EXPECT().Run(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.QueryResult, error) {
+			func(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
 				var v json.RawMessage
 				hclutil.UnmarshalCTYValue(cty.ObjectVal(evalCtx.Variables), &v)
 				g.AssertJson(t, "with_query_as_worker__eval_ctx_variables", v)
-				return prepalert.NewQueryResultWithJSONLines(
+				return provider.NewQueryResultWithJSONLines(
 					"access_logs", "select * from access_logs", nil,
 					map[string]json.RawMessage{
 						"Name":   json.RawMessage(`"A"`),

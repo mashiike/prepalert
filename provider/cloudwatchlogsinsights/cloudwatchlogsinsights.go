@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	cloudwatchlogsinsightsdriver "github.com/mashiike/cloudwatch-logs-insights-driver"
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/sqlprovider"
 )
 
@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	prepalert.RegisterProvider("redshift_data", NewProvider)
+	provider.RegisterProvider("redshift_data", NewProvider)
 	var diags hcl.Diagnostics
 	defaultStartTimeExpr, diags = hclsyntax.ParseExpression([]byte(`webhook.alert.opened_at - duration("15m")`), "start_time.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
@@ -50,7 +50,7 @@ type ProviderParameter struct {
 	Limit                *int32   `json:"limit,omitempty"`
 }
 
-func NewProvider(pp *prepalert.ProviderParameter) (*Provider, error) {
+func NewProvider(pp *provider.ProviderParameter) (*Provider, error) {
 	p := &Provider{
 		Type: pp.Type,
 		Name: pp.Name,
@@ -93,7 +93,7 @@ type Query struct {
 	*sqlprovider.Query
 }
 
-func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (prepalert.Query, error) {
+func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (provider.Query, error) {
 	var params QueryParamter
 	if diags := gohcl.DecodeBody(body, evalCtx, &params); diags.HasErrors() {
 		return nil, diags
@@ -115,7 +115,7 @@ func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext
 	}, nil
 }
 
-func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.QueryResult, error) {
+func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
 	var params []interface{}
 	var startTime, endTime int64
 	if dias := gohcl.DecodeExpression(q.Parameter.StartTime, evalCtx, &startTime); dias.HasErrors() {

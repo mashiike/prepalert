@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/providertest"
 	"github.com/mashiike/prepalert/provider/s3select"
 	s3selectsqldriver "github.com/mashiike/s3-select-sql-driver"
@@ -44,7 +44,7 @@ func TestProvider(t *testing.T) {
 		require.Equal(t, "test-key-prefix/2020/01/02/03/", cfg.ObjectKeyPrefix)
 		return mockClient, nil
 	}
-	p, err := s3select.NewProvider(&prepalert.ProviderParameter{
+	p, err := s3select.NewProvider(&provider.ProviderParameter{
 		Type: "s3_select",
 		Name: "default",
 		Params: json.RawMessage(`{
@@ -125,7 +125,7 @@ func TestProvider(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.EqualValues(t, &prepalert.QueryResult{
+	require.EqualValues(t, &provider.QueryResult{
 		Name:  "test-query",
 		Query: "select * from s3object s where s.timestamp > ?",
 		Params: []interface{}{

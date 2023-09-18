@@ -24,6 +24,7 @@ require (
 	github.com/mashiike/hclutil v0.5.0
 	github.com/mashiike/ls3viewer v0.2.0
 	github.com/mashiike/redshift-data-sql-driver v0.1.0
+	github.com/mashiike/s3-select-sql-driver v0.3.0
 	github.com/mashiike/slogutils v0.4.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.38.1
@@ -66,6 +67,7 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
+	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -87,6 +89,7 @@ require (
 	golang.org/x/crypto v0.13.0 // indirect
 	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/oauth2 v0.12.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/term v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect

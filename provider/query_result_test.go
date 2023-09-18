@@ -1,10 +1,10 @@
-package prepalert_test
+package provider_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,8 +15,8 @@ func TestNewQueryResultWithJSONLines(t *testing.T) {
 		{"name": json.RawMessage(`"piyo"`), "age": json.RawMessage(`"82"`)},
 		{"name": json.RawMessage(`"tora"`), "memo": json.RawMessage(`"animal"`)},
 	}
-	qr := prepalert.NewQueryResultWithJSONLines("dummy", "SELECT * FROM dummy", nil, lines...)
-	expected := &prepalert.QueryResult{
+	qr := provider.NewQueryResultWithJSONLines("dummy", "SELECT * FROM dummy", nil, lines...)
+	expected := &provider.QueryResult{
 		Name:    "dummy",
 		Query:   "SELECT * FROM dummy",
 		Columns: []string{"name", "age", "memo"},

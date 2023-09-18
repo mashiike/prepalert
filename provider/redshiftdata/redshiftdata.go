@@ -6,13 +6,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/sqlprovider"
 	redshiftdatasqldriver "github.com/mashiike/redshift-data-sql-driver"
 )
 
 func init() {
-	prepalert.RegisterProvider("redshift_data", NewProvider)
+	provider.RegisterProvider("redshift_data", NewProvider)
 }
 
 type Provider struct {
@@ -34,7 +34,7 @@ type ProviderParameter struct {
 	Region            string  `json:"region,omitempty"`
 }
 
-func NewProvider(pp *prepalert.ProviderParameter) (*Provider, error) {
+func NewProvider(pp *provider.ProviderParameter) (*Provider, error) {
 	p := &Provider{
 		Type: pp.Type,
 		Name: pp.Name,

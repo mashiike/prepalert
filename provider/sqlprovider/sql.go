@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclutil"
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"golang.org/x/exp/slog"
 )
 
@@ -99,7 +99,7 @@ func (p *Provider) Close() error {
 	return p.DB.Close()
 }
 
-func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (prepalert.Query, error) {
+func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (provider.Query, error) {
 	query := &Query{
 		Provider: p,
 		Name:     name,
@@ -131,7 +131,7 @@ func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext
 	return query, nil
 }
 
-func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.QueryResult, error) {
+func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
 	params, err := q.Params.ToInterfaceSlice(evalCtx)
 	if err != nil {
 		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
@@ -139,7 +139,7 @@ func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.Q
 	return q.RunWithParamters(ctx, evalCtx, params)
 }
 
-func (q *Query) RunWithParamters(ctx context.Context, evalCtx *hcl.EvalContext, params []interface{}) (*prepalert.QueryResult, error) {
+func (q *Query) RunWithParamters(ctx context.Context, evalCtx *hcl.EvalContext, params []interface{}) (*provider.QueryResult, error) {
 	value, diags := q.Statement.Value(evalCtx)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("sqlprovider.Query.Run: Evalute statement: %w", diags)
@@ -154,7 +154,7 @@ func (q *Query) RunWithParamters(ctx context.Context, evalCtx *hcl.EvalContext, 
 		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
 	}
 	defer rows.Close()
-	qr, err := prepalert.NewQueryResultWithSQLRows(q.Name, statement, params, rows)
+	qr, err := provider.NewQueryResultWithSQLRows(q.Name, statement, params, rows)
 	if err != nil {
 		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
 	}

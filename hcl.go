@@ -2,7 +2,6 @@ package prepalert
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclutil"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/function"
 )
@@ -200,8 +200,8 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 }
 
 func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
-	app.providers = make(map[string]Provider, 0)
-	app.providerParameters = make(ProviderParameters, 0)
+	app.providers = make(map[string]provider.Provider, 0)
+	app.providerParameters = make(provider.ProviderParameters, 0)
 	var diags hcl.Diagnostics
 	for _, block := range blocks {
 		switch block.Labels[0] {
@@ -215,10 +215,10 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 			continue
 		default:
 		}
-		pp := &ProviderParameter{
-			Type:   block.Labels[0],
-			Name:   "default",
-			params: make(map[string]cty.Value),
+		params := make(map[string]cty.Value)
+		pp := &provider.ProviderParameter{
+			Type: block.Labels[0],
+			Name: "default",
 		}
 		attrs, attrDiags := block.Body.JustAttributes()
 		if attrDiags.HasErrors() {
@@ -232,11 +232,10 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 			default:
 				value, valueDiags := attr.Expr.Value(app.evalCtx)
 				diags = diags.Extend(valueDiags)
-				pp.params[name] = value
+				params[name] = value
 			}
 		}
-		var jsonParams json.RawMessage
-		if err := hclutil.UnmarshalCTYValue(cty.ObjectVal(pp.params), &jsonParams); err != nil {
+		if err := pp.SetParams(params); err != nil {
 			diags = diags.Append(&hcl.Diagnostic{
 				Severity: hcl.DiagError,
 				Summary:  `Provider creation failed`,
@@ -245,8 +244,7 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 			})
 			continue
 		}
-		pp.Params = jsonParams
-		provider, err := NewProvider(pp)
+		provider, err := provider.NewProvider(pp)
 		if err != nil {
 			diags = diags.Append(&hcl.Diagnostic{
 				Severity: hcl.DiagError,
@@ -274,7 +272,7 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 }
 
 func (app *App) decodeQueryBlocks(blocks hcl.Blocks) hcl.Diagnostics {
-	app.queries = make(map[string]Query, 0)
+	app.queries = make(map[string]provider.Query, 0)
 	var diags hcl.Diagnostics
 	commonQuerySchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
@@ -372,88 +370,9 @@ func WebhookFromEvalContext(evalCtx *hcl.EvalContext) (*WebhookBody, error) {
 	return &body, nil
 }
 
-func newConvertFunctionForQueryResult(
-	description string,
-	f func(qr *QueryResult) (string, error),
-) function.Function {
-	return function.New(&function.Spec{
-		Description: description,
-		Params: []function.Parameter{
-			{
-				Name: "query",
-				Type: cty.Object(map[string]cty.Type{
-					"status": cty.String,
-					"result": cty.Object(map[string]cty.Type{
-						"name":    cty.String,
-						"query":   cty.String,
-						"columns": cty.List(cty.String),
-						"rows":    cty.List(cty.List(cty.DynamicPseudoType)),
-					}),
-				}),
-			},
-		},
-		VarParam: nil,
-		Type:     function.StaticReturnType(cty.String),
-		Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
-			var query struct {
-				FQN    string       `cty:"fqn"`
-				Status string       `cty:"status"`
-				Error  string       `cty:"error"`
-				Result *QueryResult `cty:"result"`
-			}
-			if err := hclutil.UnmarshalCTYValue(args[0], &query); err != nil {
-				return cty.UnknownVal(cty.String), fmt.Errorf("failed unmarshal query: %w", err)
-			}
-			switch query.Status {
-			case "success":
-				str, err := f(query.Result)
-				if err != nil {
-					return cty.UnknownVal(cty.String), fmt.Errorf("failed convert query result: %w", err)
-				}
-				return cty.StringVal(str), nil
-			case "failed":
-				return cty.StringVal(fmt.Sprintf("[query %q failed: %s]", query.FQN, query.Error)), nil
-			case "running":
-				return cty.StringVal(fmt.Sprintf("[query %q running]", query.FQN)), nil
-			}
-			return cty.UnknownVal(cty.String), errors.New("query.status unknown")
-		},
-	})
-}
-
 func (app *App) WithPrepalertFunctions(evalCtx *hcl.EvalContext) *hcl.EvalContext {
-	child := evalCtx.NewChild()
+	child := provider.WithFunctions(evalCtx).NewChild()
 	child.Functions = map[string]function.Function{
-		"result_to_table": newConvertFunctionForQueryResult(
-			"convert query_result to table format function",
-			func(qr *QueryResult) (string, error) {
-				return qr.ToTable(), nil
-			},
-		),
-		"result_to_jsonlines": newConvertFunctionForQueryResult(
-			"convert query_result to jsonlines format function",
-			func(qr *QueryResult) (string, error) {
-				return qr.ToJSONLines(), nil
-			},
-		),
-		"result_to_vertical": newConvertFunctionForQueryResult(
-			"convert query_result to vertical table format function",
-			func(qr *QueryResult) (string, error) {
-				return qr.ToVertical(), nil
-			},
-		),
-		"result_to_markdown": newConvertFunctionForQueryResult(
-			"convert query_result to markdown table format function",
-			func(qr *QueryResult) (string, error) {
-				return qr.ToMarkdownTable(), nil
-			},
-		),
-		"result_to_borderless": newConvertFunctionForQueryResult(
-			"convert query_result to borderless table format function",
-			func(qr *QueryResult) (string, error) {
-				return qr.ToBorderlessTable(), nil
-			},
-		),
 		"has_prefix": function.New(&function.Spec{
 			Params: []function.Parameter{
 				{

@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
-	"github.com/mashiike/prepalert"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/sqlprovider"
 	_ "github.com/mashiike/s3-select-sql-driver"
 )
@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	prepalert.RegisterProvider("s3_select", NewProvider)
+	provider.RegisterProvider("s3_select", NewProvider)
 	var diags hcl.Diagnostics
 	defaultExpressionExpr, diags = hclsyntax.ParseExpression([]byte(`"SELECT * FROM s3object s"`), "expression.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
@@ -42,7 +42,7 @@ type ProviderParameter struct {
 	ParseTime bool   `json:"parse_time" hcl:"parse_time"`
 }
 
-func NewProvider(pp *prepalert.ProviderParameter) (*Provider, error) {
+func NewProvider(pp *provider.ProviderParameter) (*Provider, error) {
 	p := &Provider{
 		Type: pp.Type,
 		Name: pp.Name,
@@ -100,7 +100,7 @@ type Query struct {
 	DSNQueryParams   url.Values
 }
 
-func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (prepalert.Query, error) {
+func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (provider.Query, error) {
 	var params QueryParamter
 	if diags := gohcl.DecodeBody(body, evalCtx, &params); diags.HasErrors() {
 		return nil, diags
@@ -145,7 +145,7 @@ func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext
 	return query, nil
 }
 
-func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.QueryResult, error) {
+func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
 	var objectKeyPrefix, exprssion string
 	if err := gohcl.DecodeExpression(q.ObjectKeyPrefix, evalCtx, &objectKeyPrefix); err != nil {
 		return nil, fmt.Errorf("failed to decode object_key_prefix: %w", err)
@@ -167,7 +167,7 @@ func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.Q
 		return nil, fmt.Errorf("failed to query: %w", err)
 	}
 	defer rows.Close()
-	qr, err := prepalert.NewQueryResultWithSQLRows(q.Name, exprssion, params, rows)
+	qr, err := provider.NewQueryResultWithSQLRows(q.Name, exprssion, params, rows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create query result: %w", err)
 	}

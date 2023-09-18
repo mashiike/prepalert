@@ -18,8 +18,8 @@ import (
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/canyon"
 	"github.com/mashiike/hclutil"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/slogutils"
-	"github.com/zclconf/go-cty/cty"
 )
 
 type App struct {
@@ -29,9 +29,9 @@ type App struct {
 	queueName           string
 	webhookClientID     string
 	webhookClientSecret string
-	providerParameters  ProviderParameters
-	providers           map[string]Provider
-	queries             map[string]Query
+	providerParameters  provider.ProviderParameters
+	providers           map[string]provider.Provider
+	queries             map[string]provider.Query
 	diagWriter          *hclutil.DiagnosticsWriter
 	evalCtx             *hcl.EvalContext
 	loadingConfig       bool
@@ -274,19 +274,25 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 			continue
 		}
 		mu.Lock()
-		evalCtx = hclutil.WithValue(evalCtx, queryFQN, cty.ObjectVal(map[string]cty.Value{
-			"status": cty.StringVal("running"),
-			"fqn":    cty.StringVal(queryFQN),
-		}))
+		evalCtxQueryVariables := &provider.EvalContextQueryVariables{
+			FQN:    queryFQN,
+			Status: "running",
+		}
+		var err error
+		evalCtx, err = provider.WithQury(evalCtx, evalCtxQueryVariables)
 		mu.Unlock()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", queryFQN, rule.Name(), err))
+			continue
+		}
 		wg.Add(1)
-		go func(fqn string, query Query) {
+		go func(v *provider.EvalContextQueryVariables, query provider.Query) {
 			defer func() {
 				wg.Done()
 			}()
 			egctxWithQueryName := slogutils.With(
 				ctx,
-				"query", fqn,
+				"query", v.FQN,
 			)
 			slog.InfoContext(egctxWithQueryName, "start run query")
 			result, err := query.Run(egctxWithQueryName, evalCtx)
@@ -294,34 +300,29 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 			defer mu.Unlock()
 			if err != nil {
 				slog.ErrorContext(egctxWithQueryName, "failed run query", "error", err.Error())
-				evalCtx = hclutil.WithValue(evalCtx, fqn, cty.ObjectVal(map[string]cty.Value{
-					"status": cty.StringVal("failed"),
-					"error":  cty.StringVal(err.Error()),
-				}))
+				v.Status = "failed"
+				v.Error = err.Error()
+				evalCtx, err = provider.WithQury(evalCtx, v)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
+				}
 				errs = append(errs, err)
 				return
 			}
-			vresult, err := hclutil.MarshalCTYValue(result)
+			v.Status = "success"
+			v.Result = result
+			evalCtx, err = provider.WithQury(evalCtx, v)
 			if err != nil {
 				slog.ErrorContext(egctxWithQueryName, "failed marshal query result", "error", err.Error())
-				evalCtx = hclutil.WithValue(evalCtx, fqn, cty.ObjectVal(map[string]cty.Value{
-					"status": cty.StringVal("failed"),
-					"error":  cty.StringVal(err.Error()),
-				}))
-				errs = append(errs, err)
-				return
+				errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
 			}
-			evalCtx = hclutil.WithValue(evalCtx, fqn, cty.ObjectVal(map[string]cty.Value{
-				"status": cty.StringVal("success"),
-				"result": vresult,
-			}))
 			if err := rule.Execute(ctx, evalCtx); err != nil {
 				slog.ErrorContext(egctxWithQueryName, "failed execute rule", "error", err.Error())
 				errs = append(errs, err)
 				return
 			}
 			slog.InfoContext(egctxWithQueryName, "end run query")
-		}(queryFQN, query)
+		}(evalCtxQueryVariables, query)
 	}
 	wg.Wait()
 	if len(errs) > 0 {
