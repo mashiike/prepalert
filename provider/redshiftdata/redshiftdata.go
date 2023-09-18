@@ -3,6 +3,7 @@ package redshiftdata
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/mashiike/prepalert"
@@ -30,12 +31,16 @@ type ProviderParameter struct {
 	SecretsARN        *string `json:"secrets_arn,omitempty"`
 	Timeout           int64   `json:"timeout,omitempty"`
 	Polling           int64   `json:"polling_interval,omitempty"`
+	Region            string  `json:"region,omitempty"`
 }
 
 func NewProvider(pp *prepalert.ProviderParameter) (*Provider, error) {
 	p := &Provider{
 		Type: pp.Type,
 		Name: pp.Name,
+		ProviderParameter: ProviderParameter{
+			Region: os.Getenv("AWS_REGION"),
+		},
 	}
 	if err := json.Unmarshal(pp.Params, &p.ProviderParameter); err != nil {
 		return nil, fmt.Errorf("failed to parse params: %w", err)
@@ -48,6 +53,9 @@ func NewProvider(pp *prepalert.ProviderParameter) (*Provider, error) {
 		SecretsARN:        p.SecretsARN,
 		Timeout:           time.Duration(p.Timeout) * time.Second,
 		Polling:           time.Duration(p.Polling) * time.Second,
+	}
+	if p.ProviderParameter.Region != "" {
+		cfg = cfg.WithRegion(p.ProviderParameter.Region)
 	}
 	p.DSN = cfg.String()
 	sqlp, err := sqlprovider.NewProvider("redshift-data", p.DSN)
