@@ -153,7 +153,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 				hclutil.UnmarshalCTYValue(cty.ObjectVal(evalCtx.Variables), &v)
 				g.AssertJson(t, "with_query_as_worker__eval_ctx_variables", v)
 				return prepalert.NewQueryResultWithJSONLines(
-					"access_logs", "select * from access_logs",
+					"access_logs", "select * from access_logs", nil,
 					map[string]json.RawMessage{
 						"Name":   json.RawMessage(`"A"`),
 						"Sign":   json.RawMessage(`"The Good"`),

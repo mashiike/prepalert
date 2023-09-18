@@ -3,6 +3,7 @@ package prepalert
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -75,10 +76,49 @@ type QueryResult struct {
 	Rows    [][]json.RawMessage `cty:"rows" json:"rows"`
 }
 
-func NewQueryResultWithJSONLines(name string, query string, lines ...map[string]json.RawMessage) *QueryResult {
+func NewQueryResultWithSQLRows(name string, query string, params []interface{}, rows *sql.Rows) (*QueryResult, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("NewQueryResultWithSQLRows: Columns: %w", err)
+	}
+	result := &QueryResult{
+		Name:    name,
+		Query:   query,
+		Params:  params,
+		Columns: columns,
+	}
+
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		for i := range values {
+			values[i] = new(interface{})
+		}
+		if err := rows.Scan(values...); err != nil {
+			return nil, fmt.Errorf("NewQueryResultWithSQLRows: Scan: %w", err)
+		}
+		row := make([]json.RawMessage, len(columns))
+		for i := range columns {
+			val := *(values[i].(*interface{}))
+			if val == nil {
+				row[i] = json.RawMessage("null")
+				continue
+			}
+			b, err := json.Marshal(val)
+			if err != nil {
+				return nil, fmt.Errorf("NewQueryResultWithSQLRows: Marshal: %w", err)
+			}
+			row[i] = b
+		}
+		result.Rows = append(result.Rows, row)
+	}
+	return result, nil
+}
+
+func NewQueryResultWithJSONLines(name string, query string, params []interface{}, lines ...map[string]json.RawMessage) *QueryResult {
 	qr := &QueryResult{
-		Name:  name,
-		Query: query,
+		Name:   name,
+		Query:  query,
+		Params: params,
 	}
 	columns := make([]string, 0)
 	columnsMap := make(map[string]int)

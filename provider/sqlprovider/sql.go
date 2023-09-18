@@ -3,7 +3,6 @@ package sqlprovider
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/hcl/v2"
@@ -36,10 +35,63 @@ type QueryParam struct {
 	Value hcl.Expression
 }
 
+type QueryParams []QueryParam
+
+func DecodeExpressionToQueryParams(expr hcl.Expression, evalCtx *hcl.EvalContext) (QueryParams, error) {
+	var params QueryParams
+	if listExpr, d := hcl.ExprList(expr); !d.HasErrors() {
+		for i, expr := range listExpr {
+			params = append(params, QueryParam{
+				Index: i,
+				Value: expr,
+			})
+		}
+		return params, nil
+	}
+	if mapExpr, d := hcl.ExprMap(expr); !d.HasErrors() {
+		for _, kv := range mapExpr {
+			nameValue, err := kv.Key.Value(evalCtx)
+			if err != nil {
+				return nil, fmt.Errorf("sqlprovider.DecodeExpressionToQueryParams: Evalute key: %w", err)
+			}
+			var name string
+			if err := hclutil.UnmarshalCTYValue(nameValue, &name); err != nil {
+				return nil, fmt.Errorf("sqlprovider.DecodeExpressionToQueryParams UnmarshalCTYValue: %w", err)
+			}
+			params = append(params, QueryParam{
+				Name:  name,
+				Value: kv.Value,
+			})
+		}
+		return params, nil
+	}
+	return nil, fmt.Errorf("sqlprovider.DecodeExpressionToQueryParams: invalid expression type")
+}
+
+func (ps QueryParams) ToInterfaceSlice(evalCtx *hcl.EvalContext) ([]interface{}, error) {
+	var params []interface{}
+	for _, param := range ps {
+		value, err := param.Value.Value(evalCtx)
+		if err != nil {
+			return nil, fmt.Errorf("sqlprovider.QueryParams.ToInterfaceSlice: Evalute param: %w", err)
+		}
+		var v interface{}
+		if err := hclutil.UnmarshalCTYValue(value, &v); err != nil {
+			return nil, fmt.Errorf("sqlprovider.QueryParams.ToInterfaceSlice UnmarshalCTYValue: %w", err)
+		}
+		if param.Name != "" {
+			params = append(params, sql.Named(param.Name, v))
+			continue
+		}
+		params = append(params, v)
+	}
+	return params, nil
+}
+
 type Query struct {
 	Provider  *Provider
 	Name      string
-	Params    []QueryParam
+	Params    QueryParams
 	Statement hcl.Expression
 }
 
@@ -69,31 +121,10 @@ func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext
 		case p.StatementAttributeName:
 			query.Statement = attr.Expr
 		case p.ParametersAttributeName:
-			if listExpr, d := hcl.ExprList(attr.Expr); !d.HasErrors() {
-				for i, expr := range listExpr {
-					query.Params = append(query.Params, QueryParam{
-						Index: i,
-						Value: expr,
-					})
-				}
-				continue
-			}
-			if mapExpr, d := hcl.ExprMap(attr.Expr); !d.HasErrors() {
-				for _, kv := range mapExpr {
-					nameValue, err := kv.Key.Value(evalCtx)
-					if err != nil {
-						return nil, fmt.Errorf("sqlprovider.NewQuery: Evalute key: %w", err)
-					}
-					var name string
-					if err := hclutil.UnmarshalCTYValue(nameValue, &name); err != nil {
-						return nil, fmt.Errorf("sqlprovider.NewQuery UnmarshalCTYValue: %w", err)
-					}
-					query.Params = append(query.Params, QueryParam{
-						Name:  name,
-						Value: kv.Value,
-					})
-				}
-				continue
+			var err error
+			query.Params, err = DecodeExpressionToQueryParams(attr.Expr, evalCtx)
+			if err != nil {
+				return nil, fmt.Errorf("sqlprovider.NewQuery: %w", err)
 			}
 		}
 	}
@@ -101,21 +132,9 @@ func (p *Provider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext
 }
 
 func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prepalert.QueryResult, error) {
-	var params []interface{}
-	for _, param := range q.Params {
-		value, err := param.Value.Value(evalCtx)
-		if err != nil {
-			return nil, fmt.Errorf("sqlprovider.Query.Run: Evalute param: %w", err)
-		}
-		var v interface{}
-		if err := hclutil.UnmarshalCTYValue(value, &v); err != nil {
-			return nil, fmt.Errorf("sqlprovider.Query.Run UnmarshalCTYValue: %w", err)
-		}
-		if param.Name != "" {
-			params = append(params, sql.Named(param.Name, v))
-			continue
-		}
-		params = append(params, v)
+	params, err := q.Params.ToInterfaceSlice(evalCtx)
+	if err != nil {
+		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
 	}
 	return q.RunWithParamters(ctx, evalCtx, params)
 }
@@ -135,39 +154,9 @@ func (q *Query) RunWithParamters(ctx context.Context, evalCtx *hcl.EvalContext, 
 		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
 	}
 	defer rows.Close()
-	columns, err := rows.Columns()
+	qr, err := prepalert.NewQueryResultWithSQLRows(q.Name, statement, params, rows)
 	if err != nil {
 		return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
 	}
-	result := &prepalert.QueryResult{
-		Name:    q.Name,
-		Query:   statement,
-		Params:  params,
-		Columns: columns,
-	}
-
-	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		for i := range values {
-			values[i] = new(interface{})
-		}
-		if err := rows.Scan(values...); err != nil {
-			return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
-		}
-		row := make([]json.RawMessage, len(columns))
-		for i := range columns {
-			val := *(values[i].(*interface{}))
-			if val == nil {
-				row[i] = json.RawMessage("null")
-				continue
-			}
-			b, err := json.Marshal(val)
-			if err != nil {
-				return nil, fmt.Errorf("sqlprovider.Query.Run: %w", err)
-			}
-			row[i] = b
-		}
-		result.Rows = append(result.Rows, row)
-	}
-	return result, nil
+	return qr, nil
 }

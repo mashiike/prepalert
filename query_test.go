@@ -15,7 +15,7 @@ func TestNewQueryResultWithJSONLines(t *testing.T) {
 		{"name": json.RawMessage(`"piyo"`), "age": json.RawMessage(`"82"`)},
 		{"name": json.RawMessage(`"tora"`), "memo": json.RawMessage(`"animal"`)},
 	}
-	qr := prepalert.NewQueryResultWithJSONLines("dummy", "SELECT * FROM dummy", lines...)
+	qr := prepalert.NewQueryResultWithJSONLines("dummy", "SELECT * FROM dummy", nil, lines...)
 	expected := &prepalert.QueryResult{
 		Name:    "dummy",
 		Query:   "SELECT * FROM dummy",
