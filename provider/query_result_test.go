@@ -57,3 +57,69 @@ func TestMarshlCTYValue(t *testing.T) {
 		]
 	}`, val)
 }
+
+func TestEvalContextQueryVariablesMarshlCTYValue(t *testing.T) {
+	t.Run("runnning", func(t *testing.T) {
+		q := provider.EvalContextQueryVariables{
+			FQN:    "query.hoge,fuga",
+			Status: "running",
+		}
+		v, err := hclutil.MarshalCTYValue(q)
+		require.NoError(t, err)
+		val, err := hclutil.DumpCTYValue(v)
+		require.NoError(t, err)
+		t.Log(string(val))
+		require.JSONEq(t, `{
+		"fqn":"query.hoge,fuga",
+		"status":"running",
+		"error":"",
+		"result":null
+	}`, val)
+	})
+	t.Run("failed", func(t *testing.T) {
+		q := provider.EvalContextQueryVariables{
+			FQN:    "query.hoge,fuga",
+			Status: "failed",
+			Error:  "error",
+		}
+		v, err := hclutil.MarshalCTYValue(q)
+		require.NoError(t, err)
+		val, err := hclutil.DumpCTYValue(v)
+		require.NoError(t, err)
+		t.Log(string(val))
+		require.JSONEq(t, `{
+		"fqn":"query.hoge,fuga",
+		"status":"failed",
+		"error":"error",
+		"result":null
+	}`, val)
+	})
+	t.Run("success", func(t *testing.T) {
+		q := provider.EvalContextQueryVariables{
+			FQN:    "query.hoge,fuga",
+			Status: "success",
+			Result: provider.NewQueryResultWithJSONLines("dummy", "SELECT * FROM dummy", nil, map[string]json.RawMessage{
+				"name": json.RawMessage(`"hoge"`),
+			}),
+		}
+		v, err := hclutil.MarshalCTYValue(q)
+		require.NoError(t, err)
+		val, err := hclutil.DumpCTYValue(v)
+		require.NoError(t, err)
+		t.Log(string(val))
+		require.JSONEq(t, `{
+		"fqn":"query.hoge,fuga",
+		"status":"success",
+		"error":"",
+		"result":{
+			"name":"dummy",
+			"query":"SELECT * FROM dummy",
+			"params":[],
+			"columns":["name"],
+			"rows":[
+				["hoge"]
+			]
+		}
+	}`, val)
+	})
+}

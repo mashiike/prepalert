@@ -3,6 +3,7 @@ package provider
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mashiike/hclutil"
@@ -17,14 +18,6 @@ type EvalContextQueryVariables struct {
 	Result *QueryResult `cty:"result"`
 }
 
-var queryResultCTYType = cty.Object(map[string]cty.Type{
-	"name":    cty.String,
-	"query":   cty.String,
-	"params":  cty.List(cty.DynamicPseudoType),
-	"columns": cty.List(cty.String),
-	"rows":    cty.List(cty.List(cty.DynamicPseudoType)),
-})
-
 func newConvertFunctionForQueryResult(
 	description string,
 	f func(qr *QueryResult) (string, error),
@@ -35,8 +28,16 @@ func newConvertFunctionForQueryResult(
 			{
 				Name: "query",
 				Type: cty.Object(map[string]cty.Type{
+					"fqn":    cty.String,
+					"error":  cty.String,
 					"status": cty.String,
-					"result": queryResultCTYType,
+					"result": cty.Object(map[string]cty.Type{
+						"name":    cty.String,
+						"query":   cty.String,
+						"params":  cty.List(cty.DynamicPseudoType),
+						"columns": cty.List(cty.String),
+						"rows":    cty.List(cty.List(cty.DynamicPseudoType)),
+					}),
 				}),
 			},
 		},
@@ -47,6 +48,7 @@ func newConvertFunctionForQueryResult(
 			if err := hclutil.UnmarshalCTYValue(args[0], &query); err != nil {
 				return cty.UnknownVal(cty.String), fmt.Errorf("failed unmarshal query: %w", err)
 			}
+			slog.Debug("convert query result", "status", query.Status, "fqn", query.FQN, "error", query.Error, "result", query.Result)
 			switch query.Status {
 			case "success":
 				str, err := f(query.Result)
@@ -116,6 +118,14 @@ func WithQury(evalCtx *hcl.EvalContext, variables *EvalContextQueryVariables) (*
 	val := map[string]cty.Value{
 		"status": cty.StringVal(variables.Status),
 		"fqn":    cty.StringVal(variables.FQN),
+		"error":  cty.StringVal(""),
+		"result": cty.ObjectVal(map[string]cty.Value{
+			"name":    cty.StringVal(""),
+			"query":   cty.StringVal(""),
+			"params":  cty.ListValEmpty(cty.DynamicPseudoType),
+			"columns": cty.ListValEmpty(cty.String),
+			"rows":    cty.ListValEmpty(cty.List(cty.DynamicPseudoType)),
+		}),
 	}
 	if variables.Error != "" {
 		val["error"] = cty.StringVal(variables.Error)

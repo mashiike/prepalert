@@ -2,7 +2,15 @@
   "query": {
     "redshift_data": {
       "access_logs": {
+        "error": "",
         "fqn": "query.redshift_data.access_logs",
+        "result": {
+          "columns": [],
+          "name": "",
+          "params": [],
+          "query": "",
+          "rows": []
+        },
         "status": "running"
       }
     }
