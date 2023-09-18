@@ -2,7 +2,7 @@ prepalert {
   required_version = ">=v0.12.0"
   sqs_queue_name   = "prepalert"
 
-  s3_backend {
+  backend "s3" {
     # Upload information about alerts to S3 and set up a simplified view of the uploaded information.
     bucket_name                 = "prepalert-information"
     object_key_prefix           = "alerts/"

@@ -125,7 +125,8 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 				Type: "auth",
 			},
 			{
-				Type: "s3_backend",
+				Type:       "backend",
+				LabelNames: []string{"type"},
 			},
 		},
 	}
@@ -139,8 +140,8 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 			Unique: true,
 		},
 		{
-			Type:   "s3_backend",
-			Unique: true,
+			Type:   "backend",
+			Unique: true, //TODO Multiple backend, none unique
 		},
 	}...))
 	for name, attr := range content.Attributes {
@@ -193,8 +194,20 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 			}
 		}
 	}
-	if blocks := content.Blocks.OfType("s3_backend"); len(blocks) > 0 {
-		diags = diags.Extend(app.SetupS3Buckend(blocks[0].Body))
+	if blocks := content.Blocks.OfType("backend"); len(blocks) > 0 {
+		for _, block := range blocks {
+			switch block.Labels[0] {
+			case "s3":
+				diags = diags.Extend(app.SetupS3Buckend(blocks[0].Body))
+			default:
+				diags = diags.Append(&hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  `backend block validation`,
+					Detail:   fmt.Sprintf("backend type %q is not supported", block.Labels[0]),
+					Subject:  block.TypeRange.Ptr(),
+				})
+			}
+		}
 	}
 	return diags
 }
