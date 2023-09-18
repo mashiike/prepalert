@@ -57,6 +57,9 @@ func RegisterProvider[T Provider](typeName string, factory GenericProviderFactor
 	}
 	providersMu.Lock()
 	defer providersMu.Unlock()
+	if _, dup := providerFactories[typeName]; dup {
+		panic(fmt.Sprintf("provider type %q is already registered", typeName))
+	}
 	providerFactories[typeName] = func(pp *ProviderParameter) (Provider, error) {
 		return factory(pp)
 	}

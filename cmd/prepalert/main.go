@@ -12,6 +12,9 @@ import (
 	"github.com/fatih/color"
 	"github.com/handlename/ssmwrap"
 	"github.com/mashiike/prepalert"
+	_ "github.com/mashiike/prepalert/provider/cloudwatchlogsinsights"
+	_ "github.com/mashiike/prepalert/provider/redshiftdata"
+	_ "github.com/mashiike/prepalert/provider/s3select"
 	"github.com/mashiike/slogutils"
 )
 

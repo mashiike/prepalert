@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	provider.RegisterProvider("redshift_data", NewProvider)
+	provider.RegisterProvider("cloudwatch_logs_insights", NewProvider)
 	var diags hcl.Diagnostics
 	defaultStartTimeExpr, diags = hclsyntax.ParseExpression([]byte(`webhook.alert.opened_at - duration("15m")`), "start_time.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
