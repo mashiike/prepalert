@@ -217,17 +217,6 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 	app.providerParameters = make(provider.ProviderParameters, 0)
 	var diags hcl.Diagnostics
 	for _, block := range blocks {
-		switch block.Labels[0] {
-		case "prepalert", "provider", "query", "rule":
-			diags = diags.Append(&hcl.Diagnostic{
-				Severity: hcl.DiagError,
-				Summary:  `Provider creation failed`,
-				Detail:   fmt.Sprintf("provider name %q is reserved", block.Labels[0]),
-				Subject:  block.TypeRange.Ptr(),
-			})
-			continue
-		default:
-		}
 		params := make(map[string]cty.Value)
 		pp := &provider.ProviderParameter{
 			Type: block.Labels[0],
@@ -247,6 +236,9 @@ func (app *App) decodeProviderBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 				diags = diags.Extend(valueDiags)
 				params[name] = value
 			}
+		}
+		if diags.HasErrors() {
+			continue
 		}
 		if err := pp.SetParams(params); err != nil {
 			diags = diags.Append(&hcl.Diagnostic{

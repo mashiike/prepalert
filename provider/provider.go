@@ -49,6 +49,12 @@ var (
 )
 
 func RegisterProvider[T Provider](typeName string, factory GenericProviderFactory[T]) {
+	switch typeName {
+	case "prepalert", "rule", "provider", "query":
+		panic(fmt.Sprintf("provider type %q is reserved", typeName))
+	case "":
+		panic("provider type name must not be empty")
+	}
 	providersMu.Lock()
 	defer providersMu.Unlock()
 	providerFactories[typeName] = func(pp *ProviderParameter) (Provider, error) {
