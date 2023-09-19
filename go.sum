@@ -150,6 +150,10 @@ github.com/mashiike/canyon v0.3.1 h1:9E2N7iHRaqTtnA/IinMTX82zdiE7iQ+U/sUNIlsyzxc
 github.com/mashiike/canyon v0.3.1/go.mod h1:IUoJ+1JKccjn91shvmTU6cjpzz6Xx2fMpi0H24mYsPM=
 github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5 h1:Cr+0t85xfrwUsN1Oj8FrZuzFjwzQvPktsTxM+XNtGPU=
 github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5/go.mod h1:M9Ugk0o4HcnH6zyd1VIiQFLjriqtQijvpsBhqPD4ico=
+github.com/mashiike/hclutil v0.5.1 h1:W1DIosbi3BA/LNyVaJs1Br4eDLyNeogDTgQuT5vl2+k=
+github.com/mashiike/hclutil v0.5.1/go.mod h1:SwNFHL8m/ReADo4mthJ0VOvh5mLqhOeeeiNWCLAIAKE=
+github.com/mashiike/hclutil v0.5.3 h1:L9DnRTTLyaGuiDrbyA1U/5XjuvUXKH+Kz393hBMepPA=
+github.com/mashiike/hclutil v0.5.3/go.mod h1:ZGyLJ66Xq+NkZchvE0uOdp/OEFYQ4YR1Ihq4Gqhf04Q=
 github.com/mashiike/ls3viewer v0.2.0 h1:7cNLnfIoDIip13aaSCPtSjXux/JyltqEuRab7h7jigA=
 github.com/mashiike/ls3viewer v0.2.0/go.mod h1:lCEcq1/Wv2q8NaZXDGERGu6ceqSa0L0MPd+hFm7rImU=
 github.com/mashiike/redshift-data-sql-driver v0.1.0 h1:ANVUFHt7qXvpjPUKt5b+RT3yJ2TkcOhn4rUaJMbVJr0=
