@@ -6,8 +6,8 @@ require (
 	github.com/Songmu/flextime v0.1.0
 	github.com/alecthomas/kong v0.8.0
 	github.com/aws/aws-sdk-go-v2 v1.21.0
-	github.com/aws/aws-sdk-go-v2/config v1.18.39
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.83
+	github.com/aws/aws-sdk-go-v2/config v1.18.40
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.84
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.23.5
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.13
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.38.5
@@ -40,7 +40,7 @@ require (
 	github.com/aws/aws-lambda-go v1.41.0 // indirect
 	github.com/aws/aws-sdk-go v1.44.118 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.13 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.13.37 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.13.38 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.41 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.35 // indirect
@@ -51,9 +51,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.35 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.15.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.39.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.13.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.15.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.21.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.14.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.16.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.22.0 // indirect
 	github.com/aws/smithy-go v1.14.2 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
