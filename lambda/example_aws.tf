@@ -48,7 +48,7 @@ data "aws_iam_policy_document" "prepalert" {
     ]
     resources = ["*"]
   }
-    statement {
+  statement {
     actions = [
       "s3:GetObject",
       "s3:PutObject",
@@ -96,53 +96,31 @@ data "archive_file" "prepalert_dummy" {
 
 resource "null_resource" "prepalert_dummy" {}
 
-resource "aws_lambda_function" "prepalert_http" {
+resource "aws_lambda_function" "prepalert" {
   lifecycle {
     ignore_changes = all
   }
 
-  function_name = "prepalert-http"
+  function_name = "prepalert"
   role          = aws_iam_role.prepalert.arn
-
-  handler  = "bootstrap"
-  runtime  = "provided.al2"
-  filename = data.archive_file.prepalert_dummy.output_path
+  architectures = ["arm64"]
+  handler       = "bootstrap"
+  runtime       = "provided.al2"
+  filename      = data.archive_file.prepalert_dummy.output_path
 }
 
-resource "aws_lambda_alias" "prepalert_http" {
+resource "aws_lambda_alias" "prepalert" {
   lifecycle {
     ignore_changes = all
   }
   name             = "current"
-  function_name    = aws_lambda_function.prepalert_http.arn
-  function_version = aws_lambda_function.prepalert_http.version
+  function_name    = aws_lambda_function.prepalert.arn
+  function_version = aws_lambda_function.prepalert.version
 }
 
-resource "aws_lambda_function" "prepalert_worker" {
-  lifecycle {
-    ignore_changes = all
-  }
-
-  function_name = "prepalert-worker"
-  role          = aws_iam_role.prepalert.arn
-
-  handler  = "bootstrap"
-  runtime  = "provided.al2"
-  filename = data.archive_file.prepalert_dummy.output_path
-}
-
-resource "aws_lambda_alias" "prepalert_worker" {
-  lifecycle {
-    ignore_changes = all
-  }
-  name             = "current"
-  function_name    = aws_lambda_function.prepalert_worker.arn
-  function_version = aws_lambda_function.prepalert_worker.version
-}
-
-resource "aws_lambda_function_url" "prepalert_http" {
-  function_name      = aws_lambda_alias.prepalert_http.function_name
-  qualifier          = aws_lambda_alias.prepalert_http.name
+resource "aws_lambda_function_url" "prepalert" {
+  function_name      = aws_lambda_alias.prepalert.function_name
+  qualifier          = aws_lambda_alias.prepalert.name
   authorization_type = "NONE"
 
   cors {
@@ -154,23 +132,23 @@ resource "aws_lambda_function_url" "prepalert_http" {
   }
 }
 
-resource "aws_lambda_event_source_mapping" "prepalert_worker_invoke_from_sqs" {
+resource "aws_lambda_event_source_mapping" "prepalert_invoke_from_sqs" {
   batch_size       = 1
   event_source_arn = aws_sqs_queue.prepalert.arn
   enabled          = true
-  function_name    = aws_lambda_alias.prepalert_worker.arn
+  function_name    = aws_lambda_alias.prepalert.arn
 }
 
 resource "aws_ssm_parameter" "mackerel_apikey" {
   name        = "/prepalert/MACKEREL_APIKEY"
-  description = "Mackerel API Key for prepalert"
+  description = "Mackerel API Key for prepalert ${local.mackerel_apikey_source}"
   type        = "SecureString"
   value       = local.mackerel_apikey
 }
 
 resource "aws_ssm_parameter" "GOOGLE_CLIENT_SECRET" {
   name        = "/prepalert/GOOGLE_CLIENT_SECRET"
-  description = "GOOGLE_CLIENT_SECRET for prepalert"
+  description = "GOOGLE_CLIENT_SECRET for prepalert ${local.google_credential_source}"
   type        = "SecureString"
   value       = local.google_client_secret
 }
@@ -191,5 +169,5 @@ resource "aws_ssm_parameter" "SESSION_ENCRYPT_KEY" {
 
 output "lambda_function_url" {
   description = "Generated function URL"
-  value       = aws_lambda_function_url.prepalert_http.function_url
+  value       = aws_lambda_function_url.prepalert.function_url
 }
