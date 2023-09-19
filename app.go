@@ -219,6 +219,12 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+	if body.Alert == nil {
+		logger.WarnContext(ctx, "not found alert in request body, maybe not webhook request", "text", body.Text, "org_name", body.OrgName, "event", body.Event)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, http.StatusText(http.StatusOK))
+		return
+	}
 	ctx = slogutils.With(
 		ctx,
 		"alert_id", body.Alert.ID,

@@ -99,6 +99,7 @@ func (svc *MackerelService) PostGraphAnnotation(ctx context.Context, params *mac
 
 type WebhookBody struct {
 	OrgName  string   `json:"orgName" cty:"org_name"`
+	Text     string   `json:"text" cty:"-"`
 	Event    string   `json:"event" cty:"event"`
 	ImageURL *string  `json:"imageUrl" cty:"image_url"`
 	Memo     string   `json:"memo" cty:"memo"`
