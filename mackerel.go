@@ -2,6 +2,8 @@ package prepalert
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -97,12 +99,36 @@ func (svc *MackerelService) PostGraphAnnotation(ctx context.Context, params *mac
 
 type WebhookBody struct {
 	OrgName  string   `json:"orgName" cty:"org_name"`
+	Text     string   `json:"text" cty:"-"`
 	Event    string   `json:"event" cty:"event"`
 	ImageURL *string  `json:"imageUrl" cty:"image_url"`
 	Memo     string   `json:"memo" cty:"memo"`
 	Host     *Host    `json:"host,omitempty" cty:"host,omitempty"`
 	Service  *Service `json:"service,omitempty" cty:"service,omitempty"`
 	Alert    *Alert   `json:"alert" cty:"alert,omitempty"`
+}
+
+//go:embed example_webhook.json
+var exampleWebhookJSON []byte
+
+func (svc *MackerelService) NewExampleWebhookBody() *WebhookBody {
+	var body WebhookBody
+	if err := json.Unmarshal(exampleWebhookJSON, &body); err != nil {
+		panic(err)
+	}
+	return &body
+}
+
+func (svc *MackerelService) GetMonitorByAlertID(ctx context.Context, alertID string) (mackerel.Monitor, error) {
+	alert, err := svc.client.GetAlert(alertID)
+	if err != nil {
+		return nil, fmt.Errorf("get alert:%w", err)
+	}
+	monitor, err := svc.client.GetMonitor(alert.MonitorID)
+	if err != nil {
+		return nil, fmt.Errorf("get monitor:%w", err)
+	}
+	return monitor, nil
 }
 
 func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID string) (*WebhookBody, error) {
@@ -123,7 +149,6 @@ func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID 
 		Event:   "alert",
 		Alert: &Alert{
 			OpenedAt:        alert.OpenedAt,
-			ClosedAt:        alert.ClosedAt,
 			CreatedAt:       alert.OpenedAt * 1000,
 			Duration:        0,
 			IsOpen:          !strings.EqualFold(alert.Status, "ok"),
@@ -136,6 +161,10 @@ func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID 
 			ID:              alert.ID,
 			URL:             fmt.Sprintf("https://mackerel.io/orgs/%s/alerts/%s", org.Name, alert.ID),
 		},
+	}
+	if alert.ClosedAt != 0 {
+		body.Alert.ClosedAt = &alert.ClosedAt
+		body.Alert.Duration = alert.ClosedAt - alert.OpenedAt
 	}
 	switch m := monitor.(type) {
 	case *mackerel.MonitorConnectivity:
@@ -230,7 +259,7 @@ type Service struct {
 
 type Alert struct {
 	OpenedAt          int64    `json:"openedAt" cty:"opened_at"`
-	ClosedAt          int64    `json:"closedAt" cty:"closed_at"`
+	ClosedAt          *int64   `json:"closedAt" cty:"closed_at"`
 	CreatedAt         int64    `json:"createdAt" cty:"created_at"`
 	CriticalThreshold *float64 `json:"criticalThreshold,omitempty" cty:"critical_threshold,omitempty"`
 	Duration          int64    `json:"duration" cty:"duration"`

@@ -1,39 +1,66 @@
 package prepalert_test
 
 import (
+	"encoding/json"
 	"testing"
 
-	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclutil"
 	"github.com/mashiike/prepalert"
-	"github.com/mashiike/queryrunner"
+	"github.com/mashiike/prepalert/mock"
+	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
-func TestEvalContextBuilder(t *testing.T) {
-	builder := prepalert.EvalContextBuilder{
-		Parent: hclutil.NewEvalContext(),
-		Runtime: &prepalert.RuntimeVariables{
-			Event: LoadJSON[*prepalert.WebhookBody](t, "testdata/event.json"),
-			QueryResults: map[string]*prepalert.QueryResult{
-				"hoge_result": (*prepalert.QueryResult)(queryrunner.NewQueryResult(
-					"hoge_result",
-					"dummy",
-					[]string{"Name", "Sign", "Rating"},
-					[][]string{
-						{"A", "The Good", "500"},
-						{"B", "The Very very Bad Man", "288"},
-						{"C", "The Ugly", "120"},
-						{"D", "The Gopher", "800"},
-					},
-				)),
-			},
-		},
-	}
-	ctx, err := builder.Build()
+func TestHCLGetMonitor(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockClient := mock.NewMockMackerelClient(ctrl)
+	mockClient.EXPECT().GetAlert(gomock.Any()).Return(&mackerel.Alert{
+		MonitorID: "mon-xxxxxxxxxxxxx",
+	}, nil).Times(1)
+	mockClient.EXPECT().GetMonitor("mon-xxxxxxxxxxxxx").Return(&mackerel.MonitorHostMetric{
+		ID:   "hoge",
+		Name: "fuga",
+	}, nil).Times(1)
+	app, err := prepalert.New("dummy-api-key")
 	require.NoError(t, err)
-	expr, _ := hclsyntax.ParseExpression([]byte("jsonencode(runtime)"), "hoge", hcl.Pos{Line: 1, Column: 1})
-	v, _ := expr.Value(ctx)
-	require.JSONEq(t, string(LoadFile(t, "testdata/runtime_eval_context.json")), v.AsString())
+	app.SetMackerelClient(mockClient)
+	app.LoadConfig("testdata/config/simple.hcl")
+	webhook := app.MackerelService().NewExampleWebhookBody()
+	evalCtx, err := app.NewEvalContext(webhook)
+	require.NoError(t, err)
+	expr, _ := hclutil.ParseExpression([]byte("jsonencode(get_monitor(webhook.alert))"))
+	result, _ := expr.Value(evalCtx)
+	g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden.json"))
+	g.AssertJson(t, "hcl_get_monitor", json.RawMessage(result.AsString()))
+}
+
+type unmarshalAndMarshalTestCase string
+
+func (c unmarshalAndMarshalTestCase) Run(t *testing.T) {
+	t.Helper()
+	body := LoadJSON[*prepalert.WebhookBody](t, string(c))
+	ctyValue, err := hclutil.MarshalCTYValue(body)
+	require.NoError(t, err)
+	var actual prepalert.WebhookBody
+	err = hclutil.UnmarshalCTYValue(ctyValue, &actual)
+	require.NoError(t, err)
+
+	acutalJSON, err := json.Marshal(actual)
+	require.NoError(t, err)
+	expectedJSON, err := json.Marshal(body)
+	require.NoError(t, err)
+	t.Log("actual", string(acutalJSON))
+	t.Log("expected", string(expectedJSON))
+	require.JSONEq(t, string(expectedJSON), string(acutalJSON))
+}
+
+func TestUnmarshalAndMarshalWebhookBody__Example(t *testing.T) {
+	unmarshalAndMarshalTestCase("example_webhook.json").Run(t)
+}
+
+func TestUnmarshalAndMarshalWebhookBody__AcutalAlert(t *testing.T) {
+	unmarshalAndMarshalTestCase("testdata/events_with_host.json").Run(t)
 }

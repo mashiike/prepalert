@@ -2,7 +2,7 @@ export AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query 'Account' -
 .PHONY: clean deploy-all
 
 bootstrap: ../cmd/prepalert/*.go ../*.go ../go.*
-	GOARCH=amd64 GOOS=linux go build -o bootstrap ../cmd/prepalert/*.go
+	GOARCH=arm64 GOOS=linux go build -o bootstrap ../cmd/prepalert/*.go
 
 clean:
 	rm -f bootstrap
@@ -10,11 +10,12 @@ clean:
 
 deploy-all: deploy/http deploy/worker
 
-deploy/%: bootstrap
-	PREPALERT_MODE=$* lambroll --log-level debug deploy --tfstate .terraform/terraform.tfstate
+lambroll/deploy: bootstrap
+	lambroll --log-level debug deploy --tfstate .terraform/terraform.tfstate
+	$(MAKE) clean
 
-logs/%:
-	PREPALERT_MODE=$* lambroll logs --follow --format=short --tfstate .terraform/terraform.tfstate
+lambroll/logs:
+	lambroll logs --follow --format=short --tfstate .terraform/terraform.tfstate
 
 .PHONY: terraform/init
 terraform/init:
@@ -35,8 +36,12 @@ terraform/plan:
 .PHONY: terraform/apply
 terraform/apply:
 	terraform apply
+	$(MAKE) clean
 
-.PHONY: send-event
-send-event:
-	cat event.json | curl -d @- -H "Content-Type: application/json" $(shell tfstate-lookup --state .terraform/terraform.tfstate aws_lambda_function_url.prepalert_http.function_url)
-	$(MAKE) logs/worker
+.PHONY: terraform/destory
+terraform/destroy:
+	terraform destroy
+
+.PHONY: mkr/throw
+mkr/throw:
+	./send_metrics.sh

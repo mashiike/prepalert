@@ -138,7 +138,7 @@ func TestParseCLI(t *testing.T) {
 		},
 	}
 
-	g := goldie.New(t, goldie.WithFixtureDir("testdata/cli/"), goldie.WithNameSuffix(".txt"))
+	g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
 	type bailout struct{}
 	for _, c := range cases {
 		casename := strings.Join(c.args, "_")
@@ -167,7 +167,11 @@ func TestParseCLI(t *testing.T) {
 				require.EqualValues(t, c.expected, cli)
 			}
 			if c.checkOutput {
-				g.Assert(t, casename, output.Bytes())
+				name := strings.ReplaceAll(casename, "--", "_")
+				name = strings.ReplaceAll(name, ".", "")
+				name = strings.ReplaceAll(name, "__", "_")
+				name = strings.ReplaceAll(name, "_help", "")
+				g.Assert(t, "parse_cli__"+name, output.Bytes())
 			}
 		})
 	}

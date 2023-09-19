@@ -1,0 +1,41 @@
+{
+  "alert": {
+    "closed_at": 1693015955,
+    "created_at": 1693013435000,
+    "critical_threshold": 10000000,
+    "duration": 3,
+    "id": "4KeYYYYYYYY",
+    "is_open": false,
+    "metric_label": "memory.mem_available",
+    "metric_value": 513557845.3333333,
+    "monitor_name": "memory.mem_available",
+    "monitor_operator": "\\u003c",
+    "opened_at": 1693013435,
+    "status": "ok",
+    "trigger": "monitor",
+    "url": "https://mackerel.io/orgs/prepalert_test/alerts/4KeYYYYYYYY",
+    "warning_threshold": 100000000
+  },
+  "event": "alert",
+  "host": {
+    "id": "4KwmXXXXXX",
+    "is_retired": false,
+    "memo": "",
+    "name": "x162-43-9-149",
+    "roles": [
+      {
+        "fullname": "Server: Game",
+        "role_name": "Game",
+        "role_url": "https://mackerel.io/orgs/prepalert_test/services/Server#role=Game",
+        "service_name": "Server",
+        "service_url": "https://mackerel.io/orgs/prepalert_test/services/Server"
+      }
+    ],
+    "status": "working",
+    "type": "",
+    "url": "https://mackerel.io/orgs/prepalert_test/hosts/4KwmXXXXXX"
+  },
+  "image_url": null,
+  "memo": "",
+  "org_name": "prepalert_test"
+}

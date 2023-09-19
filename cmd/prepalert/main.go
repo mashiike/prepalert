@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,12 +13,23 @@ import (
 	"github.com/fatih/color"
 	"github.com/handlename/ssmwrap"
 	"github.com/mashiike/prepalert"
+	_ "github.com/mashiike/prepalert/provider/cloudwatchlogsinsights"
+	_ "github.com/mashiike/prepalert/provider/redshiftdata"
+	_ "github.com/mashiike/prepalert/provider/s3select"
 	"github.com/mashiike/slogutils"
 )
 
 func main() {
+	newHander := func(w io.Writer, opts *slog.HandlerOptions) slog.Handler {
+		return slog.NewTextHandler(w, opts)
+	}
+	if os.Getenv("PREPALERT_LOG_FORMAT") == "json" {
+		newHander = func(w io.Writer, opts *slog.HandlerOptions) slog.Handler {
+			return slog.NewJSONHandler(w, opts)
+		}
+	}
 	middleware := slogutils.NewMiddleware(
-		slog.NewJSONHandler,
+		newHander,
 		slogutils.MiddlewareOptions{
 			ModifierFuncs: map[slog.Level]slogutils.ModifierFunc{
 				slog.LevelDebug: slogutils.Color(color.FgBlack),
@@ -106,6 +118,7 @@ func main() {
 			l = slog.LevelInfo
 		}
 		middleware.SetMinLevel(l)
+		slog.SetDefault(slog.New(middleware))
 	}
 
 	if err := prepalert.RunCLI(ctx, os.Args[1:], setLogLevelFunc); err != nil {

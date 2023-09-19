@@ -1,0 +1,8 @@
+Error: Duplicate "rule.simple" block
+
+  on testdata/config/invalid_duplicate.hcl line 20, in rule "simple":
+  20: rule "simple" {
+
+Only one "rule.simple" block is allowed. Another was defined at
+testdata/config/invalid_duplicate.hcl:13,1-14
+

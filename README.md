@@ -76,21 +76,26 @@ Configuration file is HCL (HashiCorp Configuration Language) format. `prepalert 
 The most small configuration file is as follows:
 ```hcl
 prepalert {
-    required_version = ">=v0.2.0"
+    required_version = ">=v0.12.0"
     sqs_queue_name   = "prepalert"
-    service          = "prod"
 }
 
-rule "any_alert" {
-    alert {
-        any = true
-    }
-
-    information = <<EOF
+locals {
+    default_message =  <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
-(This area can use Go's template notation.)
 EOF
+}
+
+rule "simple" {
+    // rule execute when org_name is "Macker..." and alert id is "4gx..."
+    when = [
+        webhook.org_name == "Macker...",
+        get_monitor(webhook.alert).id == "4gx...",
+    ]
+    update_alert {
+        memo = local.default_message
+    }
 }
 ```
 

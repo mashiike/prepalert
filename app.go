@@ -2,108 +2,105 @@ package prepalert
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
+	"sync"
 
-	"github.com/Songmu/flextime"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/canyon"
-	"github.com/mashiike/prepalert/hclconfig"
-	"github.com/mashiike/queryrunner"
+	"github.com/mashiike/hclutil"
+	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/slogutils"
 )
 
 type App struct {
 	mkrSvc              *MackerelService
 	backend             Backend
-	webhookClientID     string
-	webhookClientSecret string
 	rules               []*Rule
 	queueName           string
-	queueUrl            string
-	sqsClient           *sqs.Client
+	webhookClientID     string
+	webhookClientSecret string
+	providerParameters  provider.ProviderParameters
+	providers           map[string]provider.Provider
+	queries             map[string]provider.Query
+	diagWriter          *hclutil.DiagnosticsWriter
 	evalCtx             *hcl.EvalContext
+	loadingConfig       bool
 }
 
-func New(apikey string, cfg *hclconfig.Config) (*App, error) {
-	return NewWithMackerelClient(mackerel.NewClient(apikey), cfg)
-}
-
-func NewWithMackerelClient(client MackerelClient, cfg *hclconfig.Config) (*App, error) {
-	svc := NewMackerelService(client)
-	var backend Backend
-	switch {
-	case !cfg.Prepalert.S3Backend.IsEmpty():
-		awsCfg, err := config.LoadDefaultConfig(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("load aws default config:%w", err)
-		}
-		s3Client := s3.NewFromConfig(awsCfg)
-		backend, err = NewS3Backend(s3Client, cfg.Prepalert.S3Backend, cfg.Prepalert.Auth)
-		if err != nil {
-			return nil, fmt.Errorf("initialize s3 backend:%w", err)
-		}
-	default:
-		backend = NewDiscardBackend()
-	}
-	slog.Info("setup backend", "backend", backend.String())
-
-	rules := make([]*Rule, 0, len(cfg.Rules))
-	for i, ruleBlock := range cfg.Rules {
-		rule, err := NewRule(svc, backend, ruleBlock, cfg.Prepalert.Service)
-		if err != nil {
-			return nil, fmt.Errorf("rules[%d]:%w", i, err)
-		}
-		rules = append(rules, rule)
-	}
+func New(apikey string) (*App, error) {
 	app := &App{
-		mkrSvc:    svc,
-		backend:   backend,
-		rules:     rules,
-		queueName: cfg.Prepalert.SQSQueueName,
-		evalCtx:   cfg.EvalContext,
+		backend: NewDiscardBackend(),
 	}
-	if !cfg.Prepalert.Auth.IsEmpty() {
-		app.webhookClientID = cfg.Prepalert.Auth.ClientID
-		app.webhookClientSecret = cfg.Prepalert.Auth.ClientSecret
-	}
-	return app, nil
+	return app.SetMackerelClient(mackerel.NewClient(apikey)), nil
 }
 
-type RunOptions struct {
-	Mode      string `help:"run mode" env:"PREPALERT_MODE" default:"all" enum:"all,http,worker,webhook"`
-	Address   string `help:"run local address" env:"PREPALERT_ADDRESS" default:":8080"`
-	Prefix    string `help:"run server prefix" env:"PREPALERT_PREFIX" default:"/"`
-	BatchSize int    `help:"run local sqs batch size" env:"PREPALERT_BATCH_SIZE" default:"1"`
+func (app *App) Close() error {
+	var errs []error
+	if c, ok := app.backend.(io.Closer); ok {
+		if err := c.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	for _, provider := range app.providers {
+		if c, ok := provider.(io.Closer); ok {
+			if err := c.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	for _, query := range app.queries {
+		if c, ok := query.(io.Closer); ok {
+			if err := c.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }
 
-func (app *App) Run(ctx context.Context, opts *RunOptions) error {
-	canyonOpts := []canyon.Option{
-		canyon.WithCanyonEnv("PREPALERT_CANYON_"),
-		canyon.WithServerAddress(opts.Address, opts.Prefix),
-		canyon.WithWorkerBatchSize(opts.BatchSize),
-	}
+func (app *App) SetMackerelClient(client MackerelClient) *App {
+	app.mkrSvc = NewMackerelService(client)
+	return app
+}
 
-	switch strings.ToLower(opts.Mode) {
-	case "http", "webhook":
-		slog.InfoContext(ctx, "disable worker", "mode", opts.Mode)
-		canyonOpts = append(canyonOpts, canyon.WithDisableWorker())
-	case "worker":
-		slog.InfoContext(ctx, "disable server", "mode", opts.Mode)
-		canyonOpts = append(canyonOpts, canyon.WithDisableServer())
-	default:
-		// nothing to do
+func (app *App) SQSQueueName() string {
+	return app.queueName
+}
+
+func (app *App) MackerelService() *MackerelService {
+	return app.mkrSvc
+}
+
+func (app *App) Rules() []*Rule {
+	return app.rules
+}
+
+func (app *App) ProviderList() []string {
+	providers := make([]string, 0, len(app.providers))
+	for name := range app.providers {
+		providers = append(providers, name)
 	}
-	return canyon.RunWithContext(ctx, app.queueName, app, canyonOpts...)
+	return providers
+}
+
+func (app *App) QueryList() []string {
+	queries := make([]string, 0, len(app.queries))
+	for name := range app.queries {
+		queries = append(queries, name)
+	}
+	return queries
 }
 
 func (app *App) Exec(ctx context.Context, alertID string) error {
@@ -111,7 +108,7 @@ func (app *App) Exec(ctx context.Context, alertID string) error {
 	if err != nil {
 		return err
 	}
-	return app.ProcessRules(ctx, body)
+	return app.ExecuteRules(ctx, body)
 }
 
 func must[T any](t T, err error) T {
@@ -151,7 +148,6 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					"path", r.URL.Path,
 				)
 			} else {
-				ctx = queryrunner.WithRequestID(ctx, fmt.Sprintf("%d", reqID))
 				ctx = slogutils.With(ctx, "request_id", reqID)
 			}
 		}
@@ -222,6 +218,12 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+	if body.Alert == nil {
+		logger.WarnContext(ctx, "not found alert in request body, maybe not webhook request", "text", body.Text, "org_name", body.OrgName, "event", body.Event)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, http.StatusText(http.StatusOK))
+		return
+	}
 	ctx = slogutils.With(
 		ctx,
 		"alert_id", body.Alert.ID,
@@ -229,7 +231,7 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 		"monitor", body.Alert.MonitorName,
 	)
 	logger.InfoContext(ctx, "parse request body as Mackerel webhook body")
-	if err := app.ProcessRules(ctx, &body); err != nil {
+	if err := app.ExecuteRules(ctx, &body); err != nil {
 		logger.ErrorContext(ctx, "failed process Mackerel webhook body", "error", err.Error())
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -239,25 +241,108 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, http.StatusText(http.StatusOK))
 }
 
-func (app *App) ProcessRules(ctx context.Context, body *WebhookBody) error {
-	if body.Alert.IsOpen {
-		slog.WarnContext(ctx, "alert is open, fill closed at now time")
-		body.Alert.ClosedAt = flextime.Now().Unix()
-	}
+func (app *App) ExecuteRules(ctx context.Context, body *WebhookBody) error {
 	slog.InfoContext(ctx, "start process rules")
 	matchCount := 0
+	evalCtx, err := app.NewEvalContext(body)
+	if err != nil {
+		return fmt.Errorf("failed build eval context: %w", err)
+	}
 	for _, rule := range app.rules {
-		if !rule.Match(body) {
+		if !rule.Match(evalCtx) {
 			continue
 		}
 		slog.InfoContext(ctx, "match rule", "rule", rule.Name())
 		matchCount++
-		if err := rule.Render(ctx, app.evalCtx.NewChild(), body); err != nil {
+		if err := app.ExecuteRule(ctx, evalCtx, rule, body); err != nil {
 			return fmt.Errorf("failed process Mackerel webhook body:%s: %w", rule.Name(), err)
 		}
 	}
 	slog.InfoContext(ctx, "finish process rules", "matched_rule_count", matchCount)
 	return nil
+}
+
+func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule *Rule, body *WebhookBody) error {
+	ctx = slogutils.With(ctx, "rule_name", rule.Name())
+	dependsOn := rule.DependsOnQueries()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var errs []error
+	for _, queryFQN := range dependsOn {
+		query, ok := app.queries[queryFQN]
+		if !ok {
+			errs = append(errs, fmt.Errorf("query not found %q on %s", queryFQN, rule.Name()))
+			continue
+		}
+		mu.Lock()
+		evalCtxQueryVariables := &provider.EvalContextQueryVariables{
+			FQN:    queryFQN,
+			Status: "running",
+		}
+		var err error
+		evalCtx, err = provider.WithQury(evalCtx, evalCtxQueryVariables)
+		mu.Unlock()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", queryFQN, rule.Name(), err))
+			continue
+		}
+		wg.Add(1)
+		go func(v *provider.EvalContextQueryVariables, query provider.Query) {
+			defer func() {
+				wg.Done()
+			}()
+			egctxWithQueryName := slogutils.With(
+				ctx,
+				"query", v.FQN,
+			)
+			slog.InfoContext(egctxWithQueryName, "start run query")
+			result, err := query.Run(egctxWithQueryName, evalCtx)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				var diags hcl.Diagnostics
+				slog.DebugContext(
+					egctxWithQueryName,
+					"failed run query",
+					"error", err.Error(),
+					"errType", fmt.Sprintf("%T", err),
+				)
+				if errors.As(err, &diags) {
+					app.diagWriter.WriteDiagnostics(diags)
+				}
+				errs = append(errs, err)
+				slog.WarnContext(egctxWithQueryName, "failed run query", "reason", err.Error())
+				v.Status = "failed"
+				v.Error = err.Error()
+				evalCtx, err = provider.WithQury(evalCtx, v)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
+				}
+				return
+			}
+			v.Status = "success"
+			v.Result = result
+			evalCtx, err = provider.WithQury(evalCtx, v)
+			if err != nil {
+				slog.ErrorContext(egctxWithQueryName, "failed marshal query result", "error", err.Error())
+				errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
+			}
+			if err := rule.Execute(ctx, evalCtx); err != nil {
+				slog.ErrorContext(egctxWithQueryName, "failed execute rule", "error", err.Error())
+				errs = append(errs, err)
+				return
+			}
+			slog.InfoContext(egctxWithQueryName, "end run query")
+		}(evalCtxQueryVariables, query)
+	}
+	wg.Wait()
+	if len(errs) > 0 {
+		return fmt.Errorf("failed process rule %q: %w", rule.Name(), errors.New("query failed"))
+	}
+	if len(dependsOn) > 0 {
+		return nil
+	}
+	return rule.Execute(ctx, evalCtx)
 }
 
 func (app *App) EnableBasicAuth() bool {

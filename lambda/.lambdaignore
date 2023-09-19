@@ -5,3 +5,4 @@ function.json
 *.tf
 .terraform*
 *_dummy.zip
+*.sh

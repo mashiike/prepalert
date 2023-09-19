@@ -2,17 +2,16 @@ package prepalert_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mackerelio/mackerel-client-go"
-	"github.com/mashiike/hclconfig"
 	"github.com/mashiike/hclutil"
 	"github.com/mashiike/prepalert"
 	"github.com/mashiike/prepalert/mock"
+	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
 	"go.uber.org/mock/gomock"
@@ -162,55 +161,22 @@ func TestMackerelService__NewEmulatedWebhookBody__HostMetrics(t *testing.T) {
 	svc := prepalert.NewMackerelService(client)
 	actual, err := svc.NewEmulatedWebhookBody(context.Background(), "xxxxxxxxxxx")
 	require.NoError(t, err)
-	expected := `{
-		"orgName": "test-org",
-		"event": "alert",
-		"alert": {
-		  "id": "xxxxxxxxxxx",
-		  "url": "https://mackerel.io/orgs/test-org/alerts/xxxxxxxxxxx",
-		  "openedAt": 1691323531,
-		  "closedAt": 1691323831,
-		  "createdAt": 1691323531000,
-		  "status": "ok",
-		  "isOpen": false,
-		  "trigger": "monitor",
-		  "monitorName": "test-monitor",
-		  "metricLabel": "custom.host.metric",
-		  "metricValue": 0.5,
-		  "warningThreshold": 5,
-		  "monitorOperator": ">",
-		  "duration": 3
-		},
-		"memo": "",
-		"host": {
-		  "name": "test-instance",
-		  "memo": "",
-		  "isRetired": false,
-		  "id": "zzzzzzzzzzz",
-		  "url": "https://mackerel.io/orgs/test-org/hosts/zzzzzzzzzzz",
-		  "status": "working",
-		  "roles": [
-			{
-			  "fullname": "prod: Instance",
-			  "serviceName": "prod",
-			  "roleName": "Instance",
-			  "serviceUrl": "https://mackerel.io/orgs/test-org/services/prod",
-			  "roleUrl": "https://mackerel.io/orgs/test-org/services/prod#role=Instance"
-			}
-		  ]
-		},
-		"imageUrl": null
-	  }`
-	bs, err := json.Marshal(actual)
-	require.NoError(t, err)
-	require.JSONEq(t, expected, string(bs))
+	g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
+	g.AssertJson(t, "mkr_svc__emulated_webhook_body", actual)
+}
+
+func TestMackerelService_NewExampleWebhookBody(t *testing.T) {
+	svc := prepalert.NewMackerelService(nil)
+	actual := svc.NewExampleWebhookBody()
+	g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
+	g.AssertJson(t, "mkr_svc__example_webhook_body", actual)
 }
 
 func TestWebnookBody__MarshalCTYValues(t *testing.T) {
-	body := LoadJSON[prepalert.WebhookBody](t, "testdata/event.json")
+	body := LoadJSON[prepalert.WebhookBody](t, "example_webhook.json")
 	expr, diags := hclsyntax.ParseExpression([]byte("jsonencode(test_event)"), "test.hcl", hcl.InitialPos)
 	require.False(t, diags.HasErrors())
-	ctx := hclconfig.NewEvalContext()
+	ctx := hclutil.NewEvalContext()
 	ctx = ctx.NewChild()
 	testEvent, err := hclutil.MarshalCTYValue(body)
 	require.NoError(t, err)
