@@ -198,7 +198,7 @@ func (app *App) SetupS3Buckend(body hcl.Body) hcl.Diagnostics {
 	if b.ObjectKeyTemplate == nil {
 		var parseDiags hcl.Diagnostics
 		var expr hcl.Expression
-		expr, parseDiags = hclsyntax.ParseExpression([]byte(`strftime("%Y/%m/%d/%H/", event.alert.opened_at)`), "default_object_key_template.hcl", hcl.InitialPos)
+		expr, parseDiags = hclsyntax.ParseExpression([]byte(`strftime("%Y/%m/%d/%H/", webhook.alert.opened_at)`), "default_object_key_template.hcl", hcl.InitialPos)
 		diags = append(diags, parseDiags...)
 		b.ObjectKeyTemplate = &expr
 	}
