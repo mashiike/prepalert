@@ -149,7 +149,6 @@ func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID 
 		Event:   "alert",
 		Alert: &Alert{
 			OpenedAt:        alert.OpenedAt,
-			ClosedAt:        alert.ClosedAt,
 			CreatedAt:       alert.OpenedAt * 1000,
 			Duration:        0,
 			IsOpen:          !strings.EqualFold(alert.Status, "ok"),
@@ -162,6 +161,10 @@ func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID 
 			ID:              alert.ID,
 			URL:             fmt.Sprintf("https://mackerel.io/orgs/%s/alerts/%s", org.Name, alert.ID),
 		},
+	}
+	if alert.ClosedAt != 0 {
+		body.Alert.ClosedAt = &alert.ClosedAt
+		body.Alert.Duration = alert.ClosedAt - alert.OpenedAt
 	}
 	switch m := monitor.(type) {
 	case *mackerel.MonitorConnectivity:
@@ -256,7 +259,7 @@ type Service struct {
 
 type Alert struct {
 	OpenedAt          int64    `json:"openedAt" cty:"opened_at"`
-	ClosedAt          int64    `json:"closedAt" cty:"closed_at"`
+	ClosedAt          *int64   `json:"closedAt" cty:"closed_at"`
 	CreatedAt         int64    `json:"createdAt" cty:"created_at"`
 	CriticalThreshold *float64 `json:"criticalThreshold,omitempty" cty:"critical_threshold,omitempty"`
 	Duration          int64    `json:"duration" cty:"duration"`

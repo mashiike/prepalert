@@ -31,7 +31,7 @@
   },
   "webhook": {
     "alert": {
-      "closed_at": 1473130212,
+      "closed_at": 1473130092,
       "created_at": 1473129912693,
       "critical_threshold": 1.9588528112516932,
       "duration": 5,

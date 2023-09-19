@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/Songmu/flextime"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
@@ -243,10 +242,6 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) ExecuteRules(ctx context.Context, body *WebhookBody) error {
-	if body.Alert.IsOpen {
-		slog.WarnContext(ctx, "alert is open, fill closed at now time")
-		body.Alert.ClosedAt = flextime.Now().Unix()
-	}
 	slog.InfoContext(ctx, "start process rules")
 	matchCount := 0
 	evalCtx, err := app.NewEvalContext(body)

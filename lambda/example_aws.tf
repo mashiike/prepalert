@@ -23,6 +23,11 @@ resource "aws_iam_policy" "prepalert" {
   policy = data.aws_iam_policy_document.prepalert.json
 }
 
+resource "aws_cloudwatch_log_group" "prepalert" {
+  name              = "/aws/lambda/prepalert"
+  retention_in_days = 7
+}
+
 resource "aws_iam_role_policy_attachment" "prepalert" {
   role       = aws_iam_role.prepalert.name
   policy_arn = aws_iam_policy.prepalert.arn
@@ -62,6 +67,9 @@ data "aws_iam_policy_document" "prepalert" {
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents",
+      "logs:GetQueryResults",
+      "logs:StartQuery",
+      "logs:StopQuery",
     ]
     resources = ["*"]
   }
@@ -70,7 +78,7 @@ data "aws_iam_policy_document" "prepalert" {
 resource "aws_sqs_queue" "prepalert" {
   name                       = "prepalert"
   message_retention_seconds  = 86400
-  visibility_timeout_seconds = 900
+  visibility_timeout_seconds = 30
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.prepalert-dlq.arn
     maxReceiveCount     = 3

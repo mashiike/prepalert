@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/Songmu/flextime"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclutil"
@@ -42,31 +42,6 @@ func NewRule(svcFunc func() *MackerelService, backend Backend, ruleName string) 
 		ruleName:         ruleName,
 		dependsOnQueries: make(map[string]struct{}),
 	}
-}
-
-var dummyWebhook = &WebhookBody{
-	Alert: &Alert{
-		ID:                "dummy",
-		URL:               "https://example.com",
-		Status:            "ok",
-		OpenedAt:          0,
-		ClosedAt:          0,
-		CreatedAt:         0,
-		CriticalThreshold: aws.Float64(0),
-		WarningThreshold:  aws.Float64(0),
-		Duration:          0,
-		IsOpen:            false,
-		MonitorName:       "dummy",
-	},
-	Host: &Host{},
-	Service: &Service{
-		Name: "dummy",
-		Roles: []*Role{
-			{
-				Fullname: "dummy",
-			},
-		},
-	},
 }
 
 func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagnostics {
@@ -470,11 +445,15 @@ func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
 				description = description[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
 			}
 		}
+		to := flextime.Now().Unix()
+		if body.Alert.ClosedAt != nil {
+			to = *body.Alert.ClosedAt
+		}
 		annotation := &mackerel.GraphAnnotation{
 			Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name()),
 			Description: description,
 			From:        body.Alert.OpenedAt,
-			To:          body.Alert.ClosedAt,
+			To:          to,
 			Service:     rule.service,
 		}
 		wg.Add(1)

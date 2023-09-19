@@ -2,6 +2,6 @@
   "title": "prepalert alert_id=2bj... rule=alb_target_5xx",
   "description": "related alert: https://mackerel.io/orgs/.../alerts/2bj...\n\nthis is access_logs:\n+----------+---------+------+\n|   SIGN   | REASON  | NAME |\n+----------+---------+------+\n| The Good | The Bad | A    |\n| The Ugly |         | B    |\n+----------+---------+------+\n\n",
   "from": 1473129912,
-  "to": 1473130212,
+  "to": 1473130092,
   "service": "prod"
 }

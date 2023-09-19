@@ -12,17 +12,33 @@ prepalert {
   }
 }
 
+provider "cloudwatch_logs_insights" {
+  region = "ap-northeast-1"
+}
+
+query "cloudwatch_logs_insights" "lambda" {
+  log_group_names = [
+    "/aws/lambda/prepalert",
+  ]
+  query      = "fields @timestamp, @message | limit 10"
+  start_time = webhook.alert.opened_at - duration("15m")
+  end_time   = coalesce(webhook.alert.closed_at, now())
+}
+
 locals {
-    default_message =  <<EOF
+  default_message = <<EOF
 How do you respond to alerts?
 Describe information about your alert response here.
 EOF
 }
 
 rule "simple" {
-    // always triggerd
-    when = true
-    update_alert {
-        memo = local.default_message
-    }
+  // always triggerd
+  when = true
+  update_alert {
+    memo = "${local.default_message}\n${result_to_jsonlines(query.cloudwatch_logs_insights.lambda)}"
+  }
+  post_graph_annotation {
+    service = "prepalert"
+  }
 }
