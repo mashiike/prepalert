@@ -325,9 +325,11 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 			evalCtx, err = provider.WithQury(evalCtx, v)
 			if err != nil {
 				slog.ErrorContext(egctxWithQueryName, "failed marshal query result", "error", err.Error())
+				err = app.UnwrapAndDumpDiagnoctics(err)
 				errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
 			}
 			if err := rule.Execute(ctx, evalCtx); err != nil {
+				err = app.UnwrapAndDumpDiagnoctics(err)
 				slog.ErrorContext(egctxWithQueryName, "failed execute rule", "error", err.Error())
 				errs = append(errs, err)
 				return
@@ -355,4 +357,13 @@ func (app *App) CheckBasicAuth(r *http.Request) bool {
 		return false
 	}
 	return clientID == app.webhookClientID && clientSecret == app.webhookClientSecret
+}
+
+func (app *App) UnwrapAndDumpDiagnoctics(err error) error {
+	var diags hcl.Diagnostics
+	if errors.As(err, &diags) {
+		app.diagWriter.WriteDiagnostics(diags)
+		return err
+	}
+	return err
 }

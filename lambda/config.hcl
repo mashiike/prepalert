@@ -25,18 +25,13 @@ query "cloudwatch_logs_insights" "lambda" {
   end_time   = coalesce(webhook.alert.closed_at, now())
 }
 
-locals {
-  default_message = <<EOF
-How do you respond to alerts?
-Describe information about your alert response here.
-EOF
-}
-
 rule "simple" {
   // always triggerd
   when = true
   update_alert {
-    memo = "${local.default_message}\n${result_to_jsonlines(query.cloudwatch_logs_insights.lambda)}"
+    memo = templatefile("./memo.tpl.md", {
+        lambda_logs = result_to_borderless(query.cloudwatch_logs_insights.lambda)
+    })
   }
   post_graph_annotation {
     service = "prepalert"

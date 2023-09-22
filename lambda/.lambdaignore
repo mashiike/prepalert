@@ -4,5 +4,6 @@ Makefile
 function.json
 *.tf
 .terraform*
+config.tf.example
 *_dummy.zip
 *.sh

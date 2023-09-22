@@ -316,22 +316,22 @@ func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
 	}
 	errs := make([]error, 0, 2)
 	if rule.UpdateAlertAction().Enable() {
-		if err := rule.UpdateAlertAction().Render(ctx, evalCtx, body); err != nil {
+		if err := rule.UpdateAlertAction().Execute(ctx, evalCtx, body); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if rule.PostGraphAnnotationAction().Enable() {
-		if err := rule.PostGraphAnnotationAction().Render(ctx, evalCtx, body); err != nil {
+		if err := rule.PostGraphAnnotationAction().Execute(ctx, evalCtx, body); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if len(errs) != 0 {
-		return fmt.Errorf("has %d errors", len(errs))
+		return errors.Join(errs...)
 	}
 	return nil
 }
 
-func (action *UpdateAlertAction) Render(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+func (action *UpdateAlertAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
 	memo, err := ExpressionToString(action.memoExpr, evalCtx)
 	if err != nil {
 		return fmt.Errorf("render memo: %w", err)
@@ -376,7 +376,7 @@ func (action *UpdateAlertAction) Render(ctx context.Context, evalCtx *hcl.EvalCo
 	return nil
 }
 
-func (action *PostGraphAnnotationAction) Render(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+func (action *PostGraphAnnotationAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
 	descriptin := fmt.Sprintf("related alert: %s\n", body.Alert.URL)
 	if action.additionalDescriptionExpr != nil {
 		additionalDescription, err := ExpressionToString(action.additionalDescriptionExpr, evalCtx)
