@@ -17,6 +17,10 @@ EOF
   }
   post_graph_annotation {
     service = "prod"
+    additional_description = <<EOF
+this is access_logs:
+${result_to_table(query.redshift_data.access_logs)}
+EOF
   }
 }
 

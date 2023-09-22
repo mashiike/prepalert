@@ -346,11 +346,8 @@ func (app *App) decodeQueryBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 
 func (app *App) decodeRuleBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 	var diags hcl.Diagnostics
-	mkrSvcFunc := func() *MackerelService {
-		return app.mkrSvc
-	}
 	for _, block := range blocks {
-		rule := NewRule(mkrSvcFunc, app.backend, block.Labels[0])
+		rule := app.NewRule(block.Labels[0])
 		diags = diags.Extend(rule.DecodeBody(block.Body, app.evalCtx))
 		app.rules = append(app.rules, rule)
 	}
@@ -502,4 +499,21 @@ func (app *App) WithPrepalertFunctions(evalCtx *hcl.EvalContext) *hcl.EvalContex
 		}),
 	}
 	return child
+}
+
+func ExpressionToString(expr hcl.Expression, evalCtx *hcl.EvalContext) (string, error) {
+	value, diags := expr.Value(evalCtx)
+	if diags.HasErrors() {
+		return "", diags
+	}
+	if value.Type() != cty.String {
+		return "", errors.New("expr is not string")
+	}
+	if value.IsNull() {
+		return "", errors.New("expr is nil")
+	}
+	if !value.IsKnown() {
+		return "", errors.New("expr is unknown")
+	}
+	return value.AsString(), nil
 }

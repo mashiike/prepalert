@@ -6,41 +6,75 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
-	"sync/atomic"
 
 	"github.com/Songmu/flextime"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclutil"
 	"github.com/zclconf/go-cty/cty"
 )
 
 type Rule struct {
-	maxGraphAnnotationDescriptionSize *int
-	maxAlertMemoSize                  *int
-
-	svcFunc             func() *MackerelService
-	backend             Backend
+	app                 *App
 	ruleName            string
 	when                hcl.Expression
-	information         hcl.Expression
-	updateAlertMemo     bool
-	postGraphAnnotation bool
-	service             string
-	dependsOnQueries    map[string]struct{}
+	updateAlert         *UpdateAlertAction
+	postGraphAnnotation *PostGraphAnnotationAction
+}
+
+type UpdateAlertAction struct {
+	app              *App
+	ruleName         string
+	memoExpr         hcl.Expression
+	enable           bool
+	sizeLimit        *int
+	dependsOnQueries map[string]struct{}
+}
+
+type PostGraphAnnotationAction struct {
+	app                       *App
+	ruleName                  string
+	service                   string
+	additionalDescriptionExpr hcl.Expression
+	enable                    bool
+	dependsOnQueries          map[string]struct{}
 }
 
 const (
 	webhookHCLPrefix = "webhook"
 )
 
-func NewRule(svcFunc func() *MackerelService, backend Backend, ruleName string) *Rule {
+func (app *App) NewRule(ruleName string) *Rule {
 	return &Rule{
-		svcFunc:          svcFunc,
-		backend:          backend,
-		ruleName:         ruleName,
-		dependsOnQueries: make(map[string]struct{}),
+		app:      app,
+		ruleName: ruleName,
+		updateAlert: &UpdateAlertAction{
+			app:              app,
+			ruleName:         ruleName,
+			enable:           false,
+			dependsOnQueries: make(map[string]struct{}),
+		},
+		postGraphAnnotation: &PostGraphAnnotationAction{
+			app:              app,
+			ruleName:         ruleName,
+			enable:           false,
+			dependsOnQueries: make(map[string]struct{}),
+		},
+	}
+}
+
+func registerQueryFQNs(expr hcl.Expression, dependsOn map[string]struct{}) {
+	refarences := hclutil.VariablesReffarances(expr)
+	for _, ref := range refarences {
+		if !strings.HasPrefix(ref, "query.") {
+			continue
+		}
+		parts := strings.Split(ref, ".")
+		if len(parts) < 3 {
+			continue
+		}
+		dependsOn[strings.Join(parts[:3], ".")] = struct{}{}
 	}
 }
 
@@ -80,7 +114,7 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 		switch attr.Name {
 		case "when":
 			rule.when = attr.Expr
-			v, err := hclutil.MarshalCTYValue(rule.svcFunc().NewExampleWebhookBody())
+			v, err := hclutil.MarshalCTYValue(rule.app.MackerelService().NewExampleWebhookBody())
 			if err != nil {
 				diags = diags.Append(&hcl.Diagnostic{
 					Severity: hcl.DiagError,
@@ -105,163 +139,123 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 	for _, block := range content.Blocks {
 		switch block.Type {
 		case "update_alert":
-			attrs, attrDiags := block.Body.JustAttributes()
-			diags = diags.Extend(attrDiags)
-			if attrDiags.HasErrors() {
-				continue
-			}
-			if memoAttr, ok := attrs["memo"]; ok {
-				rule.information = memoAttr.Expr
-			} else {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  "update_alert block must have memo attribute",
-					Subject:  block.DefRange.Ptr(),
-				})
-				continue
-			}
-			for _, attr := range attrs {
-				switch attr.Name {
-				case "max_size":
-					v, err := attr.Expr.Value(evalCtx)
-					if err != nil {
-						diags = diags.Append(&hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "failed evaluate max_size attribute",
-							Detail:   err.Error(),
-							Subject:  attr.Range.Ptr(),
-						})
-						continue
-					}
-					var maxSize int
-					if err := hclutil.UnmarshalCTYValue(v, &maxSize); err != nil {
-						diags = diags.Append(&hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "failed unmarshal max_size attribute",
-							Detail:   err.Error(),
-							Subject:  attr.Range.Ptr(),
-						})
-						continue
-					}
-					if maxSize <= 0 || maxSize > maxMemoSize {
-						diags = diags.Append(&hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "max_size attribute must be positive integer",
-							Detail:   fmt.Sprintf("max_size: %d", maxSize),
-							Subject:  attr.Range.Ptr(),
-						})
-						continue
-					}
-					rule.maxAlertMemoSize = &maxSize
-				case "memo":
-				default:
-					diags = diags.Append(&hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  fmt.Sprintf("unknown attribute %q", attr.Name),
-						Subject:  attr.Range.Ptr(),
-					})
-				}
-			}
-			rule.updateAlertMemo = true
-			refarences := hclutil.VariablesReffarances(rule.information)
-			for _, ref := range refarences {
-				if !strings.HasPrefix(ref, "query.") {
-					continue
-				}
-				parts := strings.Split(ref, ".")
-				if len(parts) < 3 {
-					continue
-				}
-				rule.dependsOnQueries[strings.Join(parts[:3], ".")] = struct{}{}
-			}
+			diags = diags.Extend(rule.updateAlert.DecodeBody(block.Body, evalCtx))
 		case "post_graph_annotation":
-			attrs, attrDiags := block.Body.JustAttributes()
-			diags = diags.Extend(attrDiags)
-			if attrDiags.HasErrors() {
-				continue
-			}
-			if serviceAttr, ok := attrs["service"]; ok {
-				serviceVal, err := serviceAttr.Expr.Value(evalCtx)
-				if err != nil {
-					diags = diags.Append(&hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  "failed evaluate service attribute",
-						Detail:   err.Error(),
-						Subject:  serviceAttr.Range.Ptr(),
-					})
-					continue
-				}
-				if err := hclutil.UnmarshalCTYValue(serviceVal, &rule.service); err != nil {
-					diags = diags.Append(&hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  "failed unmarshal service attribute",
-						Detail:   err.Error(),
-						Subject:  serviceAttr.Range.Ptr(),
-					})
-					continue
-				}
-				rule.postGraphAnnotation = true
-			} else {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  "post_graph_annotation block must have service attribute",
-					Subject:  block.DefRange.Ptr(),
-				})
-				continue
-			}
-			for _, attr := range attrs {
-				switch attr.Name {
-				case "max_size":
-					v, err := attr.Expr.Value(evalCtx)
-					if err != nil {
-						diags = diags.Append(&hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "failed evaluate max_size attribute",
-							Detail:   err.Error(),
-							Subject:  attr.Range.Ptr(),
-						})
-						continue
-					}
-					var maxSize int
-					if err := hclutil.UnmarshalCTYValue(v, &maxSize); err != nil {
-						diags = diags.Append(&hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "failed unmarshal max_size attribute",
-							Detail:   err.Error(),
-							Subject:  attr.Range.Ptr(),
-						})
-						continue
-					}
-					if maxSize <= 0 || maxSize > maxDescriptionSize {
-						diags = diags.Append(&hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "max_size attribute must be positive integer",
-							Detail:   fmt.Sprintf("max_size: %d", maxSize),
-							Subject:  attr.Range.Ptr(),
-						})
-						continue
-					}
-					rule.maxGraphAnnotationDescriptionSize = &maxSize
-				case "service":
-				default:
-					diags = diags.Append(&hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  fmt.Sprintf("unknown attribute %q", attr.Name),
-						Subject:  attr.Range.Ptr(),
-					})
-				}
-			}
+			diags = diags.Extend(rule.postGraphAnnotation.DecodeBody(block.Body, evalCtx))
 		}
 	}
 	return nil
 }
 
+func (action *UpdateAlertAction) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagnostics {
+	attrs, diags := body.JustAttributes()
+	if diags.HasErrors() {
+		return diags
+	}
+	for _, attr := range attrs {
+		switch attr.Name {
+		case "max_size":
+			var maxSize int
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &maxSize))
+			if diags.HasErrors() {
+				continue
+			}
+			action.sizeLimit = &maxSize
+		case "memo":
+			action.memoExpr = attr.Expr
+			action.enable = true
+		default:
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  fmt.Sprintf("unknown attribute %q", attr.Name),
+				Subject:  attr.Range.Ptr(),
+			})
+		}
+	}
+	if !action.enable {
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "update_alert block must have memo attribute",
+			Subject:  body.MissingItemRange().Ptr(),
+		})
+		return diags
+	}
+	registerQueryFQNs(action.memoExpr, action.dependsOnQueries)
+	return diags
+}
+
+func (action *PostGraphAnnotationAction) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagnostics {
+	attrs, diags := body.JustAttributes()
+	if diags.HasErrors() {
+		return diags
+	}
+	for _, attr := range attrs {
+		switch attr.Name {
+		case "service":
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &action.service))
+			if diags.HasErrors() {
+				return diags
+			}
+			action.enable = true
+		case "additional_description":
+			action.additionalDescriptionExpr = attr.Expr
+			registerQueryFQNs(attr.Expr, action.dependsOnQueries)
+		default:
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  fmt.Sprintf("unknown attribute %q", attr.Name),
+				Subject:  attr.Range.Ptr(),
+			})
+		}
+	}
+	if !action.enable {
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "post_graph_annotation block must have service attribute",
+			Subject:  body.MissingItemRange().Ptr(),
+		})
+		return diags
+	}
+	return diags
+}
+
 func (rule *Rule) DependsOnQueries() []string {
-	queries := make([]string, 0, len(rule.dependsOnQueries))
-	for query := range rule.dependsOnQueries {
+	m := make(map[string]struct{})
+	for _, q := range rule.UpdateAlertAction().DependsOnQueries() {
+		m[q] = struct{}{}
+	}
+	for _, q := range rule.PostGraphAnnotationAction().DependsOnQueries() {
+		m[q] = struct{}{}
+	}
+	queries := make([]string, 0, len(m))
+	for query := range m {
 		queries = append(queries, query)
 	}
 	return queries
+}
+
+func (action *UpdateAlertAction) DependsOnQueries() []string {
+	queries := make([]string, 0, len(action.dependsOnQueries))
+	for query := range action.dependsOnQueries {
+		queries = append(queries, query)
+	}
+	return queries
+}
+
+func (action *PostGraphAnnotationAction) DependsOnQueries() []string {
+	queries := make([]string, 0, len(action.dependsOnQueries))
+	for query := range action.dependsOnQueries {
+		queries = append(queries, query)
+	}
+	return queries
+}
+
+func (rule *Rule) UpdateAlertAction() *UpdateAlertAction {
+	return rule.updateAlert
+}
+
+func (rule *Rule) PostGraphAnnotationAction() *PostGraphAnnotationAction {
+	return rule.postGraphAnnotation
 }
 
 func (rule *Rule) Match(evalCtx *hcl.EvalContext) bool {
@@ -307,61 +301,12 @@ func (rule *Rule) Name() string {
 	return rule.ruleName
 }
 
-func (rule *Rule) PostGraphAnnotation() bool {
-	return rule.postGraphAnnotation
+func (action *UpdateAlertAction) Enable() bool {
+	return action.enable
 }
 
-func (rule *Rule) UpdateAlertMemo() bool {
-	return rule.updateAlertMemo
-}
-
-const (
-	maxDescriptionSize = 1024
-	maxMemoSize        = 80 * 1000
-	defualtMaxMemoSize = 1024
-)
-
-func (rule *Rule) MaxGraphAnnotationDescriptionSize() int {
-	if rule.maxGraphAnnotationDescriptionSize == nil {
-		return maxDescriptionSize
-	}
-	if *rule.maxGraphAnnotationDescriptionSize > maxDescriptionSize {
-		return maxDescriptionSize
-	}
-	if *rule.maxGraphAnnotationDescriptionSize <= 0 {
-		return 100
-	}
-	return *rule.maxGraphAnnotationDescriptionSize
-}
-
-func (rule *Rule) MaxAlertMemoSize() int {
-	if rule.maxAlertMemoSize == nil {
-		return defualtMaxMemoSize
-	}
-	if *rule.maxAlertMemoSize > maxMemoSize {
-		return maxMemoSize
-	}
-	if *rule.maxAlertMemoSize <= 0 {
-		return 100
-	}
-	return *rule.maxAlertMemoSize
-}
-
-func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext) (string, error) {
-	value, diags := rule.information.Value(evalCtx)
-	if diags.HasErrors() {
-		return "", diags
-	}
-	if value.Type() != cty.String {
-		return "", errors.New("information is not string")
-	}
-	if value.IsNull() {
-		return "", errors.New("information is nil")
-	}
-	if !value.IsKnown() {
-		return "", errors.New("information is unknown")
-	}
-	return value.AsString(), nil
+func (action *PostGraphAnnotationAction) Enable() bool {
+	return action.enable
 }
 
 func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
@@ -369,109 +314,91 @@ func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
 	if err != nil {
 		return err
 	}
-	info, err := rule.Render(ctx, evalCtx)
-	if err != nil {
-		return fmt.Errorf("render information: %w", err)
+	errs := make([]error, 0, 2)
+	if rule.UpdateAlertAction().Enable() {
+		if err := rule.UpdateAlertAction().Execute(ctx, evalCtx, body); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	slog.DebugContext(ctx, "dump infomation", "infomation", info)
-	description := fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, info)
-	showDetailsURL, uploaded, err := rule.backend.Upload(
+	if rule.PostGraphAnnotationAction().Enable() {
+		if err := rule.PostGraphAnnotationAction().Execute(ctx, evalCtx, body); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) != 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func (action *UpdateAlertAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+	memo, err := ExpressionToString(action.memoExpr, evalCtx)
+	if err != nil {
+		return fmt.Errorf("render memo: %w", err)
+	}
+	slog.DebugContext(ctx, "dump memo", "memo", memo)
+	uploadBody := strings.NewReader(fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, memo))
+	fullTextURL, uploaded, err := action.app.Backend().Upload(
 		ctx, evalCtx,
-		fmt.Sprintf("%s_%s", body.Alert.ID, rule.Name()),
-		strings.NewReader(description),
+		fmt.Sprintf("%s_%s", body.Alert.ID, action.ruleName),
+		uploadBody,
 	)
 	if err != nil {
 		return fmt.Errorf("upload to backend:%w", err)
 	}
-	var abbreviatedMessage string = "\n..."
-	var wg sync.WaitGroup
-	var errNum int32
-	if rule.UpdateAlertMemo() {
-		memo := info
-		maxSize := rule.MaxAlertMemoSize()
-		if len(memo) > maxSize {
-			if uploaded {
-				slog.WarnContext(
-					ctx,
-					"alert memo is too long",
-					"length", len(memo),
-					"show_details_url", showDetailsURL,
-				)
-			} else {
-				slog.WarnContext(
-					ctx,
-					"alert memo is too long",
-					"length", len(memo),
-					"full_memo", memo,
-				)
-			}
-			if len(abbreviatedMessage) >= maxSize {
-				memo = abbreviatedMessage[0:maxSize]
-			} else {
-				memo = memo[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
-			}
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := rule.svcFunc().UpdateAlertMemo(ctx, body.Alert.ID, memo); err != nil {
-				slog.ErrorContext(ctx, "failed update alert memo", "error", err.Error())
-				atomic.AddInt32(&errNum, 1)
-			}
-		}()
+	if uploaded {
+		slog.DebugContext(ctx, "uploaded to backend", "full_text_url", fullTextURL)
+		memo = fmt.Sprintf("Full Text URL: %s\n\n%s", fullTextURL, memo)
 	}
 
-	if rule.PostGraphAnnotation() {
-		maxSize := rule.MaxGraphAnnotationDescriptionSize()
-		if len(description) > maxSize {
-			if uploaded {
-				slog.WarnContext(
-					ctx,
-					"graph anotation description is too long",
-					"length", len(description),
-					"show_details_url", showDetailsURL,
-				)
-			} else {
-				slog.WarnContext(
-					ctx,
-					"graph anotation description is too long",
-					"length", len(description),
-					"full_description", description,
-				)
-			}
-			if len(abbreviatedMessage) >= maxSize {
-				description = abbreviatedMessage[0:maxSize]
-			} else {
-				description = description[0:maxSize-len(abbreviatedMessage)] + abbreviatedMessage
-			}
+	if action.sizeLimit != nil && len(memo) > *action.sizeLimit {
+		if uploaded {
+			slog.WarnContext(
+				ctx,
+				"alert memo is too long",
+				"length", len(memo),
+				"full_text_url", fullTextURL,
+			)
+		} else {
+			slog.WarnContext(
+				ctx,
+				"alert memo is too long",
+				"length", len(memo),
+				"full_memo", memo,
+			)
 		}
-		to := flextime.Now().Unix()
-		if body.Alert.ClosedAt != nil {
-			to = *body.Alert.ClosedAt
-		}
-		annotation := &mackerel.GraphAnnotation{
-			Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, rule.Name()),
-			Description: description,
-			From:        body.Alert.OpenedAt,
-			To:          to,
-			Service:     rule.service,
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := rule.svcFunc().PostGraphAnnotation(ctx, annotation); err != nil {
-				slog.ErrorContext(
-					ctx,
-					"failed post graph annotation",
-					"error", err.Error(),
-				)
-				atomic.AddInt32(&errNum, 1)
-			}
-		}()
+		memo = triming(memo, *action.sizeLimit, "\n...")
 	}
-	wg.Wait()
-	if errNum != 0 {
-		return fmt.Errorf("has %d errors", errNum)
+	err = action.app.MackerelService().UpdateAlertMemo(ctx, body.Alert.ID, "Prepalert rule."+action.ruleName, memo)
+	if err != nil {
+		return fmt.Errorf("update alert memo: %w", err)
+	}
+	return nil
+}
+
+func (action *PostGraphAnnotationAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+	descriptin := fmt.Sprintf("related alert: %s\n", body.Alert.URL)
+	if action.additionalDescriptionExpr != nil {
+		additionalDescription, err := ExpressionToString(action.additionalDescriptionExpr, evalCtx)
+		if err != nil {
+			return fmt.Errorf("render additional_description: %w", err)
+		}
+		descriptin += additionalDescription
+	}
+	slog.DebugContext(ctx, "dump description", "description", descriptin)
+	to := flextime.Now().Unix()
+	if body.Alert.ClosedAt != nil {
+		to = *body.Alert.ClosedAt
+	}
+	err := action.app.MackerelService().PostGraphAnnotation(ctx, &mackerel.GraphAnnotation{
+		Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, action.ruleName),
+		Description: descriptin,
+		From:        body.Alert.OpenedAt,
+		To:          to,
+		Service:     action.service,
+	})
+	if err != nil {
+		return fmt.Errorf("post graph annotation: %w", err)
 	}
 	return nil
 }

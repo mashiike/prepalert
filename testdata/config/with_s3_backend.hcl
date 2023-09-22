@@ -6,6 +6,7 @@ prepalert {
     # Upload information about alerts to S3 and set up a simplified view of the uploaded information.
     bucket_name                 = "prepalert-information"
     object_key_prefix           = "alerts/"
+    object_key_template         = "${webhook.org_name}/${webhook.alert.id}/"
     viewer_base_url             = "http://localhost:8080"
     viewer_google_client_id     = env("GOOGLE_CLIENT_ID", "")
     viewer_google_client_secret = env("GOOGLE_CLIENT_SECRET", "")

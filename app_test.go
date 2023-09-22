@@ -12,6 +12,7 @@ import (
 
 	"github.com/Songmu/flextime"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/canyon"
@@ -80,7 +81,13 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 		defer ctrl.Finish()
 
 		client := mock.NewMockMackerelClient(ctrl)
-		expectedMemo := "How do you respond to alerts?\nDescribe information about your alert response here.\n"
+		expectedMemo := "this is a pen\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n"
+		client.EXPECT().GetAlert("2bj...").Return(
+			&mackerel.Alert{
+				ID:   "2bj...",
+				Memo: "this is a pen",
+			}, nil,
+		).Times(1)
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
 				require.Equal(t, "2bj...", alertID)
@@ -168,13 +175,18 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 			},
 		)
 		client := mock.NewMockMackerelClient(ctrl)
-		expectedMemo := "How do you respond to alerts?\nDescribe information about your alert response here.\n"
+		client.EXPECT().GetAlert("2bj...").Return(
+			&mackerel.Alert{
+				ID:   "2bj...",
+				Memo: "this is a pen\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n",
+			}, nil,
+		).Times(1)
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
 				require.Equal(t, "2bj...", alertID)
 				g.Assert(t, "with_query_as_worker__updated_alert_memo", []byte(param.Memo))
 				return &mackerel.UpdateAlertResponse{
-					Memo: expectedMemo,
+					Memo: param.Memo,
 				}, nil
 			},
 		).Times(1)
@@ -224,6 +236,43 @@ func TestAppLoadConfig__WithS3Backend(t *testing.T) {
 	require.True(t, backend.EnableGoogleAuth())
 	rules := app.Rules()
 	require.Len(t, rules, 1)
+
+	t.Run("AsWorker", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
+		mockS3Client.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, param *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+				g.AssertJson(t, "with_s3backend_as_worker__put_object_input", param)
+				return &s3.PutObjectOutput{}, nil
+			},
+		).Times(1)
+
+		client := mock.NewMockMackerelClient(ctrl)
+		client.EXPECT().GetAlert("2bj...").Return(
+			&mackerel.Alert{
+				ID:        "2bj...",
+				MonitorID: "4gx...",
+				Memo:      "",
+			}, nil,
+		).Times(1)
+		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
+				require.Equal(t, "2bj...", alertID)
+				g.Assert(t, "with_s3backend_as_worker__updated_alert_memo", []byte(param.Memo))
+				return &mackerel.UpdateAlertResponse{
+					Memo: param.Memo,
+				}, nil
+			},
+		).Times(1)
+		app.SetMackerelClient(client)
+		h := canyontest.AsWorker(app)
+		r := httptest.NewRequest(http.MethodPost, "/", LoadFileAsReader(t, "example_webhook.json"))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		resp := w.Result()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	})
 }
 
 func TestAppLoadConfig__Dynamic(t *testing.T) {
@@ -267,7 +316,7 @@ func TestAppLoadConfig__Invalid(t *testing.T) {
 	}
 }
 
-func TestAppLoadConfig__When_Is_Lit(t *testing.T) {
+func TestAppLoadConfig__When_Is_List(t *testing.T) {
 	app, err := prepalert.New("dummy-api-key")
 	require.NoError(t, err)
 	err = app.LoadConfig("testdata/config/when_is_list.hcl")
@@ -285,14 +334,14 @@ func TestAppLoadConfig__When_Is_Lit(t *testing.T) {
 		defer ctrl.Finish()
 
 		client := mock.NewMockMackerelClient(ctrl)
-		expectedMemo := "How do you respond to alerts?\nDescribe information about your alert response here.\n"
+		expectedMemo := "How do you respond to alerts?\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n"
 		client.EXPECT().GetAlert("2bj...").Return(
 			&mackerel.Alert{
 				ID:        "2bj...",
 				MonitorID: "4gx...",
 				Memo:      "How do you respond to alerts?",
 			}, nil,
-		).Times(1)
+		).Times(2)
 		client.EXPECT().GetMonitor("4gx...").Return(
 			&mackerel.MonitorServiceMetric{
 				ID:   "4gx...",
