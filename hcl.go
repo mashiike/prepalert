@@ -503,3 +503,20 @@ func (app *App) WithPrepalertFunctions(evalCtx *hcl.EvalContext) *hcl.EvalContex
 	}
 	return child
 }
+
+func ExpressionToString(expr hcl.Expression, evalCtx *hcl.EvalContext) (string, error) {
+	value, diags := expr.Value(evalCtx)
+	if diags.HasErrors() {
+		return "", diags
+	}
+	if value.Type() != cty.String {
+		return "", errors.New("expr is not string")
+	}
+	if value.IsNull() {
+		return "", errors.New("expr is nil")
+	}
+	if !value.IsKnown() {
+		return "", errors.New("expr is unknown")
+	}
+	return value.AsString(), nil
+}

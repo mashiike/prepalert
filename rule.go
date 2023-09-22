@@ -347,29 +347,12 @@ func (rule *Rule) MaxAlertMemoSize() int {
 	return *rule.maxAlertMemoSize
 }
 
-func (rule *Rule) Render(ctx context.Context, evalCtx *hcl.EvalContext) (string, error) {
-	value, diags := rule.information.Value(evalCtx)
-	if diags.HasErrors() {
-		return "", diags
-	}
-	if value.Type() != cty.String {
-		return "", errors.New("information is not string")
-	}
-	if value.IsNull() {
-		return "", errors.New("information is nil")
-	}
-	if !value.IsKnown() {
-		return "", errors.New("information is unknown")
-	}
-	return value.AsString(), nil
-}
-
 func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
 	body, err := WebhookFromEvalContext(evalCtx)
 	if err != nil {
 		return err
 	}
-	info, err := rule.Render(ctx, evalCtx)
+	info, err := ExpressionToString(rule.information, evalCtx)
 	if err != nil {
 		return fmt.Errorf("render information: %w", err)
 	}
