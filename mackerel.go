@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mackerelio/mackerel-client-go"
@@ -26,6 +27,7 @@ type MackerelClient interface {
 }
 
 type MackerelService struct {
+	mu     sync.Mutex
 	client MackerelClient
 }
 
@@ -35,24 +37,92 @@ func NewMackerelService(client MackerelClient) *MackerelService {
 	}
 }
 
-const (
+var (
 	GraphAnnotationDescriptionMaxSize = 1024
 	AlertMemoMaxSize                  = 80 * 1000
 )
 
-func (svc *MackerelService) UpdateAlertMemo(ctx context.Context, alertID string, memo string) error {
+func ExtructSection(memo string, header string) string {
+	index := strings.Index(memo, header)
+	if index == -1 {
+		return ""
+	}
+	sectionText := strings.TrimPrefix(memo[index:], header)
+	index = strings.Index(sectionText, "\n## ")
+	if index == -1 {
+		return header + sectionText
+	}
+	return header + sectionText[:index]
+}
+
+func (svc *MackerelService) NewAlertMemo(ctx context.Context, alertID string, sectionName string, memo string) string {
+	alert, err := svc.client.GetAlert(alertID)
+	if err != nil {
+		slog.WarnContext(ctx, "get alert failed", "alert_id", alertID, "error", err)
+		return memo
+	}
+	header := "## " + sectionName
+	if alert.Memo == "" {
+		slog.InfoContext(
+			ctx,
+			"alert memo is empty, add new section",
+			"alert_id", alertID,
+			"section_name", sectionName,
+		)
+		memo = triming(header+"\n"+memo, AlertMemoMaxSize, "...")
+		return memo
+	}
+	extracted := ExtructSection(alert.Memo, header)
+	if extracted == "" {
+		slog.InfoContext(
+			ctx,
+			"alert memo section not found, add new section",
+			"alert_id", alertID,
+			"section_name", sectionName,
+		)
+		memo = header + "\n" + memo
+		if len(alert.Memo)+len(memo) > AlertMemoMaxSize {
+			memo = triming(memo, AlertMemoMaxSize-len(alert.Memo), "...")
+			if !strings.HasPrefix(memo, header+"\n") {
+				slog.WarnContext(ctx,
+					"alert memo section not found, but memo is too long, so memo is truncated",
+					"alert_id", alertID,
+					"section_name", sectionName,
+				)
+				return alert.Memo
+			}
+		}
+		return alert.Memo + "\n\n" + memo
+	}
 	slog.InfoContext(
 		ctx,
-		"update alert memo",
+		"alert memo section found, replace section",
 		"alert_id", alertID,
+		"section_name", sectionName,
 	)
-	memo = triming(memo, AlertMemoMaxSize, "...")
+	memo = header + "\n" + memo + "\n"
+	if len(alert.Memo)-len(extracted)+len(memo) > AlertMemoMaxSize {
+		memo = triming(memo, AlertMemoMaxSize-len(alert.Memo)+len(extracted), "...\n")
+	}
+	memo = strings.Replace(alert.Memo, extracted, memo, 1)
+	return memo
+}
+
+func (svc *MackerelService) UpdateAlertMemo(ctx context.Context, alertID string, sectionName string, memo string) error {
+	svc.mu.Lock()
+	defer svc.mu.Unlock()
+	memo = svc.NewAlertMemo(ctx, alertID, sectionName, memo)
 	_, err := svc.client.UpdateAlert(alertID, mackerel.UpdateAlertParam{
 		Memo: memo,
 	})
 	if err != nil {
 		return fmt.Errorf("update alert: %w", err)
 	}
+	slog.InfoContext(
+		ctx,
+		"updated alert memo",
+		"alert_id", alertID,
+	)
 	return nil
 }
 

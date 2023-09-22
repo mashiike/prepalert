@@ -2,6 +2,7 @@ package prepalert_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,20 +22,74 @@ func ptr[V any](v V) *V {
 	return &v
 }
 
-func TestMackerelService__UpdateAlertMemo(t *testing.T) {
+func TestMackerelService__UpdateAlertMemo__NowAlertMemoEmpty(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	client := mock.NewMockMackerelClient(ctrl)
-	client.EXPECT().UpdateAlert("xxxxxxxxxxxxx", mackerel.UpdateAlertParam{
-		Memo: "hoge",
-	}).Return(
-		&mackerel.UpdateAlertResponse{},
+	client.EXPECT().GetAlert("xxxxxxxxxxxxx").Return(
+		&mackerel.Alert{
+			ID:        "xxxxxxxxxxxxx",
+			Memo:      "",
+			OpenedAt:  1691323531,
+			ClosedAt:  1691323831,
+			Status:    "OK",
+			Type:      "host",
+			MonitorID: "yyyyyyyyyyy",
+			HostID:    "zzzzzzzzzzz",
+			Value:     0.5,
+		},
 		nil,
+	).Times(1)
+	client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(id string, param mackerel.UpdateAlertParam) (mackerel.UpdateAlertResponse, error) {
+			require.Equal(t, "xxxxxxxxxxxxx", id)
+			t.Log(param.Memo)
+			require.Equal(t, "## rule.hoge\nhoge", param.Memo)
+			return mackerel.UpdateAlertResponse{}, nil
+		},
 	).Times(1)
 
 	svc := prepalert.NewMackerelService(client)
-	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "hoge")
+	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", "hoge")
+	require.NoError(t, err)
+}
+
+func TestMackerelService__UpdateAlertMemo__NowAlertMemoEmptyButLarge(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	original := prepalert.AlertMemoMaxSize
+	t.Cleanup(func() {
+		prepalert.AlertMemoMaxSize = original
+	})
+	prepalert.AlertMemoMaxSize = 100
+
+	client := mock.NewMockMackerelClient(ctrl)
+	client.EXPECT().GetAlert("xxxxxxxxxxxxx").Return(
+		&mackerel.Alert{
+			ID:        "xxxxxxxxxxxxx",
+			Memo:      "",
+			OpenedAt:  1691323531,
+			ClosedAt:  1691323831,
+			Status:    "OK",
+			Type:      "host",
+			MonitorID: "yyyyyyyyyyy",
+			HostID:    "zzzzzzzzzzz",
+			Value:     0.5,
+		},
+		nil,
+	).Times(1)
+	client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(id string, param mackerel.UpdateAlertParam) (mackerel.UpdateAlertResponse, error) {
+			require.Equal(t, "xxxxxxxxxxxxx", id)
+			t.Log(param.Memo)
+			require.Equal(t, "## rule.hoge\n"+strings.Repeat("A", 84)+"...", param.Memo)
+			return mackerel.UpdateAlertResponse{}, nil
+		},
+	).Times(1)
+
+	svc := prepalert.NewMackerelService(client)
+	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", strings.Repeat("A", 100))
 	require.NoError(t, err)
 }
 
@@ -69,6 +124,146 @@ func TestMackerelService__PostGraphAnnotation__CreateNewAnnotation(t *testing.T)
 
 	svc := prepalert.NewMackerelService(client)
 	err := svc.PostGraphAnnotation(context.Background(), param)
+	require.NoError(t, err)
+}
+
+func TestMackerelService__UpdateAlertMemo__NowAlertMemoNoSectionAndLarge(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	original := prepalert.AlertMemoMaxSize
+	t.Cleanup(func() {
+		prepalert.AlertMemoMaxSize = original
+	})
+	prepalert.AlertMemoMaxSize = 100
+	client := mock.NewMockMackerelClient(ctrl)
+	client.EXPECT().GetAlert("xxxxxxxxxxxxx").Return(
+		&mackerel.Alert{
+			ID:        "xxxxxxxxxxxxx",
+			Memo:      strings.Repeat("A", 85),
+			OpenedAt:  1691323531,
+			ClosedAt:  1691323831,
+			Status:    "OK",
+			Type:      "host",
+			MonitorID: "yyyyyyyyyyy",
+			HostID:    "zzzzzzzzzzz",
+			Value:     0.5,
+		},
+		nil,
+	).Times(1)
+	client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(id string, param mackerel.UpdateAlertParam) (mackerel.UpdateAlertResponse, error) {
+			require.Equal(t, "xxxxxxxxxxxxx", id)
+			t.Log(param.Memo)
+			require.Equal(t, strings.Repeat("A", 85), param.Memo)
+			return mackerel.UpdateAlertResponse{}, nil
+		},
+	).Times(1)
+
+	svc := prepalert.NewMackerelService(client)
+	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", "hoge")
+	require.NoError(t, err)
+}
+
+func TestMackerelService__UpdateAlertMemo__NowAlertMemoNoSection(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := mock.NewMockMackerelClient(ctrl)
+	client.EXPECT().GetAlert("xxxxxxxxxxxxx").Return(
+		&mackerel.Alert{
+			ID:        "xxxxxxxxxxxxx",
+			Memo:      "ABCDEFG",
+			OpenedAt:  1691323531,
+			ClosedAt:  1691323831,
+			Status:    "OK",
+			Type:      "host",
+			MonitorID: "yyyyyyyyyyy",
+			HostID:    "zzzzzzzzzzz",
+			Value:     0.5,
+		},
+		nil,
+	).Times(1)
+	client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(id string, param mackerel.UpdateAlertParam) (mackerel.UpdateAlertResponse, error) {
+			require.Equal(t, "xxxxxxxxxxxxx", id)
+			t.Log(param.Memo)
+			require.Equal(t, "ABCDEFG\n\n## rule.hoge\nhoge", param.Memo)
+			return mackerel.UpdateAlertResponse{}, nil
+		},
+	).Times(1)
+
+	svc := prepalert.NewMackerelService(client)
+	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", "hoge")
+	require.NoError(t, err)
+}
+
+func TestMackerelService__UpdateAlertMemo__Replace(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := mock.NewMockMackerelClient(ctrl)
+	client.EXPECT().GetAlert("xxxxxxxxxxxxx").Return(
+		&mackerel.Alert{
+			ID:        "xxxxxxxxxxxxx",
+			Memo:      "ABCDEFG\n\n## rule.hoge\nhoge\n\n## rule.fuga\nfuga",
+			OpenedAt:  1691323531,
+			ClosedAt:  1691323831,
+			Status:    "OK",
+			Type:      "host",
+			MonitorID: "yyyyyyyyyyy",
+			HostID:    "zzzzzzzzzzz",
+			Value:     0.5,
+		},
+		nil,
+	).Times(1)
+	client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(id string, param mackerel.UpdateAlertParam) (mackerel.UpdateAlertResponse, error) {
+			require.Equal(t, "xxxxxxxxxxxxx", id)
+			t.Log(param.Memo)
+			require.Equal(t, "ABCDEFG\n\n## rule.hoge\nABCDEFGHIGKLMN\n\n## rule.fuga\nfuga", param.Memo)
+			return mackerel.UpdateAlertResponse{}, nil
+		},
+	).Times(1)
+
+	svc := prepalert.NewMackerelService(client)
+	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", "ABCDEFGHIGKLMN")
+	require.NoError(t, err)
+}
+
+func TestMackerelService__UpdateAlertMemo__ReplaceLarge(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	original := prepalert.AlertMemoMaxSize
+	t.Cleanup(func() {
+		prepalert.AlertMemoMaxSize = original
+	})
+	prepalert.AlertMemoMaxSize = 100
+	client := mock.NewMockMackerelClient(ctrl)
+	client.EXPECT().GetAlert("xxxxxxxxxxxxx").Return(
+		&mackerel.Alert{
+			ID:        "xxxxxxxxxxxxx",
+			Memo:      "ABCDEFG\n\n## rule.hoge\nhoge\n\n## rule.fuga\nfuga",
+			OpenedAt:  1691323531,
+			ClosedAt:  1691323831,
+			Status:    "OK",
+			Type:      "host",
+			MonitorID: "yyyyyyyyyyy",
+			HostID:    "zzzzzzzzzzz",
+			Value:     0.5,
+		},
+		nil,
+	).Times(1)
+	client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(id string, param mackerel.UpdateAlertParam) (mackerel.UpdateAlertResponse, error) {
+			require.Equal(t, "xxxxxxxxxxxxx", id)
+			t.Log(param.Memo)
+			require.Equal(t, "ABCDEFG\n\n## rule.hoge\n"+strings.Repeat("A", 56)+"...\n\n## rule.fuga\nfuga", param.Memo)
+			return mackerel.UpdateAlertResponse{}, nil
+		},
+	).Times(1)
+
+	svc := prepalert.NewMackerelService(client)
+	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", strings.Repeat("A", 100))
 	require.NoError(t, err)
 }
 
@@ -229,4 +424,73 @@ func TestWebnookBody__MarshalCTYValues(t *testing.T) {
 		"org_name": "Macker..."
 	  }`
 	require.JSONEq(t, expected, actual)
+}
+
+func TestExtructSection(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "rule.hoge",
+			input: `
+hogeareaerlkwarewk
+
+## rule.hoge
+Subsection content.
+
+#### hoge
+
+## AnotherApp
+Another section content.
+`,
+			expected: `## rule.hoge
+Subsection content.
+
+#### hoge
+`,
+		},
+		{
+			name: "rule.fuga",
+			input: `
+dareawklfarhkjakjfa
+コレは手打ちの文字
+
+## rule.fuga
+
+ここにはruleのmemo
+後ろになにもないことも
+`,
+			expected: `## rule.fuga
+
+ここにはruleのmemo
+後ろになにもないことも
+`,
+		},
+		{
+			name: "rule.piyo",
+			input: `
+## rule.piyo
+ここにはruleのmemo
+後ろになにもないことも
+`,
+			expected: `## rule.piyo
+ここにはruleのmemo
+後ろになにもないことも
+`,
+		},
+		{
+			name:     "rule.hoge",
+			input:    ``,
+			expected: ``,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := prepalert.ExtructSection(c.input, "## "+c.name)
+			require.Equal(t, c.expected, actual)
+		})
+	}
 }

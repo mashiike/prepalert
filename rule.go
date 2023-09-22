@@ -369,7 +369,7 @@ func (action *UpdateAlertAction) Render(ctx context.Context, evalCtx *hcl.EvalCo
 		}
 		memo = triming(memo, *action.sizeLimit, "\n...")
 	}
-	err = action.app.MackerelService().UpdateAlertMemo(ctx, body.Alert.ID, memo)
+	err = action.app.MackerelService().UpdateAlertMemo(ctx, body.Alert.ID, "Prepalert rule."+action.ruleName, memo)
 	if err != nil {
 		return fmt.Errorf("update alert memo: %w", err)
 	}
