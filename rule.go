@@ -346,13 +346,18 @@ func (action *UpdateAlertAction) Render(ctx context.Context, evalCtx *hcl.EvalCo
 	if err != nil {
 		return fmt.Errorf("upload to backend:%w", err)
 	}
+	if uploaded {
+		slog.DebugContext(ctx, "uploaded to backend", "full_text_url", fullTextURL)
+		memo = fmt.Sprintf("Full Text URL: %s\n\n%s", fullTextURL, memo)
+	}
+
 	if action.sizeLimit != nil && len(memo) > *action.sizeLimit {
 		if uploaded {
 			slog.WarnContext(
 				ctx,
 				"alert memo is too long",
 				"length", len(memo),
-				"show_details_url", fullTextURL,
+				"full_text_url", fullTextURL,
 			)
 		} else {
 			slog.WarnContext(
