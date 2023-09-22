@@ -35,12 +35,18 @@ func NewMackerelService(client MackerelClient) *MackerelService {
 	}
 }
 
+const (
+	GraphAnnotationDescriptionMaxSize = 1024
+	AlertMemoMaxSize                  = 80 * 1000
+)
+
 func (svc *MackerelService) UpdateAlertMemo(ctx context.Context, alertID string, memo string) error {
 	slog.InfoContext(
 		ctx,
 		"update alert memo",
 		"alert_id", alertID,
 	)
+	memo = triming(memo, AlertMemoMaxSize, "...")
 	_, err := svc.client.UpdateAlert(alertID, mackerel.UpdateAlertParam{
 		Memo: memo,
 	})
@@ -55,6 +61,7 @@ const (
 )
 
 func (svc *MackerelService) PostGraphAnnotation(ctx context.Context, params *mackerel.GraphAnnotation) error {
+	params.Description = triming(params.Description, GraphAnnotationDescriptionMaxSize, "...")
 	annotations, err := svc.client.FindGraphAnnotations(params.Service, params.From-FindGraphAnnotationOffset, params.To+FindGraphAnnotationOffset)
 	if err != nil {
 		return fmt.Errorf("find graph annotations: %w", err)

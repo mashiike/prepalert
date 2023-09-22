@@ -5,6 +5,9 @@ func ptr[T any](v T) *T {
 }
 
 func triming(msg string, limit int, abbreviatedMessage string) string {
+	if len(msg) <= limit {
+		return msg
+	}
 	n := len(abbreviatedMessage)
 	if n >= limit {
 		return abbreviatedMessage[0:limit]

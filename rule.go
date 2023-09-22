@@ -309,12 +309,6 @@ func (action *PostGraphAnnotationAction) Enable() bool {
 	return action.enable
 }
 
-const (
-	maxDescriptionSize = 1024
-	maxMemoSize        = 80 * 1000
-	defualtMaxMemoSize = 1024
-)
-
 func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
 	body, err := WebhookFromEvalContext(evalCtx)
 	if err != nil {
