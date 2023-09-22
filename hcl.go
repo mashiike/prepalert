@@ -346,11 +346,8 @@ func (app *App) decodeQueryBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 
 func (app *App) decodeRuleBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 	var diags hcl.Diagnostics
-	mkrSvcFunc := func() *MackerelService {
-		return app.mkrSvc
-	}
 	for _, block := range blocks {
-		rule := NewRule(mkrSvcFunc, app.backend, block.Labels[0])
+		rule := app.NewRule(block.Labels[0])
 		diags = diags.Extend(rule.DecodeBody(block.Body, app.evalCtx))
 		app.rules = append(app.rules, rule)
 	}
