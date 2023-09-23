@@ -87,6 +87,10 @@ func (app *App) Rules() []*Rule {
 	return app.rules
 }
 
+func (app *App) Backend() Backend {
+	return app.backend
+}
+
 func (app *App) ProviderList() []string {
 	providers := make([]string, 0, len(app.providers))
 	for name := range app.providers {
