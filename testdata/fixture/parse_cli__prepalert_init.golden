@@ -1,6 +1,6 @@
 Usage: prepalert init
 
-create inital config
+create initial config
 
 Flags:
   -h, --help                       Show context-sensitive help.

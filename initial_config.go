@@ -13,7 +13,7 @@ import (
 var initialConfigTemplate string
 
 func GenerateInitialConfig(sqsQueueName string, orgName string) ([]byte, error) {
-	t, err := template.New("inital_config").Parse(initialConfigTemplate)
+	t, err := template.New("initial_config").Parse(initialConfigTemplate)
 	if err != nil {
 		return nil, err
 	}

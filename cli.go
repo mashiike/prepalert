@@ -45,7 +45,7 @@ type CLI struct {
 	ErrorHandling  ErrorHandling `help:"error handling" env:"PREPALERT_ERROR_HANDLING" default:"continue" enum:"continue,return"`
 	Config         string        `help:"config path" env:"PREPALERT_CONFIG" default:"."`
 	Run            *RunOptions   `cmd:"" help:"run server (default command)" default:""`
-	Init           struct{}      `cmd:"" help:"create inital config"`
+	Init           struct{}      `cmd:"" help:"create initial config"`
 	Validate       struct{}      `cmd:"" help:"validate the configuration"`
 	Exec           *ExecOptions  `cmd:"" help:"Generate a virtual webhook from past alert to execute the rule"`
 	Version        struct{}      `cmd:"" help:"Show version"`
