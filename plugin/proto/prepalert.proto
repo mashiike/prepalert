@@ -1,0 +1,62 @@
+syntax = "proto3";
+package prepalert;
+option go_package = "github.com/mashiike/prepalert/plugin/proto";
+
+message ProviderParameter {
+  string type = 1;
+  string name = 2;
+  string json = 3;
+}
+
+message Schema {
+    message Attribute {
+        string name = 1;
+        bool required = 2;
+    }
+    message Block {
+        string name = 1;
+        repeated string labels = 2;
+        bool unique = 3;
+        bool required = 4;
+        bool uniqueLabels = 5;
+        Schema body = 6;
+    }
+    repeated Attribute attributes = 1;
+    repeated Block blocks = 2;
+}
+
+message ValidatProviderPaameter {
+    message Request {
+        ProviderParameter parameter = 1;
+    }
+    message Response {
+        bool ok = 1;
+        string message = 2;
+    }
+}
+
+message GetQuerySchema {
+    message Request {}
+    message Response {
+        Schema schema = 1;
+    }
+}
+
+message RunQuery {
+    message Request {
+        string providerParams = 1;
+        string queryParams = 2;
+    }
+    message Response {
+        string name = 1;
+        string query = 2;
+        repeated string params = 3;
+        repeated string jsonlines = 4;
+    }
+}
+
+service Provider {
+  rpc ValidateProviderParameter(ValidatProviderPaameter.Request) returns (ValidatProviderPaameter.Response);
+  rpc GetQuerySchema(GetQuerySchema.Request) returns (GetQuerySchema.Response);
+  rpc RunQuery(RunQuery.Request) returns (RunQuery.Response);
+}
