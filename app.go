@@ -22,18 +22,20 @@ import (
 )
 
 type App struct {
-	mkrSvc              *MackerelService
-	backend             Backend
-	rules               []*Rule
-	queueName           string
-	webhookClientID     string
-	webhookClientSecret string
-	providerParameters  provider.ProviderParameters
-	providers           map[string]provider.Provider
-	queries             map[string]provider.Query
-	diagWriter          *hclutil.DiagnosticsWriter
-	evalCtx             *hcl.EvalContext
-	loadingConfig       bool
+	mkrSvc                *MackerelService
+	backend               Backend
+	rules                 []*Rule
+	queueName             string
+	webhookClientID       string
+	webhookClientSecret   string
+	providerParameters    provider.ProviderParameters
+	providers             map[string]provider.Provider
+	queries               map[string]provider.Query
+	diagWriter            *hclutil.DiagnosticsWriter
+	evalCtx               *hcl.EvalContext
+	loadingConfig         bool
+	workerPrepared        bool
+	webhookServerPrepared bool
 }
 
 func New(apikey string) *App {
@@ -68,6 +70,18 @@ func (app *App) Close() error {
 		return errors.Join(errs...)
 	}
 	return nil
+}
+
+func (app *App) WorkerIsReady() bool {
+	return app.workerPrepared
+}
+
+func (app *App) WebhookServerIsReady() bool {
+	return app.webhookServerPrepared
+}
+
+func (app *App) EnableWebhookServer() bool {
+	return app.SQSQueueName() != ""
 }
 
 func (app *App) SetMackerelClient(client MackerelClient) *App {

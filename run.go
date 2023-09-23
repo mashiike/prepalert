@@ -2,6 +2,7 @@ package prepalert
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -21,16 +22,27 @@ func (app *App) Run(ctx context.Context, opts *RunOptions) error {
 		canyon.WithServerAddress(opts.Address, opts.Prefix),
 		canyon.WithWorkerBatchSize(opts.BatchSize),
 	}
-
+	slog.DebugContext(ctx, "start run", "mode", opts.Mode)
 	switch strings.ToLower(opts.Mode) {
 	case "http", "webhook":
 		slog.InfoContext(ctx, "disable worker", "mode", opts.Mode)
 		canyonOpts = append(canyonOpts, canyon.WithDisableWorker())
+		if !app.WebhookServerIsReady() {
+			return errors.New("webhook server is not ready")
+		}
 	case "worker":
 		slog.InfoContext(ctx, "disable server", "mode", opts.Mode)
 		canyonOpts = append(canyonOpts, canyon.WithDisableServer())
+		if !app.WorkerIsReady() {
+			return errors.New("worker is not ready")
+		}
 	default:
-		// nothing to do
+		if !app.WebhookServerIsReady() {
+			return errors.New("webhook server is not ready")
+		}
+		if !app.WorkerIsReady() {
+			slog.WarnContext(ctx, "worker is not ready, maybe check configureion error")
+		}
 	}
 	return canyon.RunWithContext(ctx, app.queueName, app, canyonOpts...)
 }

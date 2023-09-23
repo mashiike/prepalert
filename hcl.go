@@ -51,6 +51,10 @@ func (app *App) LoadConfig(dir string, optFns ...func(*LoadConfigOptions)) error
 		hclutil.WithFilePath(dir),
 	)
 	diags = append(diags, app.DecodeBody(body, evalCtx)...)
+	if !diags.HasErrors() {
+		slog.Debug("set worker is prepared")
+		app.workerPrepared = true
+	}
 	return writer.WriteDiagnostics(diags)
 }
 
@@ -68,6 +72,24 @@ func (app *App) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagnost
 			{
 				Type: "prepalert",
 			},
+		},
+	}
+	content, remain, contentDiags := body.PartialContent(schema)
+	diags = diags.Extend(contentDiags)
+	diags = diags.Extend(hclutil.RestrictBlock(content, []hclutil.BlockRestrictionSchema{
+		{
+			Type:     "prepalert",
+			Required: true,
+			Unique:   true,
+		},
+	}...))
+	if diags.HasErrors() {
+		return diags
+	}
+	blocksByType := content.Blocks.ByType()
+	diags = diags.Extend(app.decodePrepalertBlock(blocksByType["prepalert"][0].Body))
+	schema = &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
 			{
 				Type:       "provider",
 				LabelNames: []string{"type"},
@@ -82,14 +104,9 @@ func (app *App) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagnost
 			},
 		},
 	}
-	content, contentDiags := body.Content(schema)
+	content, contentDiags = remain.Content(schema)
 	diags = diags.Extend(contentDiags)
 	diags = diags.Extend(hclutil.RestrictBlock(content, []hclutil.BlockRestrictionSchema{
-		{
-			Type:     "prepalert",
-			Required: true,
-			Unique:   true,
-		},
 		{
 			Type:         "query",
 			UniqueLabels: true,
@@ -102,8 +119,7 @@ func (app *App) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagnost
 	if diags.HasErrors() {
 		return diags
 	}
-	blocksByType := content.Blocks.ByType()
-	diags = diags.Extend(app.decodePrepalertBlock(blocksByType["prepalert"][0].Body))
+	blocksByType = content.Blocks.ByType()
 	diags = diags.Extend(app.decodeProviderBlocks(blocksByType["provider"]))
 	diags = diags.Extend(app.decodeQueryBlocks(blocksByType["query"]))
 	diags = diags.Extend(app.decodeRuleBlocks(blocksByType["rule"]))
@@ -169,6 +185,7 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 			}
 		case "sqs_queue_name":
 			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, app.evalCtx, &app.queueName))
+			app.webhookServerPrepared = true
 		}
 	}
 	if diags.HasErrors() {
@@ -192,6 +209,9 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 						Subject:  attr.NameRange.Ptr(),
 					})
 				}
+			}
+			if diags.HasErrors() {
+				app.webhookServerPrepared = false
 			}
 		}
 	}

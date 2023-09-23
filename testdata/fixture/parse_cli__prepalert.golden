@@ -3,10 +3,11 @@ Usage: prepalert <command>
 A webhook server for prepare alert memo
 
 Flags:
-  -h, --help                      Show context-sensitive help.
-      --log-level="info"          output log-level ($PREPALERT_LOG_LEVEL)
-      --mackerel-apikey=STRING    for access mackerel API ($MACKEREL_APIKEY)
-      --config="."                config path ($PREPALERT_CONFIG)
+  -h, --help                       Show context-sensitive help.
+      --log-level="info"           output log-level ($PREPALERT_LOG_LEVEL)
+      --mackerel-apikey=STRING     for access mackerel API ($MACKEREL_APIKEY)
+      --error-handling=continue    error handling ($PREPALERT_ERROR_HANDLING)
+      --config="."                 config path ($PREPALERT_CONFIG)
 
 Commands:
   run

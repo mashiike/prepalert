@@ -129,7 +129,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 	mockProvider.EXPECT().NewQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockQuery, nil).Times(1)
 	mockServelessProvider.EXPECT().NewQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockQuery, nil).Times(1)
 
-	app := LoadApp(t, "testdata/config/with_query.hcl")
+	app := LoadApp(t, "testdata/config/with_query/")
 	require.Equal(t, "prepalert", app.SQSQueueName())
 	require.ElementsMatch(t, []string{
 		"redshift_data.default",

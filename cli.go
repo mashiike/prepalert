@@ -3,6 +3,7 @@ package prepalert
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -90,12 +91,13 @@ func RunCLI(ctx context.Context, args []string, setLogLevel func(string)) error 
 		fmt.Printf("prepalert %s\n", Version)
 		return nil
 	}
+	slog.DebugContext(ctx, "load config", "config", cli.Config, "error_handling", cli.ErrorHandling)
 	err = app.LoadConfig(cli.Config)
 	if err != nil {
+		slog.DebugContext(ctx, "load config failed", "error", err)
 		if cli.ErrorHandling == ReturnOnError || cmd == "validate" {
 			return err
 		}
-		app.UnwrapAndDumpDiagnoctics(err)
 	}
 	defer app.Close()
 	switch cmd {
