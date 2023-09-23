@@ -54,10 +54,6 @@ type S3Backend struct {
 	ViewerSessionEncryptKey []byte
 }
 
-func (app *App) Backend() Backend {
-	return app.backend
-}
-
 var GlobalS3Client S3Client
 
 func (app *App) SetupS3Buckend(body hcl.Body) hcl.Diagnostics {

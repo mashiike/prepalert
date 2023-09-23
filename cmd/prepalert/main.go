@@ -119,6 +119,7 @@ func main() {
 		}
 		middleware.SetMinLevel(l)
 		slog.SetDefault(slog.New(middleware))
+		slog.Debug("log level changed", "level", l)
 	}
 
 	if err := prepalert.RunCLI(ctx, os.Args[1:], setLogLevelFunc); err != nil {

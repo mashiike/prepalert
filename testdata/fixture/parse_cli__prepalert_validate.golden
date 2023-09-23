@@ -1,9 +1,6 @@
-Usage: prepalert exec <alert-id>
+Usage: prepalert validate
 
-Generate a virtual webhook from past alert to execute the rule
-
-Arguments:
-  <alert-id>    Mackerel AlertID
+validate the configuration
 
 Flags:
   -h, --help                       Show context-sensitive help.

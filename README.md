@@ -53,7 +53,7 @@ Commands:
     run server (default command)
 
   init
-    create inital config
+    create initial config
 
   validate
     validate the configuration

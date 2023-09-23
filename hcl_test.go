@@ -24,10 +24,8 @@ func TestHCLGetMonitor(t *testing.T) {
 		ID:   "hoge",
 		Name: "fuga",
 	}, nil).Times(1)
-	app, err := prepalert.New("dummy-api-key")
-	require.NoError(t, err)
+	app := LoadApp(t, "testdata/config/simple.hcl")
 	app.SetMackerelClient(mockClient)
-	app.LoadConfig("testdata/config/simple.hcl")
 	webhook := app.MackerelService().NewExampleWebhookBody()
 	evalCtx, err := app.NewEvalContext(webhook)
 	require.NoError(t, err)

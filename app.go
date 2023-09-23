@@ -22,25 +22,27 @@ import (
 )
 
 type App struct {
-	mkrSvc              *MackerelService
-	backend             Backend
-	rules               []*Rule
-	queueName           string
-	webhookClientID     string
-	webhookClientSecret string
-	providerParameters  provider.ProviderParameters
-	providers           map[string]provider.Provider
-	queries             map[string]provider.Query
-	diagWriter          *hclutil.DiagnosticsWriter
-	evalCtx             *hcl.EvalContext
-	loadingConfig       bool
+	mkrSvc                *MackerelService
+	backend               Backend
+	rules                 []*Rule
+	queueName             string
+	webhookClientID       string
+	webhookClientSecret   string
+	providerParameters    provider.ProviderParameters
+	providers             map[string]provider.Provider
+	queries               map[string]provider.Query
+	diagWriter            *hclutil.DiagnosticsWriter
+	evalCtx               *hcl.EvalContext
+	loadingConfig         bool
+	workerPrepared        bool
+	webhookServerPrepared bool
 }
 
-func New(apikey string) (*App, error) {
+func New(apikey string) *App {
 	app := &App{
 		backend: NewDiscardBackend(),
 	}
-	return app.SetMackerelClient(mackerel.NewClient(apikey)), nil
+	return app.SetMackerelClient(mackerel.NewClient(apikey))
 }
 
 func (app *App) Close() error {
@@ -70,6 +72,18 @@ func (app *App) Close() error {
 	return nil
 }
 
+func (app *App) WorkerIsReady() bool {
+	return app.workerPrepared
+}
+
+func (app *App) WebhookServerIsReady() bool {
+	return app.webhookServerPrepared
+}
+
+func (app *App) EnableWebhookServer() bool {
+	return app.SQSQueueName() != ""
+}
+
 func (app *App) SetMackerelClient(client MackerelClient) *App {
 	app.mkrSvc = NewMackerelService(client)
 	return app
@@ -87,6 +101,10 @@ func (app *App) Rules() []*Rule {
 	return app.rules
 }
 
+func (app *App) Backend() Backend {
+	return app.backend
+}
+
 func (app *App) ProviderList() []string {
 	providers := make([]string, 0, len(app.providers))
 	for name := range app.providers {
@@ -101,14 +119,6 @@ func (app *App) QueryList() []string {
 		queries = append(queries, name)
 	}
 	return queries
-}
-
-func (app *App) Exec(ctx context.Context, alertID string) error {
-	body, err := app.mkrSvc.NewEmulatedWebhookBody(ctx, alertID)
-	if err != nil {
-		return err
-	}
-	return app.ExecuteRules(ctx, body)
 }
 
 func must[T any](t T, err error) T {

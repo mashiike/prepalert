@@ -1,0 +1,16 @@
+Usage: prepalert run
+
+run server (default command)
+
+Flags:
+  -h, --help                       Show context-sensitive help.
+      --log-level="info"           output log-level ($PREPALERT_LOG_LEVEL)
+      --mackerel-apikey=STRING     for access mackerel API ($MACKEREL_APIKEY)
+      --error-handling=continue    error handling ($PREPALERT_ERROR_HANDLING)
+      --config="."                 config path ($PREPALERT_CONFIG)
+
+      --mode="all"                 run mode ($PREPALERT_MODE)
+      --address=":8080"            run local address ($PREPALERT_ADDRESS)
+      --prefix="/"                 run server prefix ($PREPALERT_PREFIX)
+      --batch-size=1               run local sqs batch size
+                                   ($PREPALERT_BATCH_SIZE)

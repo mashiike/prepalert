@@ -45,6 +45,22 @@ func TestParseCLI(t *testing.T) {
 			checkOutput: true,
 		},
 		{
+			args:        []string{"prepalert", "run", "--help"},
+			checkOutput: true,
+		},
+		{
+			args:        []string{"prepalert", "init", "--help"},
+			checkOutput: true,
+		},
+		{
+			args:        []string{"prepalert", "version", "--help"},
+			checkOutput: true,
+		},
+		{
+			args:        []string{"prepalert", "validate", "--help"},
+			checkOutput: true,
+		},
+		{
 			args: []string{"prepalert", "--config", ".", "run", "--mode", "http", "--log-level", "debug"},
 			cmd:  "run",
 			expected: &prepalert.CLI{
