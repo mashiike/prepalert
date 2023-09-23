@@ -121,14 +121,6 @@ func (app *App) QueryList() []string {
 	return queries
 }
 
-func (app *App) Exec(ctx context.Context, alertID string) error {
-	body, err := app.mkrSvc.NewEmulatedWebhookBody(ctx, alertID)
-	if err != nil {
-		return err
-	}
-	return app.ExecuteRules(ctx, body)
-}
-
 func must[T any](t T, err error) T {
 	if err != nil {
 		panic(err)

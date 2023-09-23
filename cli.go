@@ -51,10 +51,6 @@ type CLI struct {
 	Version        struct{}      `cmd:"" help:"Show version"`
 }
 
-type ExecOptions struct {
-	AlertID string `arg:"" name:"alert-id" help:"Mackerel AlertID" required:""`
-}
-
 var Version = "current"
 
 func ParseCLI(ctx context.Context, args []string, opts ...kong.Option) (string, *CLI, error) {
@@ -106,7 +102,7 @@ func RunCLI(ctx context.Context, args []string, setLogLevel func(string)) error 
 	case "validate":
 		return nil
 	case "exec":
-		return app.Exec(ctx, cli.Exec.AlertID)
+		return app.Exec(ctx, cli.Exec)
 	}
 	return fmt.Errorf("unknown command: %s", cmd)
 }
