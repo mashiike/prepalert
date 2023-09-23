@@ -99,8 +99,6 @@ rule "simple" {
 }
 ```
 
-For more advanced configuration, please see [docs directory](docs/) 
-
 ## Usage with AWS Lambda (serverless)
 
 prepalert works with AWS Lambda and Amazon SQS.
