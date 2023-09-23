@@ -8,15 +8,46 @@ import (
 	"github.com/alecthomas/kong"
 )
 
+type ErrorHandling int
+
+const (
+	ContinueOnError ErrorHandling = iota // if load config on error, continue run
+	ReturnOnError                        // if load config on error, return error
+)
+
+func (e ErrorHandling) String() string {
+	switch e {
+	case ContinueOnError:
+		return "continue"
+	case ReturnOnError:
+		return "return"
+	default:
+		return "unknown"
+	}
+}
+
+func (e *ErrorHandling) UnmarshalText(text []byte) error {
+	switch strings.ToLower(string(text)) {
+	case "continue":
+		*e = ContinueOnError
+	case "return":
+		*e = ReturnOnError
+	default:
+		return fmt.Errorf("unknown error handling: %s", string(text))
+	}
+	return nil
+}
+
 type CLI struct {
-	LogLevel       string       `help:"output log-level" env:"PREPALERT_LOG_LEVEL" default:"info"`
-	MackerelAPIKey string       `name:"mackerel-apikey" help:"for access mackerel API" env:"MACKEREL_APIKEY"`
-	Config         string       `help:"config path" env:"PREPALERT_CONFIG" default:"."`
-	Run            *RunOptions  `cmd:"" help:"run server (default command)" default:""`
-	Init           struct{}     `cmd:"" help:"create inital config"`
-	Validate       struct{}     `cmd:"" help:"validate the configuration"`
-	Exec           *ExecOptions `cmd:"" help:"Generate a virtual webhook from past alert to execute the rule"`
-	Version        struct{}     `cmd:"" help:"Show version"`
+	LogLevel       string        `help:"output log-level" env:"PREPALERT_LOG_LEVEL" default:"info"`
+	MackerelAPIKey string        `name:"mackerel-apikey" help:"for access mackerel API" env:"MACKEREL_APIKEY"`
+	ErrorHandling  ErrorHandling `help:"error handling" env:"PREPALERT_ERROR_HANDLING" default:"continue" enum:"continue,return"`
+	Config         string        `help:"config path" env:"PREPALERT_CONFIG" default:"."`
+	Run            *RunOptions   `cmd:"" help:"run server (default command)" default:""`
+	Init           struct{}      `cmd:"" help:"create inital config"`
+	Validate       struct{}      `cmd:"" help:"validate the configuration"`
+	Exec           *ExecOptions  `cmd:"" help:"Generate a virtual webhook from past alert to execute the rule"`
+	Version        struct{}      `cmd:"" help:"Show version"`
 }
 
 type ExecOptions struct {
@@ -51,10 +82,7 @@ func RunCLI(ctx context.Context, args []string, setLogLevel func(string)) error 
 		return err
 	}
 	setLogLevel(cli.LogLevel)
-	app, err := New(cli.MackerelAPIKey)
-	if err != nil {
-		return err
-	}
+	app := New(cli.MackerelAPIKey)
 	switch cmd {
 	case "init":
 		return app.Init(ctx, cli.Config)
@@ -64,7 +92,10 @@ func RunCLI(ctx context.Context, args []string, setLogLevel func(string)) error 
 	}
 	err = app.LoadConfig(cli.Config)
 	if err != nil {
-		return err
+		if cli.ErrorHandling == ReturnOnError || cmd == "validate" {
+			return err
+		}
+		app.UnwrapAndDumpDiagnoctics(err)
 	}
 	defer app.Close()
 	switch cmd {

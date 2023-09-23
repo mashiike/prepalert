@@ -36,11 +36,11 @@ type App struct {
 	loadingConfig       bool
 }
 
-func New(apikey string) (*App, error) {
+func New(apikey string) *App {
 	app := &App{
 		backend: NewDiscardBackend(),
 	}
-	return app.SetMackerelClient(mackerel.NewClient(apikey)), nil
+	return app.SetMackerelClient(mackerel.NewClient(apikey))
 }
 
 func (app *App) Close() error {

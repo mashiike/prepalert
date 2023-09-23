@@ -10,8 +10,17 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/mashiike/prepalert"
 	"github.com/stretchr/testify/require"
 )
+
+func LoadApp(t *testing.T, path string) *prepalert.App {
+	t.Helper()
+	app := prepalert.New("dummy-api-key")
+	err := app.LoadConfig(path)
+	require.NoError(t, err)
+	return app
+}
 
 func LoadFile(t *testing.T, path string) []byte {
 	t.Helper()

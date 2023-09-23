@@ -28,10 +28,7 @@ import (
 )
 
 func TestAppLoadConfig__Simple(t *testing.T) {
-	app, err := prepalert.New("dummy-api-key")
-	require.NoError(t, err)
-	err = app.LoadConfig("testdata/config/simple.hcl")
-	require.NoError(t, err)
+	app := LoadApp(t, "testdata/config/simple.hcl")
 	require.Equal(t, "prepalert", app.SQSQueueName())
 	require.ElementsMatch(t, []string{}, app.ProviderList())
 	require.ElementsMatch(t, []string{}, app.QueryList())
@@ -132,10 +129,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 	mockProvider.EXPECT().NewQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockQuery, nil).Times(1)
 	mockServelessProvider.EXPECT().NewQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockQuery, nil).Times(1)
 
-	app, err := prepalert.New("dummy-api-key")
-	require.NoError(t, err)
-	err = app.LoadConfig("testdata/config/with_query/")
-	require.NoError(t, err)
+	app := LoadApp(t, "testdata/config/with_query.hcl")
 	require.Equal(t, "prepalert", app.SQSQueueName())
 	require.ElementsMatch(t, []string{
 		"redshift_data.default",
@@ -220,10 +214,7 @@ func TestAppLoadConfig__WithS3Backend(t *testing.T) {
 	t.Cleanup(func() {
 		prepalert.GlobalS3Client = nil
 	})
-	app, err := prepalert.New("dummy-api-key")
-	require.NoError(t, err)
-	err = app.LoadConfig("testdata/config/with_s3_backend.hcl")
-	require.NoError(t, err)
+	app := LoadApp(t, "testdata/config/with_s3_backend.hcl")
 	require.Equal(t, "prepalert", app.SQSQueueName())
 	require.ElementsMatch(t, []string{}, app.ProviderList())
 	require.ElementsMatch(t, []string{}, app.QueryList())
@@ -276,10 +267,7 @@ func TestAppLoadConfig__WithS3Backend(t *testing.T) {
 }
 
 func TestAppLoadConfig__Dynamic(t *testing.T) {
-	app, err := prepalert.New("dummy-api-key")
-	require.NoError(t, err)
-	err = app.LoadConfig("testdata/config/dynamic.hcl")
-	require.NoError(t, err)
+	app := LoadApp(t, "testdata/config/dynamic.hcl")
 	require.Equal(t, "prepalert", app.SQSQueueName())
 	require.ElementsMatch(t, []string{}, app.ProviderList())
 	require.ElementsMatch(t, []string{}, app.QueryList())
@@ -302,10 +290,9 @@ func TestAppLoadConfig__Invalid(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			app, err := prepalert.New("dummy-api-key")
-			require.NoError(t, err)
+			app := prepalert.New("dummy-api-key")
 			var buf bytes.Buffer
-			err = app.LoadConfig(tc.path, func(lco *prepalert.LoadConfigOptions) {
+			err := app.LoadConfig(tc.path, func(lco *prepalert.LoadConfigOptions) {
 				lco.DiagnosticDestination = &buf
 				lco.Color = aws.Bool(false)
 				lco.Width = aws.Uint(88)
@@ -317,10 +304,7 @@ func TestAppLoadConfig__Invalid(t *testing.T) {
 }
 
 func TestAppLoadConfig__When_Is_List(t *testing.T) {
-	app, err := prepalert.New("dummy-api-key")
-	require.NoError(t, err)
-	err = app.LoadConfig("testdata/config/when_is_list.hcl")
-	require.NoError(t, err)
+	app := LoadApp(t, "testdata/config/when_is_list.hcl")
 	require.Equal(t, "prepalert", app.SQSQueueName())
 	require.ElementsMatch(t, []string{}, app.ProviderList())
 	require.ElementsMatch(t, []string{}, app.QueryList())
