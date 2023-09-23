@@ -350,3 +350,14 @@ func TestAppLoadConfig__When_Is_List(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 }
+
+func TestAppLoadConfig__WithPlugin(t *testing.T) {
+	app := LoadApp(t, "testdata/config/with_plugin.hcl")
+	require.Equal(t, "prepalert", app.SQSQueueName())
+	require.ElementsMatch(t, []string{}, app.ProviderList())
+	require.ElementsMatch(t, []string{}, app.QueryList())
+	require.False(t, app.EnableBasicAuth())
+	rules := app.Rules()
+	require.Len(t, rules, 1)
+	require.Len(t, rules[0].DependsOnQueries(), 0)
+}

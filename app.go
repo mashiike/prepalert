@@ -36,6 +36,7 @@ type App struct {
 	loadingConfig         bool
 	workerPrepared        bool
 	webhookServerPrepared bool
+	cleanupFuncs          []func() error
 }
 
 func New(apikey string) *App {
@@ -64,6 +65,11 @@ func (app *App) Close() error {
 			if err := c.Close(); err != nil {
 				errs = append(errs, err)
 			}
+		}
+	}
+	for _, cleanup := range app.cleanupFuncs {
+		if err := cleanup(); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	if len(errs) > 0 {

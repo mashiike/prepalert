@@ -48,20 +48,27 @@ var (
 	providerFactories = map[string]ProviderFactory{}
 )
 
-func RegisterProvider[T Provider](typeName string, factory GenericProviderFactory[T]) {
+func RegisterProviderWithError[T Provider](typeName string, factory GenericProviderFactory[T]) error {
 	switch typeName {
 	case "prepalert", "rule", "provider", "query":
-		panic(fmt.Sprintf("provider type %q is reserved", typeName))
+		return fmt.Errorf("provider type %q is reserved", typeName)
 	case "":
-		panic("provider type name must not be empty")
+		return fmt.Errorf("provider type name must not be empty")
 	}
 	providersMu.Lock()
 	defer providersMu.Unlock()
 	if _, dup := providerFactories[typeName]; dup {
-		panic(fmt.Sprintf("provider type %q is already registered", typeName))
+		return fmt.Errorf("provider type %q is already registered", typeName)
 	}
 	providerFactories[typeName] = func(pp *ProviderParameter) (Provider, error) {
 		return factory(pp)
+	}
+	return nil
+}
+
+func RegisterProvider[T Provider](typeName string, factory GenericProviderFactory[T]) {
+	if err := RegisterProviderWithError(typeName, factory); err != nil {
+		panic(err)
 	}
 }
 
