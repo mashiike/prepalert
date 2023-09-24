@@ -205,25 +205,22 @@ prepalert {
 
   plugins {
     http = {
-      cmd         = "go run cmd/example-http-csv-plugin/main.go" // your plugin execution command
+      cmd         = "go run github.com/mashiike/prepalert/cmd/example-http-csv-plugin@latest" // your plugin execution command
       sync_output = true  // sync plugin output to prepalert log
     }
   }
 }
 
 provider "http" {
-  endpoint = must_env("TEST_SERVER_ENDPOINT")
+  endpoint = "<your csv server endpoint>"
 }
 
-query "http" "test_server" {
-  fields = ["id", "name"]
-  limit  = 5
-}
+query "http" "csv" {}
 
-rule "test_application_error" {
+rule "always" {
   when = true
   update_alert {
-    memo = "${query.http.test_server.result.query}\n${result_to_table(query.http.test_server)}"
+    memo = "${query.http.csv.result.query}\n${result_to_table(query.http.csv)}"
   }
 }
 ```
