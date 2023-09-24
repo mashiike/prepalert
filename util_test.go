@@ -9,11 +9,13 @@ import (
 func TestExtructSection(t *testing.T) {
 	cases := []struct {
 		name     string
+		header   string
 		input    string
 		expected string
 	}{
 		{
-			name: "rule.hoge",
+			name:   "extruct_inner_section",
+			header: "## rule.hoge",
 			input: `
 hogeareaerlkwarewk
 
@@ -32,7 +34,8 @@ Subsection content.
 `,
 		},
 		{
-			name: "rule.fuga",
+			name:   "extruct_tail_section",
+			header: "## rule.fuga",
 			input: `
 dareawklfarhkjakjfa
 コレは手打ちの文字
@@ -49,7 +52,8 @@ dareawklfarhkjakjfa
 `,
 		},
 		{
-			name: "rule.piyo",
+			name:   "extruct_head_section",
+			header: "## rule.piyo",
 			input: `
 ## rule.piyo
 ここにはruleのmemo
@@ -61,15 +65,34 @@ dareawklfarhkjakjfa
 `,
 		},
 		{
-			name:     "rule.hoge",
+			name:     "empty",
+			header:   "## rule.hoge",
 			input:    ``,
 			expected: ``,
+		},
+		{
+			name:     "#1 header",
+			header:   "# Prepalert",
+			input:    "abc\n# Prepalert\n\nhoge",
+			expected: "# Prepalert\n\nhoge",
+		},
+		{
+			name:     "#1 header with #2 header",
+			header:   "# Prepalert",
+			input:    "abc\n# Prepalert\n\n## hoge\n\nfuga\n\n## piyo\n\nmoge",
+			expected: "# Prepalert\n\n## hoge\n\nfuga\n\n## piyo\n\nmoge",
+		},
+		{
+			name:     "#1 header with #2 header",
+			header:   "# Prepalert",
+			input:    "abc\n# Prepalert\n\n## hoge\n\nfuga\n\n## piyo\n\nmoge\n# Other\n\nhoge",
+			expected: "# Prepalert\n\n## hoge\n\nfuga\n\n## piyo\n\nmoge",
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual := extructSection(c.input, "## "+c.name)
+			actual := extructSection(c.input, c.header)
 			require.Equal(t, c.expected, actual)
 		})
 	}

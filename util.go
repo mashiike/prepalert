@@ -18,12 +18,17 @@ func triming(msg string, limit int, abbreviatedMessage string) string {
 }
 
 func extructSection(memo string, header string) string {
+	indexHeader := strings.Index(header, "# ")
+	if indexHeader == -1 {
+		return ""
+	}
+	atxHeaderPrefix := header[:indexHeader+2]
 	index := strings.Index(memo, header)
 	if index == -1 {
 		return ""
 	}
 	sectionText := strings.TrimPrefix(memo[index:], header)
-	index = strings.Index(sectionText, "\n## ")
+	index = strings.Index(sectionText, "\n"+atxHeaderPrefix)
 	if index == -1 {
 		return header + sectionText
 	}
