@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -433,6 +434,49 @@ func TestAppLoadConfig__WithExamplePlugin(t *testing.T) {
 				}, nil
 			},
 		).Times(1)
+		app.SetMackerelClient(client)
+		h := canyontest.AsWorker(app)
+		r := httptest.NewRequest(http.MethodPost, "/", LoadFileAsReader(t, "example_webhook.json"))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		resp := w.Result()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+}
+
+func TestAppLoadConfig__WithRulePriorty(t *testing.T) {
+	app := LoadApp(t, "testdata/config/with_rule_priority.hcl")
+	rules := app.Rules()
+	require.Len(t, rules, 2)
+	require.Equal(t, rules[0].Name(), "first")
+	require.Equal(t, rules[1].Name(), "second")
+
+	t.Run("AsWorker", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
+		client := mock.NewMockMackerelClient(ctrl)
+		callCount := 0
+		lastMemo := "this is a pen"
+		client.EXPECT().GetAlert("2bj...").DoAndReturn(
+			func(alertID string) (*mackerel.Alert, error) {
+				return &mackerel.Alert{
+					ID:   "2bj...",
+					Memo: lastMemo,
+				}, nil
+			},
+		).Times(2)
+		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
+				require.Equal(t, "2bj...", alertID)
+				callCount++
+				g.Assert(t, fmt.Sprintf("with_rule_priority_as_worker__updated_alert_memo_%d", callCount), []byte(param.Memo))
+				lastMemo = param.Memo
+				return &mackerel.UpdateAlertResponse{
+					Memo: param.Memo,
+				}, nil
+			},
+		).Times(2)
 		app.SetMackerelClient(client)
 		h := canyontest.AsWorker(app)
 		r := httptest.NewRequest(http.MethodPost, "/", LoadFileAsReader(t, "example_webhook.json"))
