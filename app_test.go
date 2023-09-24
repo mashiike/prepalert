@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -79,9 +80,8 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 	t.Run("AsWorker", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-
+		g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
 		client := mock.NewMockMackerelClient(ctrl)
-		expectedMemo := "this is a pen\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n"
 		client.EXPECT().GetAlert("2bj...").Return(
 			&mackerel.Alert{
 				ID:   "2bj...",
@@ -91,9 +91,9 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
 				require.Equal(t, "2bj...", alertID)
-				require.Equal(t, expectedMemo, param.Memo)
+				g.Assert(t, "simple_as_worker__updated_alert_memo", []byte(param.Memo))
 				return &mackerel.UpdateAlertResponse{
-					Memo: expectedMemo,
+					Memo: param.Memo,
 				}, nil
 			},
 		).Times(1)
@@ -175,7 +175,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 		client.EXPECT().GetAlert("2bj...").Return(
 			&mackerel.Alert{
 				ID:   "2bj...",
-				Memo: "this is a pen\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n",
+				Memo: "this is a pen\n\n## Prepalert\n\n### rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n",
 			}, nil,
 		).Times(1)
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -238,6 +238,9 @@ func TestAppLoadConfig__WithS3Backend(t *testing.T) {
 		mockS3Client.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, param *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 				g.AssertJson(t, "with_s3backend_as_worker__put_object_input", param)
+				bs, err := io.ReadAll(param.Body)
+				require.NoError(t, err)
+				g.Assert(t, "with_s3backend_as_worker__put_object_body", bs)
 				return &s3.PutObjectOutput{}, nil
 			},
 		).Times(1)
@@ -476,7 +479,7 @@ func TestAppLoadConfig__WithRulePriorty(t *testing.T) {
 					Memo: param.Memo,
 				}, nil
 			},
-		).Times(2)
+		).Times(1)
 		app.SetMackerelClient(client)
 		h := canyontest.AsWorker(app)
 		r := httptest.NewRequest(http.MethodPost, "/", LoadFileAsReader(t, "example_webhook.json"))

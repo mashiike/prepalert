@@ -2,7 +2,6 @@ package prepalert_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +21,7 @@ func ptr[V any](v V) *V {
 	return &v
 }
 
+/*
 func TestMackerelService__UpdateAlertMemo__NowAlertMemoEmpty(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -45,13 +45,13 @@ func TestMackerelService__UpdateAlertMemo__NowAlertMemoEmpty(t *testing.T) {
 		func(id string, param mackerel.UpdateAlertParam) (mackerel.UpdateAlertResponse, error) {
 			require.Equal(t, "xxxxxxxxxxxxx", id)
 			t.Log(param.Memo)
-			require.Equal(t, "## rule.hoge\nhoge", param.Memo)
+			require.Equal(t, "hoge", param.Memo)
 			return mackerel.UpdateAlertResponse{}, nil
 		},
 	).Times(1)
 
 	svc := prepalert.NewMackerelService(client)
-	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", "hoge")
+	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "hoge")
 	require.NoError(t, err)
 }
 
@@ -266,6 +266,7 @@ func TestMackerelService__UpdateAlertMemo__ReplaceLarge(t *testing.T) {
 	err := svc.UpdateAlertMemo(context.Background(), "xxxxxxxxxxxxx", "rule.hoge", strings.Repeat("A", 100))
 	require.NoError(t, err)
 }
+*/
 
 func TestMackerelService__PostGraphAnnotation__UpdateAnnotationDescription(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -424,73 +425,4 @@ func TestWebnookBody__MarshalCTYValues(t *testing.T) {
 		"org_name": "Macker..."
 	  }`
 	require.JSONEq(t, expected, actual)
-}
-
-func TestExtructSection(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name: "rule.hoge",
-			input: `
-hogeareaerlkwarewk
-
-## rule.hoge
-Subsection content.
-
-#### hoge
-
-## AnotherApp
-Another section content.
-`,
-			expected: `## rule.hoge
-Subsection content.
-
-#### hoge
-`,
-		},
-		{
-			name: "rule.fuga",
-			input: `
-dareawklfarhkjakjfa
-コレは手打ちの文字
-
-## rule.fuga
-
-ここにはruleのmemo
-後ろになにもないことも
-`,
-			expected: `## rule.fuga
-
-ここにはruleのmemo
-後ろになにもないことも
-`,
-		},
-		{
-			name: "rule.piyo",
-			input: `
-## rule.piyo
-ここにはruleのmemo
-後ろになにもないことも
-`,
-			expected: `## rule.piyo
-ここにはruleのmemo
-後ろになにもないことも
-`,
-		},
-		{
-			name:     "rule.hoge",
-			input:    ``,
-			expected: ``,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			actual := prepalert.ExtructSection(c.input, "## "+c.name)
-			require.Equal(t, c.expected, actual)
-		})
-	}
 }

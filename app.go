@@ -277,11 +277,12 @@ func (app *App) ExecuteRules(ctx context.Context, body *WebhookBody) error {
 			dependsOnQueries[queryFQN] = struct{}{}
 		}
 	}
+	u := app.mkrSvc.NewMackerelUpdater(body, app.Backend())
 	executeRule := func() error {
 		var errs []error
 		for _, rule := range matchedRules {
 			ctxWithRule := slogutils.With(ctx, "rule_name", rule.Name())
-			if err := rule.Execute(ctxWithRule, evalCtx); err != nil {
+			if err := rule.Execute(ctxWithRule, evalCtx, u); err != nil {
 				slog.ErrorContext(ctxWithRule, "failed execute rule", "error", err.Error())
 				errs = append(errs, fmt.Errorf(
 					"%s: %w",
@@ -292,6 +293,9 @@ func (app *App) ExecuteRules(ctx context.Context, body *WebhookBody) error {
 		}
 		if len(errs) > 0 {
 			return errors.Join(errs...)
+		}
+		if err := u.Flush(ctx, evalCtx); err != nil {
+			return fmt.Errorf("failed flush to mackerel: %w", err)
 		}
 		return nil
 	}
