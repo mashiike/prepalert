@@ -7,16 +7,15 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/Songmu/flextime"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclutil"
 	"github.com/zclconf/go-cty/cty"
 )
 
 type Rule struct {
 	app                 *App
+	priority            int
 	ruleName            string
 	when                hcl.Expression
 	updateAlert         *UpdateAlertAction
@@ -63,6 +62,9 @@ func (app *App) NewRule(ruleName string) *Rule {
 		},
 	}
 }
+func (rule *Rule) Priority() int {
+	return rule.priority
+}
 
 func registerQueryFQNs(expr hcl.Expression, dependsOn map[string]struct{}) {
 	refarences := hclutil.VariablesReffarances(expr)
@@ -85,6 +87,9 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 			{
 				Name:     "when",
 				Required: true,
+			},
+			{
+				Name: "priority",
 			},
 		},
 		Blocks: []hcl.BlockHeaderSchema{
@@ -134,6 +139,8 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 				})
 				continue
 			}
+		case "priority":
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &rule.priority))
 		}
 	}
 	for _, block := range content.Blocks {
@@ -309,19 +316,15 @@ func (action *PostGraphAnnotationAction) Enable() bool {
 	return action.enable
 }
 
-func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
-	body, err := WebhookFromEvalContext(evalCtx)
-	if err != nil {
-		return err
-	}
+func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext, u *MackerelUpdater) error {
 	errs := make([]error, 0, 2)
 	if rule.UpdateAlertAction().Enable() {
-		if err := rule.UpdateAlertAction().Execute(ctx, evalCtx, body); err != nil {
+		if err := rule.UpdateAlertAction().Execute(ctx, evalCtx, u); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if rule.PostGraphAnnotationAction().Enable() {
-		if err := rule.PostGraphAnnotationAction().Execute(ctx, evalCtx, body); err != nil {
+		if err := rule.PostGraphAnnotationAction().Execute(ctx, evalCtx, u); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -331,74 +334,24 @@ func (rule *Rule) Execute(ctx context.Context, evalCtx *hcl.EvalContext) error {
 	return nil
 }
 
-func (action *UpdateAlertAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
+func (action *UpdateAlertAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, u *MackerelUpdater) error {
 	memo, err := ExpressionToString(action.memoExpr, evalCtx)
 	if err != nil {
 		return fmt.Errorf("render memo: %w", err)
 	}
 	slog.DebugContext(ctx, "dump memo", "memo", memo)
-	uploadBody := strings.NewReader(fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, memo))
-	fullTextURL, uploaded, err := action.app.Backend().Upload(
-		ctx, evalCtx,
-		fmt.Sprintf("%s_%s", body.Alert.ID, action.ruleName),
-		uploadBody,
-	)
-	if err != nil {
-		return fmt.Errorf("upload to backend:%w", err)
-	}
-	if uploaded {
-		slog.DebugContext(ctx, "uploaded to backend", "full_text_url", fullTextURL)
-		memo = fmt.Sprintf("Full Text URL: %s\n\n%s", fullTextURL, memo)
-	}
-
-	if action.sizeLimit != nil && len(memo) > *action.sizeLimit {
-		if uploaded {
-			slog.WarnContext(
-				ctx,
-				"alert memo is too long",
-				"length", len(memo),
-				"full_text_url", fullTextURL,
-			)
-		} else {
-			slog.WarnContext(
-				ctx,
-				"alert memo is too long",
-				"length", len(memo),
-				"full_memo", memo,
-			)
-		}
-		memo = triming(memo, *action.sizeLimit, "\n...")
-	}
-	err = action.app.MackerelService().UpdateAlertMemo(ctx, body.Alert.ID, "Prepalert rule."+action.ruleName, memo)
-	if err != nil {
-		return fmt.Errorf("update alert memo: %w", err)
-	}
+	u.AddMemoSectionText(memo, action.sizeLimit)
 	return nil
 }
 
-func (action *PostGraphAnnotationAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, body *WebhookBody) error {
-	descriptin := fmt.Sprintf("related alert: %s\n", body.Alert.URL)
+func (action *PostGraphAnnotationAction) Execute(ctx context.Context, evalCtx *hcl.EvalContext, u *MackerelUpdater) error {
+	u.AddService(action.service)
 	if action.additionalDescriptionExpr != nil {
 		additionalDescription, err := ExpressionToString(action.additionalDescriptionExpr, evalCtx)
 		if err != nil {
 			return fmt.Errorf("render additional_description: %w", err)
 		}
-		descriptin += additionalDescription
-	}
-	slog.DebugContext(ctx, "dump description", "description", descriptin)
-	to := flextime.Now().Unix()
-	if body.Alert.ClosedAt != nil {
-		to = *body.Alert.ClosedAt
-	}
-	err := action.app.MackerelService().PostGraphAnnotation(ctx, &mackerel.GraphAnnotation{
-		Title:       fmt.Sprintf("prepalert alert_id=%s rule=%s", body.Alert.ID, action.ruleName),
-		Description: descriptin,
-		From:        body.Alert.OpenedAt,
-		To:          to,
-		Service:     action.service,
-	})
-	if err != nil {
-		return fmt.Errorf("post graph annotation: %w", err)
+		u.AddAdditionalDescription(action.service, additionalDescription)
 	}
 	return nil
 }

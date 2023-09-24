@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Songmu/flextime"
 	"github.com/mackerelio/mackerel-client-go"
 )
 
@@ -27,23 +28,33 @@ type MackerelClient interface {
 }
 
 type MackerelService struct {
-	mu     sync.Mutex
-	client MackerelClient
+	client          MackerelClient
+	alertCacheMu    sync.Mutex
+	alertCache      map[string]*mackerel.Alert
+	alertCachedAt   map[string]time.Time
+	monitorCacheMu  sync.Mutex
+	monitorCache    map[string]mackerel.Monitor
+	monitorCachedAt map[string]time.Time
 }
 
 func NewMackerelService(client MackerelClient) *MackerelService {
 	return &MackerelService{
-		client: client,
+		client:          client,
+		alertCache:      make(map[string]*mackerel.Alert),
+		alertCachedAt:   make(map[string]time.Time),
+		monitorCache:    make(map[string]mackerel.Monitor),
+		monitorCachedAt: make(map[string]time.Time),
 	}
 }
 
 var (
 	GraphAnnotationDescriptionMaxSize = 1024
 	AlertMemoMaxSize                  = 80 * 1000
+	CacheDuration                     = 1 * time.Minute
 )
 
-func (svc *MackerelService) NewAlertMemo(ctx context.Context, alertID string, sectionName string, memo string) string {
-	alert, err := svc.client.GetAlert(alertID)
+func (svc *MackerelService) newAlertMemo(ctx context.Context, alertID string, sectionName string, memo string) string {
+	alert, err := svc.getAlertWithCache(ctx, alertID)
 	if err != nil {
 		slog.WarnContext(ctx, "get alert failed", "alert_id", alertID, "error", err)
 		return memo
@@ -95,10 +106,9 @@ func (svc *MackerelService) NewAlertMemo(ctx context.Context, alertID string, se
 	return memo
 }
 
-func (svc *MackerelService) UpdateAlertMemo(ctx context.Context, alertID string, sectionName string, memo string) error {
-	svc.mu.Lock()
-	defer svc.mu.Unlock()
-	memo = svc.NewAlertMemo(ctx, alertID, sectionName, memo)
+func (svc *MackerelService) UpdateAlertMemo(ctx context.Context, alertID string, memo string) error {
+	svc.alertCacheMu.Lock()
+	defer svc.alertCacheMu.Unlock()
 	_, err := svc.client.UpdateAlert(alertID, mackerel.UpdateAlertParam{
 		Memo: memo,
 	})
@@ -110,6 +120,9 @@ func (svc *MackerelService) UpdateAlertMemo(ctx context.Context, alertID string,
 		"updated alert memo",
 		"alert_id", alertID,
 	)
+	if _, ok := svc.alertCache[alertID]; ok {
+		svc.alertCache[alertID].Memo = memo
+	}
 	return nil
 }
 
@@ -183,8 +196,46 @@ func (svc *MackerelService) NewExampleWebhookBody() *WebhookBody {
 	return &body
 }
 
-func (svc *MackerelService) GetMonitorByAlertID(ctx context.Context, alertID string) (mackerel.Monitor, error) {
+func (svc *MackerelService) GetAlertWithCache(ctx context.Context, alertID string) (*mackerel.Alert, error) {
+	svc.alertCacheMu.Lock()
+	defer svc.alertCacheMu.Unlock()
+	return svc.getAlertWithCache(ctx, alertID)
+}
+
+func (svc *MackerelService) getAlertWithCache(ctx context.Context, alertID string) (*mackerel.Alert, error) {
+	if cachedAt, ok := svc.alertCachedAt[alertID]; ok && time.Since(cachedAt) < CacheDuration {
+		return svc.alertCache[alertID], nil
+	}
 	alert, err := svc.client.GetAlert(alertID)
+	if err != nil {
+		return nil, fmt.Errorf("get alert:%w", err)
+	}
+	svc.alertCache[alertID] = alert
+	svc.alertCachedAt[alertID] = flextime.Now()
+	return alert, nil
+}
+
+func (svc *MackerelService) GetMonitorWithCache(ctx context.Context, monitorID string) (mackerel.Monitor, error) {
+	svc.monitorCacheMu.Lock()
+	defer svc.monitorCacheMu.Unlock()
+	return svc.getMonitorWithCache(ctx, monitorID)
+}
+
+func (svc *MackerelService) getMonitorWithCache(ctx context.Context, monitorID string) (mackerel.Monitor, error) {
+	if cachedAt, ok := svc.monitorCachedAt[monitorID]; ok && time.Since(cachedAt) < CacheDuration {
+		return svc.monitorCache[monitorID], nil
+	}
+	monitor, err := svc.client.GetMonitor(monitorID)
+	if err != nil {
+		return nil, fmt.Errorf("get monitor:%w", err)
+	}
+	svc.monitorCache[monitorID] = monitor
+	svc.monitorCachedAt[monitorID] = flextime.Now()
+	return monitor, nil
+}
+
+func (svc *MackerelService) GetMonitorByAlertID(ctx context.Context, alertID string) (mackerel.Monitor, error) {
+	alert, err := svc.GetAlertWithCache(ctx, alertID)
 	if err != nil {
 		return nil, fmt.Errorf("get alert:%w", err)
 	}
@@ -200,11 +251,11 @@ func (svc *MackerelService) NewEmulatedWebhookBody(ctx context.Context, alertID 
 	if err != nil {
 		return nil, fmt.Errorf("get org:%w", err)
 	}
-	alert, err := svc.client.GetAlert(alertID)
+	alert, err := svc.GetAlertWithCache(ctx, alertID)
 	if err != nil {
 		return nil, fmt.Errorf("get alert:%w", err)
 	}
-	monitor, err := svc.client.GetMonitor(alert.MonitorID)
+	monitor, err := svc.getMonitorWithCache(ctx, alert.MonitorID)
 	if err != nil {
 		return nil, fmt.Errorf("get monitor:%w", err)
 	}
@@ -341,7 +392,7 @@ type Alert struct {
 
 func (svc *MackerelService) GetMonitorName(ctx context.Context, monitorID string) (string, error) {
 	slog.DebugContext(ctx, "call MackerelService.GetMonitorName", "monitor_id", monitorID)
-	monitor, err := svc.client.GetMonitor(monitorID)
+	monitor, err := svc.getMonitorWithCache(ctx, monitorID)
 	if err != nil {
 		return "", fmt.Errorf("get monitor:%w", err)
 	}

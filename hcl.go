@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
@@ -414,6 +415,10 @@ func (app *App) decodeRuleBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 		diags = diags.Extend(rule.DecodeBody(block.Body, app.evalCtx))
 		app.rules = append(app.rules, rule)
 	}
+	// priority sort, bigger is first
+	sort.SliceStable(app.rules, func(i, j int) bool {
+		return app.rules[i].Priority() > app.rules[j].Priority()
+	})
 	return diags
 }
 
