@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.12.0](https://github.com/mashiike/prepalert/compare/v0.11.0...v0.12.0) - 2023-09-24
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.33.1 to 1.38.2 by @dependabot in https://github.com/mashiike/prepalert/pull/136
+- install log/slog json loggging by @mashiike in https://github.com/mashiike/prepalert/pull/138
+- Feature/delay render and error fallback by @mashiike in https://github.com/mashiike/prepalert/pull/143
+- Bump actions/checkout from 3 to 4 by @dependabot in https://github.com/mashiike/prepalert/pull/142
+- Bump actions/setup-go from 3 to 4 by @dependabot in https://github.com/mashiike/prepalert/pull/140
+- Bump goreleaser/goreleaser-action from 1 to 4 by @dependabot in https://github.com/mashiike/prepalert/pull/141
+- Enabling Monolithic Lambd Architecture by github.com/mashiike/canyon by @mashiike in https://github.com/mashiike/prepalert/pull/145
+- hcl modify  by @mashiike in https://github.com/mashiike/prepalert/pull/148
+- Bump goreleaser/goreleaser-action from 4 to 5 by @dependabot in https://github.com/mashiike/prepalert/pull/146
+- Bump github.com/aws/aws-sdk-go-v2/feature/s3/manager from 1.11.83 to 1.11.84 by @dependabot in https://github.com/mashiike/prepalert/pull/147
+- alert memo format markdown?  by @mashiike in https://github.com/mashiike/prepalert/pull/149
+- ErrorHandling cli option by @mashiike in https://github.com/mashiike/prepalert/pull/150
+- delete old docs by @mashiike in https://github.com/mashiike/prepalert/pull/151
+- Plugin System by @mashiike in https://github.com/mashiike/prepalert/pull/152
+- Rule Priority by @mashiike in https://github.com/mashiike/prepalert/pull/153
+- upload to backend, only 1 alert  by @mashiike in https://github.com/mashiike/prepalert/pull/154
+
 ## [v0.11.0](https://github.com/mashiike/prepalert/compare/v0.10.2...v0.11.0) - 2023-06-08
 - Bump github.com/mackerelio/mackerel-client-go from 0.25.0 to 0.26.0 by @dependabot in https://github.com/mashiike/prepalert/pull/126
 - Improved Presentation of Detailed Information in Mackerel by @mashiike in https://github.com/mashiike/prepalert/pull/128
