@@ -17,6 +17,7 @@ import (
 
 type Rule struct {
 	app                 *App
+	priority            int
 	ruleName            string
 	when                hcl.Expression
 	updateAlert         *UpdateAlertAction
@@ -63,6 +64,9 @@ func (app *App) NewRule(ruleName string) *Rule {
 		},
 	}
 }
+func (rule *Rule) Priority() int {
+	return rule.priority
+}
 
 func registerQueryFQNs(expr hcl.Expression, dependsOn map[string]struct{}) {
 	refarences := hclutil.VariablesReffarances(expr)
@@ -85,6 +89,9 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 			{
 				Name:     "when",
 				Required: true,
+			},
+			{
+				Name: "priority",
 			},
 		},
 		Blocks: []hcl.BlockHeaderSchema{
@@ -134,6 +141,8 @@ func (rule *Rule) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext) hcl.Diagno
 				})
 				continue
 			}
+		case "priority":
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &rule.priority))
 		}
 	}
 	for _, block := range content.Blocks {

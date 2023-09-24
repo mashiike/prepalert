@@ -264,30 +264,44 @@ func (app *App) ExecuteRules(ctx context.Context, body *WebhookBody) error {
 	if err != nil {
 		return fmt.Errorf("failed build eval context: %w", err)
 	}
+	matchedRules := make([]*Rule, 0, len(app.rules))
+	dependsOnQueries := make(map[string]struct{})
 	for _, rule := range app.rules {
 		if !rule.Match(evalCtx) {
 			continue
 		}
 		slog.InfoContext(ctx, "match rule", "rule", rule.Name())
 		matchCount++
-		if err := app.ExecuteRule(ctx, evalCtx, rule, body); err != nil {
-			return fmt.Errorf("failed process Mackerel webhook body:%s: %w", rule.Name(), err)
+		matchedRules = append(matchedRules, rule)
+		for _, queryFQN := range rule.DependsOnQueries() {
+			dependsOnQueries[queryFQN] = struct{}{}
 		}
 	}
-	slog.InfoContext(ctx, "finish process rules", "matched_rule_count", matchCount)
-	return nil
-}
-
-func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule *Rule, body *WebhookBody) error {
-	ctx = slogutils.With(ctx, "rule_name", rule.Name())
-	dependsOn := rule.DependsOnQueries()
+	executeRule := func() error {
+		var errs []error
+		for _, rule := range matchedRules {
+			ctxWithRule := slogutils.With(ctx, "rule_name", rule.Name())
+			if err := rule.Execute(ctxWithRule, evalCtx); err != nil {
+				slog.ErrorContext(ctxWithRule, "failed execute rule", "error", err.Error())
+				errs = append(errs, fmt.Errorf(
+					"%s: %w",
+					rule.Name(),
+					app.UnwrapAndDumpDiagnoctics(err),
+				))
+			}
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
+		}
+		return nil
+	}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	var errs []error
-	for _, queryFQN := range dependsOn {
+	for queryFQN := range dependsOnQueries {
 		query, ok := app.queries[queryFQN]
 		if !ok {
-			errs = append(errs, fmt.Errorf("query not found %q on %s", queryFQN, rule.Name()))
+			errs = append(errs, fmt.Errorf("not found query %q", queryFQN))
 			continue
 		}
 		mu.Lock()
@@ -299,7 +313,7 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 		evalCtx, err = provider.WithQury(evalCtx, evalCtxQueryVariables)
 		mu.Unlock()
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", queryFQN, rule.Name(), err))
+			errs = append(errs, fmt.Errorf("failed set query status %q", queryFQN))
 			continue
 		}
 		wg.Add(1)
@@ -332,7 +346,7 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 				v.Error = err.Error()
 				evalCtx, err = provider.WithQury(evalCtx, v)
 				if err != nil {
-					errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
+					errs = append(errs, fmt.Errorf("failed set query status %q: %w", v.FQN, err))
 				}
 				return
 			}
@@ -342,11 +356,9 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 			if err != nil {
 				slog.ErrorContext(egctxWithQueryName, "failed marshal query result", "error", err.Error())
 				err = app.UnwrapAndDumpDiagnoctics(err)
-				errs = append(errs, fmt.Errorf("failed set query status %q on %s: %w", v.FQN, rule.Name(), err))
+				errs = append(errs, fmt.Errorf("failed set query status %q: %w", v.FQN, err))
 			}
-			if err := rule.Execute(ctx, evalCtx); err != nil {
-				err = app.UnwrapAndDumpDiagnoctics(err)
-				slog.ErrorContext(egctxWithQueryName, "failed execute rule", "error", err.Error())
+			if err := executeRule(); err != nil {
 				errs = append(errs, err)
 				return
 			}
@@ -355,12 +367,17 @@ func (app *App) ExecuteRule(ctx context.Context, evalCtx *hcl.EvalContext, rule 
 	}
 	wg.Wait()
 	if len(errs) > 0 {
-		return fmt.Errorf("failed process rule %q: %w", rule.Name(), errors.New("query failed"))
+		return fmt.Errorf("failed process Mackerel webhook body: %w", errors.Join(errs...))
 	}
-	if len(dependsOn) > 0 {
+	if len(dependsOnQueries) > 0 {
 		return nil
 	}
-	return rule.Execute(ctx, evalCtx)
+	if err := executeRule(); err != nil {
+		return fmt.Errorf("failed process Mackerel webhook body: %w", err)
+	}
+
+	slog.InfoContext(ctx, "finish process rules", "matched_rule_count", matchCount)
+	return nil
 }
 
 func (app *App) EnableBasicAuth() bool {
