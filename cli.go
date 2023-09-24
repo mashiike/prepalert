@@ -51,8 +51,6 @@ type CLI struct {
 	Version        struct{}      `cmd:"" help:"Show version"`
 }
 
-var Version = "current"
-
 func ParseCLI(ctx context.Context, args []string, opts ...kong.Option) (string, *CLI, error) {
 	var cli CLI
 	cliOptions := []kong.Option{
