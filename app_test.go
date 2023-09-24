@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -237,6 +238,9 @@ func TestAppLoadConfig__WithS3Backend(t *testing.T) {
 		mockS3Client.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, param *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 				g.AssertJson(t, "with_s3backend_as_worker__put_object_input", param)
+				bs, err := io.ReadAll(param.Body)
+				require.NoError(t, err)
+				g.Assert(t, "with_s3backend_as_worker__put_object_body", bs)
 				return &s3.PutObjectOutput{}, nil
 			},
 		).Times(1)
