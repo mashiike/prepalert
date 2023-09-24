@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	plugin "github.com/hashicorp/go-plugin"
 	paproto "github.com/mashiike/prepalert/plugin/proto"
@@ -32,6 +33,7 @@ type BlockSchema struct {
 
 type RunQueryRequest struct {
 	ProviderParameters *provider.ProviderParameter
+	QueryName          string
 	QueryParameters    json.RawMessage
 }
 
@@ -39,6 +41,8 @@ type RunQueryResponse struct {
 	Name      string
 	Query     string
 	Params    []json.RawMessage
+	Columns   []string
+	Rows      [][]string
 	JSONLines []json.RawMessage
 }
 
@@ -105,14 +109,12 @@ type GRPCServer struct {
 
 func (m *GRPCServer) ValidateProviderParameter(ctx context.Context, r *paproto.ValidatProviderPaameter_Request) (*paproto.ValidatProviderPaameter_Response, error) {
 	params := r.GetParameter()
-	err := m.Impl.ValidateProviderParameter(
-		ctx,
-		&provider.ProviderParameter{
-			Type:   params.GetType(),
-			Name:   params.GetName(),
-			Params: json.RawMessage(params.GetJson()),
-		},
-	)
+	pp := &provider.ProviderParameter{
+		Type:   params.GetType(),
+		Name:   params.GetName(),
+		Params: json.RawMessage(params.GetJson()),
+	}
+	err := m.Impl.ValidateProviderParameter(ctx, pp)
 	if err != nil {
 		return &paproto.ValidatProviderPaameter_Response{
 			Ok:      false,
@@ -146,19 +148,42 @@ func (m *GRPCServer) RunQuery(ctx context.Context, r *paproto.RunQuery_Request) 
 				Name:   pp.GetName(),
 				Params: json.RawMessage(pp.GetJson()),
 			},
+			QueryName:       r.QueryName,
 			QueryParameters: json.RawMessage(qp),
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
-	jsonLines := make([]string, len(res.JSONLines))
-	for i, line := range res.JSONLines {
-		jsonLines[i] = string(line)
-	}
 	params := make([]string, len(res.Params))
 	for i, param := range res.Params {
 		params[i] = string(param)
+	}
+	if res.Columns != nil {
+		rows := make([]*paproto.RunQuery_Response_Row, len(res.Rows))
+		for i, row := range res.Rows {
+			if len(row) > len(res.Columns) {
+				return nil, fmt.Errorf("invalid row[%d] length: %d > %d", i, len(row), len(res.Columns))
+			}
+			r := &paproto.RunQuery_Response_Row{
+				Values: make([]string, len(res.Columns)),
+			}
+			for j, val := range row {
+				r.Values[j] = val
+			}
+			rows[i] = r
+		}
+		return &paproto.RunQuery_Response{
+			Name:    res.Name,
+			Query:   res.Query,
+			Params:  params,
+			Columns: res.Columns,
+			Rows:    rows,
+		}, nil
+	}
+	jsonLines := make([]string, len(res.JSONLines))
+	for i, line := range res.JSONLines {
+		jsonLines[i] = string(line)
 	}
 	return &paproto.RunQuery_Response{
 		Name:      res.Name,
@@ -204,11 +229,16 @@ func (m *GRPCClient) RunQuery(ctx context.Context, req *RunQueryRequest) (*RunQu
 			Name: req.ProviderParameters.Name,
 			Json: string(req.ProviderParameters.Params),
 		},
+
 		QueryParams: string(req.QueryParameters),
 	}
 	res, err := m.client.RunQuery(ctx, r)
 	if err != nil {
 		return nil, err
+	}
+	rows := make([][]string, len(res.Rows))
+	for i, row := range res.Rows {
+		rows[i] = row.Values
 	}
 	jsonLines := make([]json.RawMessage, len(res.Jsonlines))
 	for i, line := range res.Jsonlines {
@@ -222,6 +252,8 @@ func (m *GRPCClient) RunQuery(ctx context.Context, req *RunQueryRequest) (*RunQu
 		Name:      res.Name,
 		Query:     res.Query,
 		Params:    params,
+		Columns:   res.Columns,
+		Rows:      rows,
 		JSONLines: jsonLines,
 	}, nil
 }

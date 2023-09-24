@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -67,7 +69,11 @@ type Client struct {
 	initErr    error
 }
 
-func NewClient(pluginName string, cmd string) *Client {
+func NewClient(pluginName string, cmd string, sync bool) *Client {
+	var stderr, stdout io.Writer = io.Discard, io.Discard
+	if sync {
+		stderr, stdout = os.Stderr, os.Stdout
+	}
 	client := plugin.NewClient(
 		&plugin.ClientConfig{
 			HandshakeConfig: Handshake,
@@ -76,6 +82,9 @@ func NewClient(pluginName string, cmd string) *Client {
 			AllowedProtocols: []plugin.Protocol{
 				plugin.ProtocolGRPC,
 			},
+			Stderr:     stderr,
+			SyncStderr: stderr,
+			SyncStdout: stdout,
 			Logger: hclog.New(&hclog.LoggerOptions{
 				Output: hclog.DefaultOutput,
 				Level:  hclog.Error,
@@ -131,8 +140,8 @@ type RemoteProviderFactory struct {
 	provier    Provider
 }
 
-func NewRemoteProviderFactory(pluginName string, cmd string) (*RemoteProviderFactory, func() error, error) {
-	c := NewClient(pluginName, cmd)
+func NewRemoteProviderFactory(pluginName string, cmd string, sync bool) (*RemoteProviderFactory, func() error, error) {
+	c := NewClient(pluginName, cmd, sync)
 	f := &RemoteProviderFactory{
 		pluginName: pluginName,
 	}
@@ -151,6 +160,7 @@ type RemoteProvider struct {
 }
 
 type RemoteQuery struct {
+	name   string
 	rp     *RemoteProvider
 	params *decodedBlock
 }
@@ -173,6 +183,7 @@ func (f *RemoteProviderFactory) NewProvider(pp *provider.ProviderParameter) (*Re
 
 func (rp *RemoteProvider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (provider.Query, error) {
 	rq := &RemoteQuery{
+		name:   name,
 		rp:     rp,
 		params: &decodedBlock{},
 	}
@@ -293,6 +304,7 @@ func (rq *RemoteQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prov
 	}
 	req := &RunQueryRequest{
 		ProviderParameters: rq.rp.pp,
+		QueryName:          rq.name,
 		QueryParameters:    json.RawMessage(bs),
 	}
 	resp, err := rq.rp.impl.RunQuery(ctx, req)
@@ -306,6 +318,20 @@ func (rq *RemoteQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*prov
 			return nil, fmt.Errorf("unmarshal query result param error: %w", err)
 		}
 		params[i] = value
+	}
+	if resp.Columns != nil {
+		rows := make([][]json.RawMessage, len(resp.Rows))
+		for i, row := range resp.Rows {
+			rows[i] = make([]json.RawMessage, len(row))
+			for j, val := range row {
+				if json.Valid([]byte(val)) {
+					rows[i][j] = json.RawMessage(val)
+				} else {
+					rows[i][j] = json.RawMessage(fmt.Sprintf("%q", val))
+				}
+			}
+		}
+		return provider.NewQueryResult(resp.Name, resp.Query, params, resp.Columns, rows), nil
 	}
 	lines := make([]map[string]json.RawMessage, len(resp.JSONLines))
 	for i, jl := range resp.JSONLines {

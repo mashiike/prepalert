@@ -431,6 +431,7 @@ func (app *App) NewEvalContext(body *WebhookBody) (*hcl.EvalContext, error) {
 type LoadPluginConfig struct {
 	PluginName string `cty:"-"`
 	Command    string `cty:"cmd"`
+	SyncOutput bool   `cty:"sync_output"`
 }
 
 func (app *App) LoadPlugin(ctx context.Context, cfg *LoadPluginConfig) error {
@@ -440,7 +441,7 @@ func (app *App) LoadPlugin(ctx context.Context, cfg *LoadPluginConfig) error {
 	if cfg.PluginName == "" {
 		return fmt.Errorf("plugin name is empty")
 	}
-	f, clenup, err := plugin.NewRemoteProviderFactory(cfg.PluginName, cfg.Command)
+	f, clenup, err := plugin.NewRemoteProviderFactory(cfg.PluginName, cfg.Command, cfg.SyncOutput)
 	if clenup != nil {
 		app.cleanupFuncs = append(app.cleanupFuncs, clenup)
 	}

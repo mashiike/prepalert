@@ -45,13 +45,19 @@ message GetQuerySchema {
 message RunQuery {
     message Request {
         ProviderParameter providerParams = 1;
-        string queryParams = 2;
+        string queryName = 2;
+        string queryParams = 3;
     }
     message Response {
+        message Row {
+            repeated string values = 1;
+        }
         string name = 1;
         string query = 2;
         repeated string params = 3;
-        repeated string jsonlines = 4;
+        repeated string columns = 4;
+        repeated Row rows = 5;
+        repeated string jsonlines = 6;
     }
 }
 

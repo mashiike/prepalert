@@ -4,20 +4,21 @@ prepalert {
 
   plugins {
     test = {
-      cmd = "go run testdata/plugin/testplugin/main.go"
+      cmd         = "go run testdata/plugin/testplugin/main.go"
+      sync_output = true
     }
   }
 }
 
 provider "test" {
-    magic = "this is test"
+  magic = "this is test"
 }
 
 query "test" "hoge" {
-    code = "hoge"
-    details {
-        description = "test hoge query"
-    }
+  code = "hoge"
+  details {
+    description = "test hoge query"
+  }
 }
 
 rule "test_application_error" {
