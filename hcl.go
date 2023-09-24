@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/mackerelio/mackerel-client-go"
 	"github.com/mashiike/hclutil"
+	"github.com/mashiike/prepalert/plugin"
 	"github.com/mashiike/prepalert/provider"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/function"
@@ -139,6 +140,9 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 		},
 		Blocks: []hcl.BlockHeaderSchema{
 			{
+				Type: "plugins",
+			},
+			{
 				Type: "auth",
 			},
 			{
@@ -152,6 +156,10 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 		return diags
 	}
 	diags.Extend(hclutil.RestrictBlock(content, []hclutil.BlockRestrictionSchema{
+		{
+			Type:   "plugins",
+			Unique: true,
+		},
 		{
 			Type:   "auth",
 			Unique: true,
@@ -191,10 +199,45 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 	if diags.HasErrors() {
 		return diags
 	}
+	if blocks := content.Blocks.OfType("plugins"); len(blocks) > 0 {
+		attrs, attrDiags := blocks[0].Body.JustAttributes()
+		diags = diags.Extend(attrDiags)
+		if !attrDiags.HasErrors() {
+			for name, attr := range attrs {
+				value, valueDiags := attr.Expr.Value(app.evalCtx)
+				diags = diags.Extend(valueDiags)
+				if valueDiags.HasErrors() {
+					continue
+				}
+				var loadPluginConfig LoadPluginConfig
+				if err := hclutil.UnmarshalCTYValue(value, &loadPluginConfig); err != nil {
+					diags = diags.Append(&hcl.Diagnostic{
+						Severity: hcl.DiagError,
+						Summary:  `plugin attribute validation`,
+						Detail:   err.Error(),
+						Subject:  attr.NameRange.Ptr(),
+					})
+					continue
+				}
+				loadPluginConfig.PluginName = name
+				if err := app.LoadPlugin(context.Background(), &loadPluginConfig); err != nil {
+					diags = diags.Append(&hcl.Diagnostic{
+						Severity: hcl.DiagError,
+						Summary:  `plugin attribute validation`,
+						Detail:   err.Error(),
+						Subject:  attr.NameRange.Ptr(),
+					})
+					continue
+				}
+			}
+		}
+	}
 	if blocks := content.Blocks.OfType("auth"); len(blocks) > 0 {
 		attr, attrDiags := blocks[0].Body.JustAttributes()
 		diags = diags.Extend(attrDiags)
-		if !attrDiags.HasErrors() {
+		if attrDiags.HasErrors() {
+			app.webhookServerPrepared = false
+		} else {
 			for name, attr := range attr {
 				switch name {
 				case "client_id":
@@ -383,6 +426,29 @@ func (app *App) NewEvalContext(body *WebhookBody) (*hcl.EvalContext, error) {
 		return app.evalCtx.NewChild(), fmt.Errorf("failed marshal Mackerel webhook body to cty value: %w", err)
 	}
 	return hclutil.WithValue(app.evalCtx, webhookHCLPrefix, webhook), nil
+}
+
+type LoadPluginConfig struct {
+	PluginName string `cty:"-"`
+	Command    string `cty:"cmd"`
+	SyncOutput bool   `cty:"sync_output"`
+}
+
+func (app *App) LoadPlugin(ctx context.Context, cfg *LoadPluginConfig) error {
+	if cfg.Command == "" {
+		return fmt.Errorf("plugin cmd is empty")
+	}
+	if cfg.PluginName == "" {
+		return fmt.Errorf("plugin name is empty")
+	}
+	f, clenup, err := plugin.NewRemoteProviderFactory(cfg.PluginName, cfg.Command, cfg.SyncOutput)
+	if clenup != nil {
+		app.cleanupFuncs = append(app.cleanupFuncs, clenup)
+	}
+	if err != nil {
+		return fmt.Errorf("failed load plugin: %w", err)
+	}
+	return provider.RegisterProviderWithError(cfg.PluginName, f.NewProvider)
 }
 
 func WebhookFromEvalContext(evalCtx *hcl.EvalContext) (*WebhookBody, error) {

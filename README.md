@@ -134,10 +134,99 @@ A related document is [https://docs.aws.amazon.com/lambda/latest/dg/runtimes-cus
 
 for example.
 
-deploy two lambda functions, prepalert-http and prepalert-worker in [lambda directory](lambda/)  
+deploy lambda function, prepalert in [lambda directory](lambda/)  
 The example of lambda directory uses [lambroll](https://github.com/fujiwara/lambroll) for deployment.
 
-For more information on the infrastructure around lambda functions, please refer to [example.tf](lambda/example.tf).
+## Advanced Usage
+
+### Plugin System 
+
+prepalert has a plugin system. you can add custom provider. plugin is gRPC Server program. 
+protocol buffer definition is [here](plugin/proto/prepalert.proto)
+
+in Go language, following code is example plugin.
+
+```go
+package main
+
+import (
+	"context"
+
+	"github.com/mashiike/prepalert/plugin"
+	"github.com/mashiike/prepalert/provider"
+)
+
+type Provider struct {
+	// ...
+}
+
+func (p *Provider) ValidateProviderParameter(ctx context.Context, pp *provider.ProviderParameter) error {
+	/*
+		Your custom provider parameter validation
+	*/
+	return nil
+}
+
+func (p *Provider) GetQuerySchema(ctx context.Context) (*plugin.Schema, error) {
+	/*
+		Your custom provider's query paramete schema
+	*/
+	return &plugin.Schema{}, nil
+}
+
+func (p *Provider) RunQuery(ctx context.Context, req *plugin.RunQueryRequest) (*plugin.RunQueryResponse, error) {
+	/*
+		Your custom provider's query execution
+	*/
+	return &plugin.RunQueryResponse{
+		Name:    req.QueryName,
+		Query:   "<your query string>",
+		Columns: []string{"<column name>", "<column name>", "<column name>"},
+		Rows: [][]string{
+			{"<row value>", "<row value>", "<row value>"},
+			{"<row value>", "<row value>", "<row value>"},
+			{"<row value>", "<row value>", "<row value>"},
+		},
+	}, nil
+}
+
+func main() {
+	plugin.ServePlugin(plugin.WithProviderPlugin(&Provider{}))
+}
+```
+example plugin is [cmd/example-http-csv-plugin](cmd/example-http-csv-plugin/main.go)
+
+configuration is as follows:
+
+```hcl
+prepalert {
+  required_version = ">=v0.12.0"
+  sqs_queue_name   = "prepalert"
+
+  plugins {
+    http = {
+      cmd         = "go run cmd/example-http-csv-plugin/main.go" // your plugin execution command
+      sync_output = true  // sync plugin output to prepalert log
+    }
+  }
+}
+
+provider "http" {
+  endpoint = must_env("TEST_SERVER_ENDPOINT")
+}
+
+query "http" "test_server" {
+  fields = ["id", "name"]
+  limit  = 5
+}
+
+rule "test_application_error" {
+  when = true
+  update_alert {
+    memo = "${query.http.test_server.result.query}\n${result_to_table(query.http.test_server)}"
+  }
+}
+```
 
 ## LICENSE
 

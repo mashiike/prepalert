@@ -1,0 +1,10 @@
+this is a pen
+
+## Prepalert rule.test_application_error
+GET http://<test_server_endpoint>?fields=id%2Cname&limit=5
++----+------+
+| ID | NAME |
++----+------+
+|  1 | hoge |
+|  2 | fuga |
++----+------+

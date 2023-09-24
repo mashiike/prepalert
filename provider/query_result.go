@@ -103,10 +103,11 @@ func NewQueryResultWithJSONLines(name string, query string, params []interface{}
 	return qr
 }
 
-func NewQueryResult(name string, query string, columns []string, rows [][]json.RawMessage) *QueryResult {
+func NewQueryResult(name string, query string, params []interface{}, columns []string, rows [][]json.RawMessage) *QueryResult {
 	return &QueryResult{
 		Name:    name,
 		Query:   query,
+		Params:  params,
 		Columns: columns,
 		Rows:    rows,
 	}
