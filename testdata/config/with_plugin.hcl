@@ -20,7 +20,7 @@ query "test" "hoge" {
     }
 }
 
-rule "alb_target_5xx" {
+rule "test_application_error" {
   when = true
   update_alert {
     memo = result_to_table(query.test.hoge)

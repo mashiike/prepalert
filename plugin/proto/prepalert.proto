@@ -44,7 +44,7 @@ message GetQuerySchema {
 
 message RunQuery {
     message Request {
-        string providerParams = 1;
+        ProviderParameter providerParams = 1;
         string queryParams = 2;
     }
     message Response {

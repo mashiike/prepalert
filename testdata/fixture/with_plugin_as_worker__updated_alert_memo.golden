@@ -1,0 +1,9 @@
+this is a pen
+
+## Prepalert rule.test_application_error
++--------+-----------------------------+------+
+| SYSTEM |         DESCRIPTION         | CODE |
++--------+-----------------------------+------+
+| app    | hoge is test app error code | hoge |
+| app    | fuga is test app error code | fuga |
++--------+-----------------------------+------+

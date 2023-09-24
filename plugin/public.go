@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -225,7 +226,10 @@ func (b *decodedBlock) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext, schem
 	b.Attributes = content.Attributes
 	b.NestedBlocks = make(map[string]*decodedBlock)
 	for _, block := range content.Blocks {
-		key := block.Type + "." + strings.Join(block.Labels, ".")
+		key := block.Type
+		if len(block.Labels) > 0 {
+			key += "." + strings.Join(block.Labels, ".")
+		}
 		b.NestedBlocks[key] = &decodedBlock{
 			Block: block,
 		}
@@ -234,6 +238,83 @@ func (b *decodedBlock) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext, schem
 	return diags
 }
 
+func (b *decodedBlock) toJSON(evalCtx *hcl.EvalContext) (map[string]interface{}, error) {
+	params := make(map[string]interface{}, len(b.Attributes)+len(b.NestedBlocks))
+	for _, attr := range b.Attributes {
+		value, err := attr.Expr.Value(evalCtx)
+		if err != nil {
+			return nil, fmt.Errorf("eval attribute error: %w", err)
+		}
+		var jsonValue json.RawMessage
+		if err := hclutil.UnmarshalCTYValue(value, &jsonValue); err != nil {
+			return nil, fmt.Errorf("unmarshal attribute error: %w", err)
+		}
+		params[attr.Name] = jsonValue
+	}
+	blocks := make(map[string]interface{}, len(b.NestedBlocks))
+	for key, block := range b.NestedBlocks {
+		value, err := block.toJSON(evalCtx)
+		if err != nil {
+			return nil, fmt.Errorf("convert nested block error: %w", err)
+		}
+		blocks[key] = value
+	}
+	// split . and merge into params map
+	for key, value := range blocks {
+		parts := strings.Split(key, ".")
+		current := params
+		for _, part := range parts[:len(parts)-1] {
+			if _, ok := current[part]; !ok {
+				current[part] = make(map[string]interface{})
+			}
+			current = current[part].(map[string]interface{})
+		}
+		current[parts[len(parts)-1]] = value
+	}
+	return params, nil
+}
+
+func (b *decodedBlock) ToJSON(evalCtx *hcl.EvalContext) ([]byte, error) {
+	params, err := b.toJSON(evalCtx)
+	if err != nil {
+		return nil, err
+	}
+	bs, err := json.Marshal(params)
+	if err != nil {
+		return nil, fmt.Errorf("marshal json error: %w", err)
+	}
+	return bs, nil
+}
+
 func (rq *RemoteQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
-	return nil, errors.New("not implemented yet")
+	bs, err := rq.params.ToJSON(evalCtx)
+	if err != nil {
+		return nil, fmt.Errorf("convert query body to json error: %w", err)
+	}
+	req := &RunQueryRequest{
+		ProviderParameters: rq.rp.pp,
+		QueryParameters:    json.RawMessage(bs),
+	}
+	resp, err := rq.rp.impl.RunQuery(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("impl.RunQuery: %w", err)
+	}
+	params := make([]interface{}, len(resp.Params))
+	for i, param := range resp.Params {
+		var value interface{}
+		if err := json.Unmarshal(param, &value); err != nil {
+			return nil, fmt.Errorf("unmarshal query result param error: %w", err)
+		}
+		params[i] = value
+	}
+	lines := make([]map[string]json.RawMessage, len(resp.JSONLines))
+	for i, jl := range resp.JSONLines {
+		var line map[string]json.RawMessage
+		if err := json.Unmarshal(jl, &line); err != nil {
+			return nil, fmt.Errorf("unmarshal query result line error: %w", err)
+		}
+		lines[i] = line
+	}
+	qr := provider.NewQueryResultWithJSONLines(resp.Name, resp.Query, params, lines...)
+	return qr, nil
 }

@@ -30,10 +30,22 @@ type BlockSchema struct {
 	Body         *Schema
 }
 
+type RunQueryRequest struct {
+	ProviderParameters *provider.ProviderParameter
+	QueryParameters    json.RawMessage
+}
+
+type RunQueryResponse struct {
+	Name      string
+	Query     string
+	Params    []json.RawMessage
+	JSONLines []json.RawMessage
+}
+
 type Provider interface {
 	ValidateProviderParameter(ctx context.Context, pp *provider.ProviderParameter) error
 	GetQuerySchema(ctx context.Context) (*Schema, error)
-	// RunQuery(ctx context.Context, req *RunQueryRequest) (*RunQueryResponse, error)
+	RunQuery(ctx context.Context, req *RunQueryRequest) (*RunQueryResponse, error)
 }
 
 func NewSchemaWithProto(s *paproto.Schema) *Schema {
@@ -123,8 +135,37 @@ func (m *GRPCServer) GetQuerySchema(ctx context.Context, _ *paproto.GetQuerySche
 	return res, nil
 }
 
-func (m *GRPCServer) RunQuery(context.Context, *paproto.RunQuery_Request) (*paproto.RunQuery_Response, error) {
-	return nil, errors.New("not implemeted yet")
+func (m *GRPCServer) RunQuery(ctx context.Context, r *paproto.RunQuery_Request) (*paproto.RunQuery_Response, error) {
+	pp := r.GetProviderParams()
+	qp := r.GetQueryParams()
+	res, err := m.Impl.RunQuery(
+		ctx,
+		&RunQueryRequest{
+			ProviderParameters: &provider.ProviderParameter{
+				Type:   pp.GetType(),
+				Name:   pp.GetName(),
+				Params: json.RawMessage(pp.GetJson()),
+			},
+			QueryParameters: json.RawMessage(qp),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	jsonLines := make([]string, len(res.JSONLines))
+	for i, line := range res.JSONLines {
+		jsonLines[i] = string(line)
+	}
+	params := make([]string, len(res.Params))
+	for i, param := range res.Params {
+		params[i] = string(param)
+	}
+	return &paproto.RunQuery_Response{
+		Name:      res.Name,
+		Query:     res.Query,
+		Params:    params,
+		Jsonlines: jsonLines,
+	}, nil
 }
 
 type GRPCClient struct{ client paproto.ProviderClient }
@@ -154,6 +195,35 @@ func (m *GRPCClient) GetQuerySchema(ctx context.Context) (*Schema, error) {
 		return nil, err
 	}
 	return NewSchemaWithProto(res.Schema), nil
+}
+
+func (m *GRPCClient) RunQuery(ctx context.Context, req *RunQueryRequest) (*RunQueryResponse, error) {
+	r := &paproto.RunQuery_Request{
+		ProviderParams: &paproto.ProviderParameter{
+			Type: req.ProviderParameters.Type,
+			Name: req.ProviderParameters.Name,
+			Json: string(req.ProviderParameters.Params),
+		},
+		QueryParams: string(req.QueryParameters),
+	}
+	res, err := m.client.RunQuery(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	jsonLines := make([]json.RawMessage, len(res.Jsonlines))
+	for i, line := range res.Jsonlines {
+		jsonLines[i] = json.RawMessage(line)
+	}
+	params := make([]json.RawMessage, len(res.Params))
+	for i, param := range res.Params {
+		params[i] = json.RawMessage(param)
+	}
+	return &RunQueryResponse{
+		Name:      res.Name,
+		Query:     res.Query,
+		Params:    params,
+		JSONLines: jsonLines,
+	}, nil
 }
 
 type ProviderPlugin struct {

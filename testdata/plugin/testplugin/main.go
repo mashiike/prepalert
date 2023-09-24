@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 
 	"github.com/mashiike/prepalert/plugin"
@@ -37,6 +38,16 @@ func (p *Provider) GetQuerySchema(ctx context.Context) (*plugin.Schema, error) {
 					},
 				},
 			},
+		},
+	}, nil
+}
+
+func (p *Provider) RunQuery(ctx context.Context, req *plugin.RunQueryRequest) (*plugin.RunQueryResponse, error) {
+	return &plugin.RunQueryResponse{
+		Name: "test",
+		JSONLines: []json.RawMessage{
+			[]byte(`{"system":"app", "code":"hoge", "description":"hoge is test app error code"}`),
+			[]byte(`{"system":"app", "code":"fuga", "description":"fuga is test app error code"}`),
 		},
 	}, nil
 }
