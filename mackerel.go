@@ -42,19 +42,6 @@ var (
 	AlertMemoMaxSize                  = 80 * 1000
 )
 
-func ExtructSection(memo string, header string) string {
-	index := strings.Index(memo, header)
-	if index == -1 {
-		return ""
-	}
-	sectionText := strings.TrimPrefix(memo[index:], header)
-	index = strings.Index(sectionText, "\n## ")
-	if index == -1 {
-		return header + sectionText
-	}
-	return header + sectionText[:index]
-}
-
 func (svc *MackerelService) NewAlertMemo(ctx context.Context, alertID string, sectionName string, memo string) string {
 	alert, err := svc.client.GetAlert(alertID)
 	if err != nil {
@@ -72,7 +59,7 @@ func (svc *MackerelService) NewAlertMemo(ctx context.Context, alertID string, se
 		memo = triming(header+"\n"+memo, AlertMemoMaxSize, "...")
 		return memo
 	}
-	extracted := ExtructSection(alert.Memo, header)
+	extracted := extructSection(alert.Memo, header)
 	if extracted == "" {
 		slog.InfoContext(
 			ctx,

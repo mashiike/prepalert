@@ -1,65 +1,76 @@
-package prepalert_test
+package prepalert
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"os"
-	"strings"
 	"testing"
 
-	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/hclsyntax"
-	"github.com/mashiike/prepalert"
 	"github.com/stretchr/testify/require"
 )
 
-func LoadApp(t *testing.T, path string) *prepalert.App {
-	t.Helper()
-	app := prepalert.New("dummy-api-key")
-	err := app.LoadConfig(path)
-	require.NoError(t, err)
-	return app
-}
+func TestExtructSection(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "rule.hoge",
+			input: `
+hogeareaerlkwarewk
 
-func LoadFile(t *testing.T, path string) []byte {
-	t.Helper()
-	fp, err := os.Open(path)
-	require.NoError(t, err)
-	defer fp.Close()
-	bs, err := io.ReadAll(fp)
-	require.NoError(t, err)
-	return bs
-}
+## rule.hoge
+Subsection content.
 
-func LoadFileAsReader(t *testing.T, path string) io.Reader {
-	t.Helper()
-	bs := LoadFile(t, path)
-	return bytes.NewReader(bs)
-}
+#### hoge
 
-func LoadJSON[V any](t *testing.T, path string) V {
-	t.Helper()
-	var v V
-	err := json.Unmarshal(LoadFile(t, path), &v)
-	require.NoError(t, err)
-	return v
-}
+## AnotherApp
+Another section content.
+`,
+			expected: `## rule.hoge
+Subsection content.
 
-func ParseExpression(t *testing.T, expr string) hcl.Expression {
-	t.Helper()
-	parsed, diags := hclsyntax.ParseExpression([]byte(expr), "expression.hcl", hcl.InitialPos)
-	if diags.HasErrors() {
-		var buf strings.Builder
-		w := hcl.NewDiagnosticTextWriter(&buf, map[string]*hcl.File{
-			"expression.hcl": {
-				Body:  nil,
-				Bytes: []byte(expr),
-			},
-		}, 400, false)
-		w.WriteDiagnostics(diags)
-		t.Log(buf.String())
-		require.FailNow(t, diags.Error())
+#### hoge
+`,
+		},
+		{
+			name: "rule.fuga",
+			input: `
+dareawklfarhkjakjfa
+コレは手打ちの文字
+
+## rule.fuga
+
+ここにはruleのmemo
+後ろになにもないことも
+`,
+			expected: `## rule.fuga
+
+ここにはruleのmemo
+後ろになにもないことも
+`,
+		},
+		{
+			name: "rule.piyo",
+			input: `
+## rule.piyo
+ここにはruleのmemo
+後ろになにもないことも
+`,
+			expected: `## rule.piyo
+ここにはruleのmemo
+後ろになにもないことも
+`,
+		},
+		{
+			name:     "rule.hoge",
+			input:    ``,
+			expected: ``,
+		},
 	}
-	return parsed
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := extructSection(c.input, "## "+c.name)
+			require.Equal(t, c.expected, actual)
+		})
+	}
 }
