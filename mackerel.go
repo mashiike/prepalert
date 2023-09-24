@@ -53,59 +53,6 @@ var (
 	CacheDuration                     = 1 * time.Minute
 )
 
-func (svc *MackerelService) newAlertMemo(ctx context.Context, alertID string, sectionName string, memo string) string {
-	alert, err := svc.getAlertWithCache(ctx, alertID)
-	if err != nil {
-		slog.WarnContext(ctx, "get alert failed", "alert_id", alertID, "error", err)
-		return memo
-	}
-	header := "## " + sectionName
-	if alert.Memo == "" {
-		slog.InfoContext(
-			ctx,
-			"alert memo is empty, add new section",
-			"alert_id", alertID,
-			"section_name", sectionName,
-		)
-		memo = triming(header+"\n"+memo, AlertMemoMaxSize, "...")
-		return memo
-	}
-	extracted := extructSection(alert.Memo, header)
-	if extracted == "" {
-		slog.InfoContext(
-			ctx,
-			"alert memo section not found, add new section",
-			"alert_id", alertID,
-			"section_name", sectionName,
-		)
-		memo = header + "\n" + memo
-		if len(alert.Memo)+len(memo) > AlertMemoMaxSize {
-			memo = triming(memo, AlertMemoMaxSize-len(alert.Memo), "...")
-			if !strings.HasPrefix(memo, header+"\n") {
-				slog.WarnContext(ctx,
-					"alert memo section not found, but memo is too long, so memo is truncated",
-					"alert_id", alertID,
-					"section_name", sectionName,
-				)
-				return alert.Memo
-			}
-		}
-		return alert.Memo + "\n\n" + memo
-	}
-	slog.InfoContext(
-		ctx,
-		"alert memo section found, replace section",
-		"alert_id", alertID,
-		"section_name", sectionName,
-	)
-	memo = header + "\n" + memo + "\n"
-	if len(alert.Memo)-len(extracted)+len(memo) > AlertMemoMaxSize {
-		memo = triming(memo, AlertMemoMaxSize-len(alert.Memo)+len(extracted), "...\n")
-	}
-	memo = strings.Replace(alert.Memo, extracted, memo, 1)
-	return memo
-}
-
 func (svc *MackerelService) UpdateAlertMemo(ctx context.Context, alertID string, memo string) error {
 	svc.alertCacheMu.Lock()
 	defer svc.alertCacheMu.Unlock()
@@ -388,13 +335,4 @@ type Alert struct {
 	ID                string   `json:"id" cty:"id"`
 	URL               string   `json:"url" cty:"url"`
 	WarningThreshold  *float64 `json:"warningThreshold,omitempty" cty:"warning_threshold,omitempty"`
-}
-
-func (svc *MackerelService) GetMonitorName(ctx context.Context, monitorID string) (string, error) {
-	slog.DebugContext(ctx, "call MackerelService.GetMonitorName", "monitor_id", monitorID)
-	monitor, err := svc.getMonitorWithCache(ctx, monitorID)
-	if err != nil {
-		return "", fmt.Errorf("get monitor:%w", err)
-	}
-	return monitor.MonitorName(), nil
 }
