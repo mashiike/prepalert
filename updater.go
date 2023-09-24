@@ -64,12 +64,14 @@ func (u *MackerelUpdater) Flush(ctx context.Context, evalCtx *hcl.EvalContext) e
 	if len(u.memoSectionText) > 0 {
 		var fullText, memo string
 		for i, text := range u.memoSectionText {
-			fullText += text + "\n\n"
+			fullText += "\n\n" + text
 			if u.memoSectionSizeLimit[i] != nil {
 				text = triming(text, *u.memoSectionSizeLimit[i], "\n...")
 			}
-			memo += text + "\n\n"
+			memo += "\n\n" + text
 		}
+		fullText = strings.TrimPrefix(fullText, "\n\n")
+		memo = strings.TrimPrefix(memo, "\n\n")
 		uploadBody := strings.NewReader(fmt.Sprintf("related alert: %s\n\n%s", body.Alert.URL, fullText))
 		fullTextURL, uploaded, err := u.backend.Upload(ctx, evalCtx, body.Alert.ID, uploadBody)
 		if err != nil {
@@ -81,7 +83,7 @@ func (u *MackerelUpdater) Flush(ctx context.Context, evalCtx *hcl.EvalContext) e
 		} else {
 			memo = fullText
 		}
-		header := "# Prepalert\n"
+		header := "## Prepalert\n"
 		memo = header + memo
 		alert, err := u.svc.GetAlertWithCache(ctx, body.Alert.ID)
 		if err != nil {

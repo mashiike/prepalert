@@ -19,6 +19,9 @@ func LoadApp(t *testing.T, path string) *prepalert.App {
 	app := prepalert.New("dummy-api-key")
 	err := app.LoadConfig(path)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		app.Close()
+	})
 	return app
 }
 

@@ -79,9 +79,8 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 	t.Run("AsWorker", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-
+		g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
 		client := mock.NewMockMackerelClient(ctrl)
-		expectedMemo := "this is a pen\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n"
 		client.EXPECT().GetAlert("2bj...").Return(
 			&mackerel.Alert{
 				ID:   "2bj...",
@@ -91,9 +90,9 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
 				require.Equal(t, "2bj...", alertID)
-				require.Equal(t, expectedMemo, param.Memo)
+				g.Assert(t, "simple_as_worker__updated_alert_memo", []byte(param.Memo))
 				return &mackerel.UpdateAlertResponse{
-					Memo: expectedMemo,
+					Memo: param.Memo,
 				}, nil
 			},
 		).Times(1)
@@ -175,7 +174,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 		client.EXPECT().GetAlert("2bj...").Return(
 			&mackerel.Alert{
 				ID:   "2bj...",
-				Memo: "this is a pen\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n",
+				Memo: "this is a pen\n\n## Prepalert\n\n### rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n",
 			}, nil,
 		).Times(1)
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -476,7 +475,7 @@ func TestAppLoadConfig__WithRulePriorty(t *testing.T) {
 					Memo: param.Memo,
 				}, nil
 			},
-		).Times(2)
+		).Times(1)
 		app.SetMackerelClient(client)
 		h := canyontest.AsWorker(app)
 		r := httptest.NewRequest(http.MethodPost, "/", LoadFileAsReader(t, "example_webhook.json"))
