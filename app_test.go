@@ -327,7 +327,7 @@ func TestAppLoadConfig__When_Is_List(t *testing.T) {
 				MonitorID: "4gx...",
 				Memo:      "How do you respond to alerts?",
 			}, nil,
-		).Times(2)
+		).Times(1)
 		client.EXPECT().GetMonitor("4gx...").Return(
 			&mackerel.MonitorServiceMetric{
 				ID:   "4gx...",
@@ -465,7 +465,7 @@ func TestAppLoadConfig__WithRulePriorty(t *testing.T) {
 					Memo: lastMemo,
 				}, nil
 			},
-		).Times(2)
+		).Times(1)
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
 				require.Equal(t, "2bj...", alertID)
