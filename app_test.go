@@ -316,9 +316,8 @@ func TestAppLoadConfig__When_Is_List(t *testing.T) {
 	t.Run("AsWorker", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-
+		g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
 		client := mock.NewMockMackerelClient(ctrl)
-		expectedMemo := "How do you respond to alerts?\n\n## Prepalert rule.simple\nHow do you respond to alerts?\nDescribe information about your alert response here.\n"
 		client.EXPECT().GetAlert("2bj...").Return(
 			&mackerel.Alert{
 				ID:        "2bj...",
@@ -335,9 +334,9 @@ func TestAppLoadConfig__When_Is_List(t *testing.T) {
 		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
 				require.Equal(t, "2bj...", alertID)
-				require.Equal(t, expectedMemo, param.Memo)
+				g.Assert(t, "when_is_list_as_worker__updated_alert_memo", []byte(param.Memo))
 				return &mackerel.UpdateAlertResponse{
-					Memo: expectedMemo,
+					Memo: param.Memo,
 				}, nil
 			},
 		).Times(1)
@@ -354,10 +353,38 @@ func TestAppLoadConfig__When_Is_List(t *testing.T) {
 func TestAppLoadConfig__WithPlugin(t *testing.T) {
 	app := LoadApp(t, "testdata/config/with_plugin.hcl")
 	require.Equal(t, "prepalert", app.SQSQueueName())
-	require.ElementsMatch(t, []string{}, app.ProviderList())
-	require.ElementsMatch(t, []string{}, app.QueryList())
+	require.ElementsMatch(t, []string{"test.default"}, app.ProviderList())
+	require.ElementsMatch(t, []string{"query.test.hoge"}, app.QueryList())
 	require.False(t, app.EnableBasicAuth())
 	rules := app.Rules()
 	require.Len(t, rules, 1)
-	require.Len(t, rules[0].DependsOnQueries(), 0)
+	require.ElementsMatch(t, []string{"query.test.hoge"}, rules[0].DependsOnQueries())
+	t.Run("AsWorker", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		g := goldie.New(t, goldie.WithFixtureDir("testdata/fixture/"), goldie.WithNameSuffix(".golden"))
+		client := mock.NewMockMackerelClient(ctrl)
+		client.EXPECT().GetAlert("2bj...").Return(
+			&mackerel.Alert{
+				ID:   "2bj...",
+				Memo: "this is a pen",
+			}, nil,
+		).Times(1)
+		client.EXPECT().UpdateAlert(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error) {
+				require.Equal(t, "2bj...", alertID)
+				g.Assert(t, "with_plugin_as_worker__updated_alert_memo", []byte(param.Memo))
+				return &mackerel.UpdateAlertResponse{
+					Memo: param.Memo,
+				}, nil
+			},
+		).Times(1)
+		app.SetMackerelClient(client)
+		h := canyontest.AsWorker(app)
+		r := httptest.NewRequest(http.MethodPost, "/", LoadFileAsReader(t, "example_webhook.json"))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		resp := w.Result()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	})
 }

@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/mashiike/hclutil"
 	"github.com/mashiike/prepalert/provider"
 )
 
@@ -142,8 +144,14 @@ func NewRemoteProviderFactory(pluginName string, cmd string) (*RemoteProviderFac
 }
 
 type RemoteProvider struct {
-	impl Provider
-	pp   *provider.ProviderParameter
+	impl        Provider
+	pp          *provider.ProviderParameter
+	querySchema *Schema
+}
+
+type RemoteQuery struct {
+	rp     *RemoteProvider
+	params *decodedBlock
 }
 
 func (f *RemoteProviderFactory) NewProvider(pp *provider.ProviderParameter) (*RemoteProvider, error) {
@@ -153,11 +161,79 @@ func (f *RemoteProviderFactory) NewProvider(pp *provider.ProviderParameter) (*Re
 	}
 	err := rp.impl.ValidateProviderParameter(context.Background(), pp)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validate provider parameter error: %w", err)
+	}
+	rp.querySchema, err = rp.impl.GetQuerySchema(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("get query schema error: %w", err)
 	}
 	return rp, nil
 }
 
 func (rp *RemoteProvider) NewQuery(name string, body hcl.Body, evalCtx *hcl.EvalContext) (provider.Query, error) {
+	rq := &RemoteQuery{
+		rp:     rp,
+		params: &decodedBlock{},
+	}
+	diags := rq.params.DecodeBody(body, evalCtx, rp.querySchema)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("decode query body error: %w", diags)
+	}
+	return rq, nil
+}
+
+type decodedBlock struct {
+	Attributes hcl.Attributes
+	*hcl.Block
+	NestedBlocks map[string]*decodedBlock
+}
+
+func (b *decodedBlock) DecodeBody(body hcl.Body, evalCtx *hcl.EvalContext, schema *Schema) hcl.Diagnostics {
+	s := &hcl.BodySchema{
+		Attributes: make([]hcl.AttributeSchema, 0, len(schema.Attributes)),
+		Blocks:     make([]hcl.BlockHeaderSchema, 0, len(schema.Blocks)),
+	}
+	for _, attr := range schema.Attributes {
+		s.Attributes = append(s.Attributes, hcl.AttributeSchema{
+			Name:     attr.Name,
+			Required: attr.Required,
+		})
+	}
+	nestedBlockSchemaByType := make(map[string]*Schema)
+	restriction := make([]hclutil.BlockRestrictionSchema, 0, len(schema.Blocks))
+	for _, block := range schema.Blocks {
+		s.Blocks = append(s.Blocks, hcl.BlockHeaderSchema{
+			Type:       block.Type,
+			LabelNames: block.LabelNames,
+		})
+		nestedBlockSchemaByType[block.Type] = block.Body
+		restriction = append(restriction, hclutil.BlockRestrictionSchema{
+			Type:         block.Type,
+			Required:     block.Required,
+			Unique:       block.Unique,
+			UniqueLabels: block.UniqueLabels,
+		})
+	}
+	content, diags := body.Content(s)
+	if diags.HasErrors() {
+		return diags
+	}
+	diags = diags.Extend(hclutil.RestrictBlock(content, restriction...))
+	if diags.HasErrors() {
+		return diags
+	}
+	b.Attributes = content.Attributes
+	b.NestedBlocks = make(map[string]*decodedBlock)
+	for _, block := range content.Blocks {
+		key := block.Type + "." + strings.Join(block.Labels, ".")
+		b.NestedBlocks[key] = &decodedBlock{
+			Block: block,
+		}
+		diags = diags.Extend(b.NestedBlocks[key].DecodeBody(block.Body, evalCtx, nestedBlockSchemaByType[block.Type]))
+	}
+	return diags
+}
+
+func (rq *RemoteQuery) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
 	return nil, errors.New("not implemented yet")
 }

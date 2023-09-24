@@ -15,6 +15,32 @@ func (p *Provider) ValidateProviderParameter(ctx context.Context, pp *provider.P
 	return nil
 }
 
+func (p *Provider) GetQuerySchema(ctx context.Context) (*plugin.Schema, error) {
+	return &plugin.Schema{
+		Attributes: []plugin.AttributeSchema{
+			{
+				Name:     "code",
+				Required: true,
+			},
+		},
+		Blocks: []plugin.BlockSchema{
+			{
+				Type:         "details",
+				Required:     true,
+				UniqueLabels: true,
+				Body: &plugin.Schema{
+					Attributes: []plugin.AttributeSchema{
+						{
+							Name:     "description",
+							Required: true,
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
 func main() {
 	plugin.ServePlugin(plugin.WithProviderPlugin(&Provider{}))
 }

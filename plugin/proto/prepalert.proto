@@ -14,7 +14,7 @@ message Schema {
         bool required = 2;
     }
     message Block {
-        string name = 1;
+        string type = 1;
         repeated string labels = 2;
         bool unique = 3;
         bool required = 4;

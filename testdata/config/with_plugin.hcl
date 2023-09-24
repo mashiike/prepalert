@@ -15,6 +15,9 @@ provider "test" {
 
 query "test" "hoge" {
     code = "hoge"
+    details {
+        description = "test hoge query"
+    }
 }
 
 rule "alb_target_5xx" {
