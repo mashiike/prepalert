@@ -225,7 +225,7 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 		ctx, "accept Worker request",
 		"method", r.Method,
 		"path", r.URL.Path,
-		"sqs_message_id", r.Header.Get(canyon.HeaderSQSMessageId),
+		"sqs_message_id", r.Header.Get(canyon.HeaderSQSMessageID),
 	)
 	decoder := json.NewDecoder(r.Body)
 	var body WebhookBody

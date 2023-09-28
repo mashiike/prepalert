@@ -46,7 +46,7 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 		var sendMessageRequestId string
 		h := canyontest.AsServer(
 			app,
-			canyon.SQSMessageSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
+			canyon.WorkerSenderFunc(func(r *http.Request, _ *canyon.SendOptions) (string, error) {
 				sendMessageCount++
 				sendMessageRequestId = r.Header.Get(prepalert.HeaderRequestID)
 				return "dummy-message-id", nil
@@ -64,7 +64,7 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 	t.Run("AsViewer", func(t *testing.T) {
 		h := canyontest.AsServer(
 			app,
-			canyon.SQSMessageSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
+			canyon.WorkerSenderFunc(func(r *http.Request, _ *canyon.SendOptions) (string, error) {
 				t.Error("unexpected call SendMessage")
 				t.FailNow()
 				return "dummy-message-id", nil
