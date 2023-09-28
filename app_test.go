@@ -46,7 +46,7 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 		var sendMessageRequestId string
 		h := canyontest.AsServer(
 			app,
-			canyon.SQSMessageSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
+			canyon.WorkerSenderFunc(func(r *http.Request, _ *canyon.SendOptions) (string, error) {
 				sendMessageCount++
 				sendMessageRequestId = r.Header.Get(prepalert.HeaderRequestID)
 				return "dummy-message-id", nil
@@ -64,7 +64,7 @@ func TestAppLoadConfig__Simple(t *testing.T) {
 	t.Run("AsViewer", func(t *testing.T) {
 		h := canyontest.AsServer(
 			app,
-			canyon.SQSMessageSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
+			canyon.WorkerSenderFunc(func(r *http.Request, _ *canyon.SendOptions) (string, error) {
 				t.Error("unexpected call SendMessage")
 				t.FailNow()
 				return "dummy-message-id", nil
@@ -156,7 +156,8 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 			func(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
 				var v json.RawMessage
 				hclutil.UnmarshalCTYValue(cty.ObjectVal(evalCtx.Variables), &v)
-				g.AssertJson(t, "with_query_as_worker__eval_ctx_variables", v)
+				actual := strings.ReplaceAll(string(v), prepalert.Version, "<app_versio>")
+				g.AssertJson(t, "with_query_as_worker__eval_ctx_variables", actual)
 				return provider.NewQueryResultWithJSONLines(
 					"access_logs", "select * from access_logs", nil,
 					map[string]json.RawMessage{

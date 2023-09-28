@@ -10,7 +10,6 @@ builds:
     binary: prepalert
     ldflags:
       - -s -w
-      - -X github.com/mashiike/prepalert.Version=v{{.Version}}
     goos:
       - darwin
       - linux

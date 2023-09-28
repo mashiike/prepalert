@@ -7,10 +7,10 @@ require (
 	github.com/alecthomas/kong v0.8.0
 	github.com/aws/aws-sdk-go-v2 v1.21.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.42
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.86
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.87
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.23.5
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.13
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.39.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.5
 	github.com/fatih/color v1.15.0
 	github.com/handlename/ssmwrap v1.2.1
@@ -20,7 +20,7 @@ require (
 	github.com/kayac/go-katsubushi v1.7.0
 	github.com/mackerelio/mackerel-client-go v0.26.0
 	github.com/manifoldco/promptui v0.9.0
-	github.com/mashiike/canyon v0.3.1
+	github.com/mashiike/canyon v0.5.0
 	github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5
 	github.com/mashiike/hclutil v0.5.3
 	github.com/mashiike/ls3viewer v0.2.0
@@ -55,6 +55,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.35 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.15.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.39.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/scheduler v1.3.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.14.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.17.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.22.0 // indirect
