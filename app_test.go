@@ -156,7 +156,8 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 			func(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.QueryResult, error) {
 				var v json.RawMessage
 				hclutil.UnmarshalCTYValue(cty.ObjectVal(evalCtx.Variables), &v)
-				g.AssertJson(t, "with_query_as_worker__eval_ctx_variables", v)
+				actual := strings.ReplaceAll(string(v), prepalert.Version, "<app_versio>")
+				g.AssertJson(t, "with_query_as_worker__eval_ctx_variables", actual)
 				return provider.NewQueryResultWithJSONLines(
 					"access_logs", "select * from access_logs", nil,
 					map[string]json.RawMessage{

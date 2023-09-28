@@ -175,15 +175,6 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 		case "required_version":
 			var rv hclutil.VersionConstraints
 			diags = diags.Extend(rv.DecodeExpression(attr.Expr, app.evalCtx))
-			if Version == "current" {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagWarning,
-					Summary:  `required_version validation`,
-					Detail:   `required_version is not validated because version is "current"`,
-					Subject:  attr.Expr.Range().Ptr(),
-				})
-				continue
-			}
 			if err := rv.ValidateVersion(Version); err != nil {
 				diags = diags.Append(&hcl.Diagnostic{
 					Severity: hcl.DiagError,

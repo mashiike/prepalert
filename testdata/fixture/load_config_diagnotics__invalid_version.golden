@@ -2,10 +2,3 @@ Error: Invalid version constraint
 
 Malformed constraint: invalid format
 
-Warning: required_version validation
-
-  on testdata/config/invalid_version.hcl line 2, in prepalert:
-   2:     required_version = "invalid format"
-
-required_version is not validated because version is "current"
-
