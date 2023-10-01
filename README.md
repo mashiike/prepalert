@@ -225,6 +225,21 @@ rule "always" {
 }
 ```
 
+## Local Development
+
+```shell
+$ PREPALERT_CANYON_ENV=development go run cmd/prepalert/main.go --config testdata/config/simple.hcl
+time=2023-10-01T14:55:47.267+09:00 level=INFO msg="create temporary file backend, canyon request body upload to temporary directory" path=/var/folders/rn/jj26k6s93x9c5yblnjq7_dw80000gp/T/canon-240945814 version=v0.12.0 app=prepalert
+time=2023-10-01T14:55:47.268+09:00 level=INFO msg="running canyon" env=development version=v0.12.0 app=prepalert
+time=2023-10-01T14:55:47.268+09:00 level=INFO msg="enable in memory queue" visibility_timeout=30s max_receive_count=3 version=v0.12.0 app=prepalert
+time=2023-10-01T14:55:47.268+09:00 level=INFO msg="starting up with local httpd" address=:8080 version=v0.12.0 app=prepalert
+time=2023-10-01T14:55:47.268+09:00 level=INFO msg="staring polling sqs queue" queue=prepalert on_memory_queue_mode=true version=v0.12.0 app=prepalert
+```
+
+prepalert is using [canyon](https://github.com/mashiike/canyon).
+if you want to use local development, you can use `PREPALERT_CANYON_ENV=development` environment variable.
+this variable is enable to use local file backend and sqs simulated in memory queue.
+
 ## LICENSE
 
 MIT License
