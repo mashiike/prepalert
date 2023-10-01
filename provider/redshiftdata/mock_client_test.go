@@ -35,6 +35,26 @@ func (m *MockRedshiftDataClient) EXPECT() *MockRedshiftDataClientMockRecorder {
 	return m.recorder
 }
 
+// BatchExecuteStatement mocks base method.
+func (m *MockRedshiftDataClient) BatchExecuteStatement(ctx context.Context, params *redshiftdata.BatchExecuteStatementInput, optFns ...func(*redshiftdata.Options)) (*redshiftdata.BatchExecuteStatementOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{ctx, params}
+	for _, a := range optFns {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "BatchExecuteStatement", varargs...)
+	ret0, _ := ret[0].(*redshiftdata.BatchExecuteStatementOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BatchExecuteStatement indicates an expected call of BatchExecuteStatement.
+func (mr *MockRedshiftDataClientMockRecorder) BatchExecuteStatement(ctx, params interface{}, optFns ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{ctx, params}, optFns...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchExecuteStatement", reflect.TypeOf((*MockRedshiftDataClient)(nil).BatchExecuteStatement), varargs...)
+}
+
 // CancelStatement mocks base method.
 func (m *MockRedshiftDataClient) CancelStatement(ctx context.Context, params *redshiftdata.CancelStatementInput, optFns ...func(*redshiftdata.Options)) (*redshiftdata.CancelStatementOutput, error) {
 	m.ctrl.T.Helper()
