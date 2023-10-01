@@ -20,7 +20,7 @@ require (
 	github.com/kayac/go-katsubushi v1.7.0
 	github.com/mackerelio/mackerel-client-go v0.26.0
 	github.com/manifoldco/promptui v0.9.0
-	github.com/mashiike/canyon v0.5.0
+	github.com/mashiike/canyon v0.6.0
 	github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5
 	github.com/mashiike/hclutil v0.5.3
 	github.com/mashiike/ls3viewer v0.2.0
