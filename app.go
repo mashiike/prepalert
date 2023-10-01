@@ -37,6 +37,7 @@ type App struct {
 	workerPrepared        bool
 	webhookServerPrepared bool
 	cleanupFuncs          []func() error
+	retryPolicy           *RetryPolicy `hcl:"retry_policy,block"`
 }
 
 func New(apikey string) *App {
@@ -109,6 +110,10 @@ func (app *App) Rules() []*Rule {
 
 func (app *App) Backend() Backend {
 	return app.backend
+}
+
+func (app *App) RetryPolicy() *RetryPolicy {
+	return app.retryPolicy
 }
 
 func (app *App) ProviderList() []string {
@@ -231,6 +236,7 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	var body WebhookBody
 	if err := decoder.Decode(&body); err != nil {
 		logger.ErrorContext(ctx, "can not parse request body as Mackerel webhook body", "error", err.Error())
+		app.retryPolicy.SetRetryAfter(w, r)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -249,6 +255,7 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	logger.InfoContext(ctx, "parse request body as Mackerel webhook body")
 	if err := app.ExecuteRules(ctx, &body); err != nil {
 		logger.ErrorContext(ctx, "failed process Mackerel webhook body", "error", err.Error())
+		app.retryPolicy.SetRetryAfter(w, r)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

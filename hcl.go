@@ -147,6 +147,9 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 				Type: "auth",
 			},
 			{
+				Type: "retry",
+			},
+			{
 				Type:       "backend",
 				LabelNames: []string{"type"},
 			},
@@ -163,6 +166,10 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 		},
 		{
 			Type:   "auth",
+			Unique: true,
+		},
+		{
+			Type:   "retry",
 			Unique: true,
 		},
 		{
@@ -248,6 +255,15 @@ func (app *App) decodePrepalertBlock(body hcl.Body) hcl.Diagnostics {
 			if diags.HasErrors() {
 				app.webhookServerPrepared = false
 			}
+		}
+	}
+	if blocks := content.Blocks.OfType("retry"); len(blocks) > 0 {
+		attrs, attrDiags := blocks[0].Body.JustAttributes()
+		diags = diags.Extend(attrDiags)
+		if !attrDiags.HasErrors() {
+			var rp RetryPolicy
+			diags = diags.Extend(rp.DecodeAttributes(attrs, app.evalCtx))
+			app.retryPolicy = &rp
 		}
 	}
 	if blocks := content.Blocks.OfType("backend"); len(blocks) > 0 {
@@ -410,6 +426,30 @@ func (app *App) decodeRuleBlocks(blocks hcl.Blocks) hcl.Diagnostics {
 	sort.SliceStable(app.rules, func(i, j int) bool {
 		return app.rules[i].Priority() > app.rules[j].Priority()
 	})
+	return diags
+}
+
+func (rp *RetryPolicy) DecodeAttributes(attrs hcl.Attributes, evalCtx *hcl.EvalContext) hcl.Diagnostics {
+	var diags hcl.Diagnostics
+	for name, attr := range attrs {
+		switch name {
+		case "max_interval":
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &rp.MaxInterval))
+		case "interval":
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &rp.Interval))
+		case "backoff_factor":
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &rp.BackoffFactor))
+		case "jitter":
+			diags = diags.Extend(gohcl.DecodeExpression(attr.Expr, evalCtx, &rp.Jitter))
+		default:
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  `retry attribute validation`,
+				Detail:   fmt.Sprintf("attribute %q is not supported", name),
+				Subject:  attr.NameRange.Ptr(),
+			})
+		}
+	}
 	return diags
 }
 

@@ -143,6 +143,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 		"query.redshift_data.serverless_access_logs",
 	}, app.QueryList())
 	require.True(t, app.EnableBasicAuth())
+	require.Equal(t, "interval:10s jitter:30s max_interval:300s backoff_factor:4.00", app.RetryPolicy().String())
 	rules := app.Rules()
 	require.Len(t, rules, 2)
 	require.ElementsMatch(t, []string{
