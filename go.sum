@@ -57,6 +57,8 @@ github.com/aws/aws-sdk-go-v2/service/lambda v1.39.5 h1:uMvxJFS92hNW6BRX0Ou+5zb9D
 github.com/aws/aws-sdk-go-v2/service/lambda v1.39.5/go.mod h1:ByLHcf0zbHpyLTOy1iPVRPJWmAUPCiJv5k81dt52ID8=
 github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.13 h1:hVrup9EZ/QgcSn6viaHnNTGvr+F82fUekDrvmtoKIPQ=
 github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.16.13/go.mod h1:7f6XcpJ1hH7ai5yby7gE03CaIXqGvlaWGilNnE/wzpc=
+github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.20.5 h1:iIRfLBX36lMn7vXdaVF1PZV/jiBXeUpiL2KHkGOjVsc=
+github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.20.5/go.mod h1:q++QEMyKK3FcyuHOuab73F3mtkmP/Xu25VkMSEgqpE0=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0 h1:wl5dxN1NONhTDQD9uaEvNsDRX29cBmGED/nl0jkWlt4=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0/go.mod h1:rDGMZA7f4pbmTtPOk5v5UM2lmX6UAbRnMDJeDvnH7AM=
 github.com/aws/aws-sdk-go-v2/service/scheduler v1.3.0 h1:uzCEL2ILopsOcWvbmeMmmy3Sc0ybVh+nHMg5knnA0Rg=
@@ -167,6 +169,8 @@ github.com/mashiike/ls3viewer v0.2.0 h1:7cNLnfIoDIip13aaSCPtSjXux/JyltqEuRab7h7j
 github.com/mashiike/ls3viewer v0.2.0/go.mod h1:lCEcq1/Wv2q8NaZXDGERGu6ceqSa0L0MPd+hFm7rImU=
 github.com/mashiike/redshift-data-sql-driver v0.1.0 h1:ANVUFHt7qXvpjPUKt5b+RT3yJ2TkcOhn4rUaJMbVJr0=
 github.com/mashiike/redshift-data-sql-driver v0.1.0/go.mod h1:ETccRF1+n++o8HP4eG/IrSeA+hlywV+qgF9y0oF2D1I=
+github.com/mashiike/redshift-data-sql-driver v0.2.0 h1:agU0/gcS0aiznmJwTbru14yDSKOi9dPU/wDGFean7hc=
+github.com/mashiike/redshift-data-sql-driver v0.2.0/go.mod h1:VwxNm3Jlf4EM8r2lSPYCJ7MnNTSjiQzi83KXRXMzJPE=
 github.com/mashiike/s3-select-sql-driver v0.3.0 h1:/KYGHKK8SuItvybcshtCPPCMM5UUoTgj2mXm3sbgHAA=
 github.com/mashiike/s3-select-sql-driver v0.3.0/go.mod h1:OzTdlpWLc/XISO2R5cJ1WSuYbIIff8OPMD65+8NZht4=
 github.com/mashiike/slogutils v0.4.0 h1:VQIkeEZ/dMhYnwwXPI5Ve19ZuD2fJTwLQ7ZoSkt+zfE=
@@ -238,6 +242,8 @@ go.uber.org/goleak v1.2.0 h1:xqgm/S+aQvhWFTtR0XK3Jvg7z8kGV8P4X14IzwN3Eqk=
 go.uber.org/goleak v1.2.0/go.mod h1:XJYK+MuIchqpmGmUSAzotztawfKvYLUIgg7guXrwVUo=
 go.uber.org/mock v0.2.0 h1:TaP3xedm7JaAgScZO7tlvlKrqT0p7I6OsdGB5YNSMDU=
 go.uber.org/mock v0.2.0/go.mod h1:J0y0rp9L3xiff1+ZBfKxlC1fz2+aO16tw0tsDOixfuM=
+go.uber.org/mock v0.3.0 h1:3mUxI1No2/60yUYax92Pt8eNOEecx2D3lcXZh2NEZJo=
+go.uber.org/mock v0.3.0/go.mod h1:a6FSlNadKUHUa9IP5Vyt1zh4fC7uAwxMutEAscFbkZc=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 go.uber.org/zap v1.26.0 h1:sI7k6L95XOKS281NhVKOFCUNIvv9e0w4BF8N3u+tCRo=
