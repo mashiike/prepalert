@@ -6,6 +6,14 @@ prepalert {
     client_id     = "hoge"
     client_secret = "fuga"
   }
+
+  retry {
+    interval       = duration("10s")
+    backoff_factor = 4
+    max_interval   = duration("5m")
+    jitter         = duration("30s")
+  }
+
 }
 
 provider "redshift_data" {
