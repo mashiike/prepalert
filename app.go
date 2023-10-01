@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -39,8 +40,10 @@ type App struct {
 	workerPrepared        bool
 	webhookServerPrepared bool
 	cleanupFuncs          []func() error
-	retryDurationSecods   int
-	jitterDurationSeconds int
+	retryDurationSecods   float64
+	jitterDurationSeconds float64
+	maxDurationSeconds    float64
+	factor                float64
 	randGenerator         *rand.Rand
 }
 
@@ -50,6 +53,8 @@ func New(apikey string) *App {
 		randGenerator:         rand.New(rand.NewSource(flextime.Now().UnixNano())),
 		retryDurationSecods:   5,
 		jitterDurationSeconds: 10,
+		maxDurationSeconds:    300,
+		factor:                2,
 	}
 	return app.SetMackerelClient(mackerel.NewClient(apikey))
 }
@@ -226,12 +231,23 @@ func (app *App) serveHTTPAsWebhookServer(w http.ResponseWriter, r *http.Request)
 	fmt.Fprintln(w, http.StatusText(http.StatusOK))
 }
 
-func (app *App) getRetryAfterSeconds() string {
-	s := app.retryDurationSecods
-	if app.jitterDurationSeconds > 0 {
-		s += app.randGenerator.Intn(app.jitterDurationSeconds)
+func (app *App) getRetryAfterSeconds(r *http.Request) string {
+	approxmateReceiveCount, err := strconv.Atoi(
+		r.Header.Get(canyon.HeaderSQSAttribute("ApproximateReceiveCount")),
+	)
+	if err != nil {
+		approxmateReceiveCount = 1
 	}
-	return strconv.Itoa(s)
+	// exponential backoff
+	// base * factor ^ (approxmateReceiveCount - 1)
+	s := app.retryDurationSecods * math.Pow(app.factor, float64(approxmateReceiveCount-1))
+	if s > app.maxDurationSeconds {
+		s = app.maxDurationSeconds
+	}
+	if app.jitterDurationSeconds > 0 {
+		s += app.randGenerator.Float64() * app.jitterDurationSeconds
+	}
+	return strconv.Itoa(int(s))
 }
 
 func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +263,7 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	var body WebhookBody
 	if err := decoder.Decode(&body); err != nil {
 		logger.ErrorContext(ctx, "can not parse request body as Mackerel webhook body", "error", err.Error())
-		w.Header().Set("Retry-After", app.getRetryAfterSeconds())
+		w.Header().Set("Retry-After", app.getRetryAfterSeconds(r))
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -266,7 +282,9 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	logger.InfoContext(ctx, "parse request body as Mackerel webhook body")
 	if err := app.ExecuteRules(ctx, &body); err != nil {
 		logger.ErrorContext(ctx, "failed process Mackerel webhook body", "error", err.Error())
-		w.Header().Set("Retry-After", app.getRetryAfterSeconds())
+		if !errors.Is(err, context.DeadlineExceeded) {
+			w.Header().Set("Retry-After", app.getRetryAfterSeconds(r))
+		}
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
