@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.0.0](https://github.com/mashiike/prepalert/compare/v0.12.0...v1.0.0) - 2023-10-01
+- Prepare v1, create version.go by @mashiike in https://github.com/mashiike/prepalert/pull/155
+- Bump actions/checkout from 3 to 4 by @dependabot in https://github.com/mashiike/prepalert/pull/157
+- fix test and update canyon by @mashiike in https://github.com/mashiike/prepalert/pull/162
+- Update to github.com/mashiike/canyon and add retry policy with jittered exponential backoff based on SQS ApproximateReceiveCount by @mashiike in https://github.com/mashiike/prepalert/pull/163
+- Bump up gitHub.com/mashiike/redshift-data-sql-driver by @mashiike in https://github.com/mashiike/prepalert/pull/164
+- Bump github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs from 1.23.5 to 1.24.0 by @dependabot in https://github.com/mashiike/prepalert/pull/159
+
 ## [v0.12.0](https://github.com/mashiike/prepalert/compare/v0.11.0...v0.12.0) - 2023-09-24
 - Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.33.1 to 1.38.2 by @dependabot in https://github.com/mashiike/prepalert/pull/136
 - install log/slog json loggging by @mashiike in https://github.com/mashiike/prepalert/pull/138
