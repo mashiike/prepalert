@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"sync"
 
+	"github.com/Songmu/flextime"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/kayac/go-katsubushi"
 	"github.com/mackerelio/mackerel-client-go"
@@ -37,11 +39,17 @@ type App struct {
 	workerPrepared        bool
 	webhookServerPrepared bool
 	cleanupFuncs          []func() error
+	retryDurationSecods   int
+	jitterDurationSeconds int
+	randGenerator         *rand.Rand
 }
 
 func New(apikey string) *App {
 	app := &App{
-		backend: NewDiscardBackend(),
+		backend:               NewDiscardBackend(),
+		randGenerator:         rand.New(rand.NewSource(flextime.Now().UnixNano())),
+		retryDurationSecods:   5,
+		jitterDurationSeconds: 10,
 	}
 	return app.SetMackerelClient(mackerel.NewClient(apikey))
 }
@@ -218,6 +226,14 @@ func (app *App) serveHTTPAsWebhookServer(w http.ResponseWriter, r *http.Request)
 	fmt.Fprintln(w, http.StatusText(http.StatusOK))
 }
 
+func (app *App) getRetryAfterSeconds() string {
+	s := app.retryDurationSecods
+	if app.jitterDurationSeconds > 0 {
+		s += app.randGenerator.Intn(app.jitterDurationSeconds)
+	}
+	return strconv.Itoa(s)
+}
+
 func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	logger := canyon.Logger(r)
 	ctx := r.Context()
@@ -231,6 +247,7 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	var body WebhookBody
 	if err := decoder.Decode(&body); err != nil {
 		logger.ErrorContext(ctx, "can not parse request body as Mackerel webhook body", "error", err.Error())
+		w.Header().Set("Retry-After", app.getRetryAfterSeconds())
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -249,6 +266,7 @@ func (app *App) serveHTTPAsWorker(w http.ResponseWriter, r *http.Request) {
 	logger.InfoContext(ctx, "parse request body as Mackerel webhook body")
 	if err := app.ExecuteRules(ctx, &body); err != nil {
 		logger.ErrorContext(ctx, "failed process Mackerel webhook body", "error", err.Error())
+		w.Header().Set("Retry-After", app.getRetryAfterSeconds())
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
