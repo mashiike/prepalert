@@ -1,6 +1,10 @@
 this is a pen
 
 ## Prepalert
+### rule.simple
+How do you respond to alerts?
+Describe information about your alert response here.
+
 ### rule.alb_target_5xx
 
 this is access_logs:
@@ -10,4 +14,3 @@ this is access_logs:
 | The Good | The Bad | A    |
 | The Ugly |         | B    |
 +----------+---------+------+
-
