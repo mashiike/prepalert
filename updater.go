@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -17,8 +18,9 @@ type MackerelUpdater struct {
 	mu                     sync.Mutex
 	backend                Backend
 	body                   *WebhookBody
-	memoSectionText        []string
-	memoSectionSizeLimit   []*int
+	memoSectionNames       []string
+	memoSectionText        map[string]string
+	memoSectionSizeLimit   map[string]*int
 	additionalDescriptions map[string][]string
 	postServices           map[string]struct{}
 }
@@ -28,18 +30,20 @@ func (svc *MackerelService) NewMackerelUpdater(body *WebhookBody, backend Backen
 		svc:                    svc,
 		body:                   body,
 		backend:                backend,
-		memoSectionText:        make([]string, 0),
-		memoSectionSizeLimit:   make([]*int, 0),
+		memoSectionNames:       make([]string, 0),
+		memoSectionText:        make(map[string]string),
+		memoSectionSizeLimit:   make(map[string]*int),
 		additionalDescriptions: make(map[string][]string),
 		postServices:           make(map[string]struct{}),
 	}
 }
 
-func (u *MackerelUpdater) AddMemoSectionText(text string, sizeLimit *int) {
+func (u *MackerelUpdater) AddMemoSectionText(sectionName string, text string, sizeLimit *int) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	u.memoSectionText = append(u.memoSectionText, text)
-	u.memoSectionSizeLimit = append(u.memoSectionSizeLimit, sizeLimit)
+	u.memoSectionNames = append(u.memoSectionNames, sectionName)
+	u.memoSectionText[sectionName] = text
+	u.memoSectionSizeLimit[sectionName] = sizeLimit
 }
 
 func (u *MackerelUpdater) AddService(service string) {
@@ -57,18 +61,46 @@ func (u *MackerelUpdater) AddAdditionalDescription(service string, text string) 
 	u.additionalDescriptions[service] = append(u.additionalDescriptions[service], text)
 }
 
+const (
+	prepalertSectionHeader = "## Prepalert"
+	fullTextLabel          = "Full Text URL:"
+)
+
+var (
+	// match `## Prepalert\n`` or `## Prepalert\nFull Text URL: <url>\n`
+	prepalertHeaderRegexp = regexp.MustCompile(fmt.Sprintf(
+		`(?m)^%s\n(?:%s .*\n)?`, prepalertSectionHeader, fullTextLabel,
+	))
+)
+
 func (u *MackerelUpdater) Flush(ctx context.Context, evalCtx *hcl.EvalContext) error {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	body := u.body
 	if len(u.memoSectionText) > 0 {
-		var fullText, memo string
-		for i, text := range u.memoSectionText {
-			fullText += "\n\n" + text
-			if u.memoSectionSizeLimit[i] != nil {
-				text = triming(text, *u.memoSectionSizeLimit[i], "\n...")
+		alert, err := u.svc.GetAlertWithCache(ctx, body.Alert.ID)
+		if err != nil {
+			return fmt.Errorf("get alert: %w", err)
+		}
+		currentMemo := alert.Memo
+		currentPrepalertSection := extructSection(currentMemo, prepalertSectionHeader)
+		fullText := strings.Trim(prepalertHeaderRegexp.ReplaceAllString(currentPrepalertSection, ""), "\n")
+		memo := fullText
+		for _, sectionName := range u.memoSectionNames {
+			extracted := extructSection(fullText, "### "+sectionName)
+			sectionText := u.memoSectionText[sectionName]
+			trimedSectionText := sectionText
+			if u.memoSectionSizeLimit[sectionName] != nil {
+				trimedSectionText = triming(sectionText, *u.memoSectionSizeLimit[sectionName], "\n...")
 			}
-			memo += "\n\n" + text
+			if extracted != "" {
+				fullText = strings.ReplaceAll(fullText, extracted, "### "+sectionName+"\n\n"+sectionText)
+				memo = strings.ReplaceAll(memo, extracted, "### "+sectionName+"\n\n"+trimedSectionText)
+
+			} else {
+				fullText += "\n\n### " + sectionName + "\n\n" + u.memoSectionText[sectionName]
+				memo += "\n\n### " + sectionName + "\n\n" + trimedSectionText
+			}
 		}
 		fullText = strings.TrimPrefix(fullText, "\n\n")
 		memo = strings.TrimPrefix(memo, "\n\n")
@@ -83,19 +115,11 @@ func (u *MackerelUpdater) Flush(ctx context.Context, evalCtx *hcl.EvalContext) e
 		} else {
 			memo = fullText
 		}
-		header := "## Prepalert\n"
-		memo = header + memo
-		alert, err := u.svc.GetAlertWithCache(ctx, body.Alert.ID)
-		if err != nil {
-			return fmt.Errorf("get alert: %w", err)
-		}
-		if alert.Memo != "" {
-			currentSection := extructSection(alert.Memo, header)
-			if currentSection != "" {
-				memo = strings.ReplaceAll(alert.Memo, currentSection, memo)
-			} else {
-				memo = alert.Memo + "\n\n" + memo
-			}
+		memo = prepalertSectionHeader + "\n" + memo
+		if currentPrepalertSection != "" {
+			memo = strings.ReplaceAll(currentMemo, currentPrepalertSection, memo)
+		} else {
+			memo = alert.Memo + "\n\n" + memo
 		}
 		if len(memo) > AlertMemoMaxSize {
 			slog.WarnContext(
@@ -111,6 +135,7 @@ func (u *MackerelUpdater) Flush(ctx context.Context, evalCtx *hcl.EvalContext) e
 			)
 			memo = triming(memo, AlertMemoMaxSize, "\n...")
 		}
+		memo = strings.Trim(memo, "\n") + "\n"
 		err = u.svc.UpdateAlertMemo(ctx, body.Alert.ID, memo)
 		if err != nil {
 			return fmt.Errorf("update alert memo: %w", err)

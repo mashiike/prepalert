@@ -340,7 +340,7 @@ func (action *UpdateAlertAction) Execute(ctx context.Context, evalCtx *hcl.EvalC
 		return fmt.Errorf("render memo: %w", err)
 	}
 	slog.DebugContext(ctx, "dump memo", "memo", memo)
-	u.AddMemoSectionText("### rule."+action.ruleName+"\n\n"+memo, action.sizeLimit)
+	u.AddMemoSectionText("rule."+action.ruleName, memo, action.sizeLimit)
 	return nil
 }
 

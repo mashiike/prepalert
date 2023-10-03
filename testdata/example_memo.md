@@ -1,0 +1,12 @@
+header message written by human
+
+## Prepalert
+Full Text URL: https://example.com/alerts/hoge.txt
+
+### rule.fuga 
+fugafuga
+
+## Other App Block
+
+### hogehoge
+this message written by other app
