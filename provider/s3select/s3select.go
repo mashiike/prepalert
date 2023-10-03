@@ -6,21 +6,40 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/mashiike/prepalert/provider"
 	"github.com/mashiike/prepalert/provider/sqlprovider"
-	_ "github.com/mashiike/s3-select-sql-driver"
+	s3select "github.com/mashiike/s3-select-sql-driver"
 )
 
 var (
 	defaultExpressionExpr hcl.Expression
 )
+
+type bypassLogger struct {
+	Level slog.Level
+	Impl  *slog.Logger
+	once  sync.Once
+}
+
+func (l *bypassLogger) Printf(format string, v ...any) {
+	l.once.Do(func() {
+		l.Impl = slog.Default().With("component", "s3-select-sql-driver")
+	})
+	l.Impl.Log(context.Background(), l.Level, fmt.Sprintf(format, v...))
+}
+
+func (l *bypassLogger) SetOutput(w io.Writer) {}
+func (l *bypassLogger) Writer() io.Writer     { return io.Discard }
 
 func init() {
 	provider.RegisterProvider("s3_select", NewProvider)
@@ -29,6 +48,8 @@ func init() {
 	if diags.HasErrors() {
 		panic(diags)
 	}
+	s3select.SetLogger(&bypassLogger{Level: slog.LevelError})
+	s3select.SetDebugLogger(&bypassLogger{Level: slog.LevelDebug})
 }
 
 type Provider struct {
