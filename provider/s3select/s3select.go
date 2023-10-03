@@ -178,7 +178,9 @@ func (q *Query) Run(ctx context.Context, evalCtx *hcl.EvalContext) (*provider.Qu
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert params: %w", err)
 	}
-	db, err := sql.Open("s3-select", fmt.Sprintf("s3://%s/%s?%s", q.BucketName, objectKeyPrefix, q.DSNQueryParams.Encode()))
+	dsn := fmt.Sprintf("s3://%s/%s?%s", q.BucketName, objectKeyPrefix, q.DSNQueryParams.Encode())
+	slog.InfoContext(ctx, "s3 select", "dsn", dsn)
+	db, err := sql.Open("s3-select", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open s3-select: %w", err)
 	}

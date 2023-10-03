@@ -1,9 +1,13 @@
 package redshiftdata
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/mashiike/prepalert/provider"
@@ -11,8 +15,26 @@ import (
 	redshiftdatasqldriver "github.com/mashiike/redshift-data-sql-driver"
 )
 
+type bypassLogger struct {
+	Level slog.Level
+	Impl  *slog.Logger
+	once  sync.Once
+}
+
+func (l *bypassLogger) Printf(format string, v ...any) {
+	l.once.Do(func() {
+		l.Impl = slog.Default().With("component", "redshift-data-sql-driver")
+	})
+	l.Impl.Log(context.Background(), l.Level, fmt.Sprintf(format, v...))
+}
+
+func (l *bypassLogger) SetOutput(w io.Writer) {}
+func (l *bypassLogger) Writer() io.Writer     { return io.Discard }
+
 func init() {
 	provider.RegisterProvider("redshift_data", NewProvider)
+	redshiftdatasqldriver.SetLogger(&bypassLogger{Level: slog.LevelError})
+	redshiftdatasqldriver.SetDebugLogger(&bypassLogger{Level: slog.LevelDebug})
 }
 
 type Provider struct {
