@@ -1,5 +1,10 @@
 # Changelog
 
+## [v1.0.1](https://github.com/mashiike/prepalert/compare/v1.0.0...v1.0.1) - 2023-10-03
+- bypass s3 select sql driver logger by @mashiike in https://github.com/mashiike/prepalert/pull/167
+- fix MackerelUpdater by @mashiike in https://github.com/mashiike/prepalert/pull/169
+- Bump github.com/aws/aws-sdk-go-v2/feature/s3/manager from 1.11.87 to 1.11.88 by @dependabot in https://github.com/mashiike/prepalert/pull/166
+
 ## [v1.0.0](https://github.com/mashiike/prepalert/compare/v0.12.0...v1.0.0) - 2023-10-01
 - Prepare v1, create version.go by @mashiike in https://github.com/mashiike/prepalert/pull/155
 - Bump actions/checkout from 3 to 4 by @dependabot in https://github.com/mashiike/prepalert/pull/157
