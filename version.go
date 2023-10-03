@@ -1,3 +1,3 @@
 package prepalert
 
-var Version = "v1.0.0"
+var Version = "v1.0.1"
