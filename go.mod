@@ -16,7 +16,7 @@ require (
 	github.com/handlename/ssmwrap v1.2.1
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.5.2
-	github.com/hashicorp/hcl/v2 v2.18.0
+	github.com/hashicorp/hcl/v2 v2.18.1
 	github.com/kayac/go-katsubushi v1.7.0
 	github.com/mackerelio/mackerel-client-go v0.26.0
 	github.com/manifoldco/promptui v0.9.0
