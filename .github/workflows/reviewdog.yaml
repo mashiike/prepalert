@@ -9,6 +9,7 @@ permissions:
 jobs:
   golangci-lint:
     runs-on: ubuntu-latest
+    working-directory: backend/v2/
     steps:
       - uses: actions/checkout@v4
       - name: golangci-lint
@@ -23,6 +24,7 @@ jobs:
 
   staticcheck:
     runs-on: ubuntu-latest
+    working-directory: backend/v2/
     steps:
       - uses: actions/checkout@v4
       - uses: reviewdog/action-staticcheck@v1
