@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.24.0
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.20.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0
-	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.6
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.26.0
 	github.com/fatih/color v1.15.0
 	github.com/handlename/ssmwrap v1.2.1
 	github.com/hashicorp/go-hclog v1.5.0
