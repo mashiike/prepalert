@@ -15,7 +15,7 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/handlename/ssmwrap v1.2.1
 	github.com/hashicorp/go-hclog v1.5.0
-	github.com/hashicorp/go-plugin v1.5.2
+	github.com/hashicorp/go-plugin v1.6.0
 	github.com/hashicorp/hcl/v2 v2.18.1
 	github.com/kayac/go-katsubushi v1.7.0
 	github.com/mackerelio/mackerel-client-go v0.26.0
