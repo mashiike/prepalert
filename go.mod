@@ -5,13 +5,13 @@ go 1.21.0
 require (
 	github.com/Songmu/flextime v0.1.0
 	github.com/alecthomas/kong v0.8.0
-	github.com/aws/aws-sdk-go-v2 v1.22.1
+	github.com/aws/aws-sdk-go-v2 v1.23.0
 	github.com/aws/aws-sdk-go-v2/config v1.22.1
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.88
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.24.0
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.20.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0
-	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.6
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.28.1
 	github.com/fatih/color v1.15.0
 	github.com/handlename/ssmwrap v1.2.1
 	github.com/hashicorp/go-hclog v1.5.0
@@ -46,8 +46,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.13 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.15.1 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.2 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.1 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.3 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.5.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.14 // indirect
@@ -59,7 +59,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.17.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.19.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.25.0 // indirect
-	github.com/aws/smithy-go v1.16.0 // indirect
+	github.com/aws/smithy-go v1.17.0 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
