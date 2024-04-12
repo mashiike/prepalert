@@ -37,7 +37,7 @@ func TestMackerelService__PostGraphAnnotation__UpdateAnnotationDescription(t *te
 	client.EXPECT().
 		FindGraphAnnotations("piyo", param.From-prepalert.FindGraphAnnotationOffset, param.To+prepalert.FindGraphAnnotationOffset).
 		Return(
-			[]mackerel.GraphAnnotation{
+			[]*mackerel.GraphAnnotation{
 				{
 					ID:          "tora",
 					Title:       "hoge",
