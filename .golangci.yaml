@@ -1,0 +1,34 @@
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/my_org
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    ignore: '[rR]ead|[w|W]rite|[c|C]lose|[c|C]ommit|[r|R]ollback|[p|P]rintln'
+
+linters:
+  disable-all: true
+  enable:
+    - govet
+    - revive
+    - gocyclo
+    - gofmt
+    - goimports
+    - errcheck
+    - unconvert
+    - ineffassign
+    - typecheck
+    - unused
+    - staticcheck
+
+run:
+  deadline: 5m
+  skip-dirs:
+    - vendor
+    - third_party
+  skip-files:
+    - ".*\\.gen\\.go"
+    - ".*_test\\.go"
+
