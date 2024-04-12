@@ -1,4 +1,4 @@
-Usage: prepalert <command>
+Usage: prepalert <command> [flags]
 
 A webhook server for prepare alert memo
 
@@ -10,19 +10,19 @@ Flags:
       --config="."                 config path ($PREPALERT_CONFIG)
 
 Commands:
-  run
+  run [flags]
     run server (default command)
 
-  init
+  init [flags]
     create initial config
 
-  validate
+  validate [flags]
     validate the configuration
 
-  exec <alert-id>
+  exec <alert-id> [flags]
     Generate a virtual webhook from past alert to execute the rule
 
-  version
+  version [flags]
     Show version
 
 Run "prepalert <command> --help" for more information on a command.

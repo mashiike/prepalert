@@ -1,4 +1,4 @@
-Usage: prepalert run
+Usage: prepalert run [flags]
 
 run server (default command)
 
