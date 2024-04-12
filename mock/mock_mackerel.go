@@ -50,10 +50,10 @@ func (mr *MockMackerelClientMockRecorder) CreateGraphAnnotation(annotation inter
 }
 
 // FindGraphAnnotations mocks base method.
-func (m *MockMackerelClient) FindGraphAnnotations(service string, from, to int64) ([]mackerel.GraphAnnotation, error) {
+func (m *MockMackerelClient) FindGraphAnnotations(service string, from, to int64) ([]*mackerel.GraphAnnotation, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindGraphAnnotations", service, from, to)
-	ret0, _ := ret[0].([]mackerel.GraphAnnotation)
+	ret0, _ := ret[0].([]*mackerel.GraphAnnotation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

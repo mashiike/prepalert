@@ -1,4 +1,4 @@
-Usage: prepalert init
+Usage: prepalert init [flags]
 
 create initial config
 

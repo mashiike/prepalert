@@ -18,7 +18,7 @@ import (
 
 type MackerelClient interface {
 	UpdateAlert(alertID string, param mackerel.UpdateAlertParam) (*mackerel.UpdateAlertResponse, error)
-	FindGraphAnnotations(service string, from int64, to int64) ([]mackerel.GraphAnnotation, error)
+	FindGraphAnnotations(service string, from int64, to int64) ([]*mackerel.GraphAnnotation, error)
 	UpdateGraphAnnotation(annotationID string, annotation *mackerel.GraphAnnotation) (*mackerel.GraphAnnotation, error)
 	CreateGraphAnnotation(annotation *mackerel.GraphAnnotation) (*mackerel.GraphAnnotation, error)
 	GetOrg() (*mackerel.Org, error)
@@ -98,7 +98,7 @@ func (svc *MackerelService) PostGraphAnnotation(ctx context.Context, params *mac
 			)
 			annotation.Description = params.Description
 			annotation.Service = params.Service
-			_, err := svc.client.UpdateGraphAnnotation(annotation.ID, &annotation)
+			_, err := svc.client.UpdateGraphAnnotation(annotation.ID, annotation)
 			if err != nil {
 				return fmt.Errorf("update graph annotations: %w", err)
 			}
@@ -149,7 +149,7 @@ func (svc *MackerelService) GetAlertWithCache(ctx context.Context, alertID strin
 	return svc.getAlertWithCache(ctx, alertID)
 }
 
-func (svc *MackerelService) getAlertWithCache(ctx context.Context, alertID string) (*mackerel.Alert, error) {
+func (svc *MackerelService) getAlertWithCache(_ context.Context, alertID string) (*mackerel.Alert, error) {
 	if cachedAt, ok := svc.alertCachedAt[alertID]; ok && time.Since(cachedAt) < CacheDuration {
 		return svc.alertCache[alertID], nil
 	}
@@ -168,7 +168,7 @@ func (svc *MackerelService) GetMonitorWithCache(ctx context.Context, monitorID s
 	return svc.getMonitorWithCache(ctx, monitorID)
 }
 
-func (svc *MackerelService) getMonitorWithCache(ctx context.Context, monitorID string) (mackerel.Monitor, error) {
+func (svc *MackerelService) getMonitorWithCache(_ context.Context, monitorID string) (mackerel.Monitor, error) {
 	if cachedAt, ok := svc.monitorCachedAt[monitorID]; ok && time.Since(cachedAt) < CacheDuration {
 		return svc.monitorCache[monitorID], nil
 	}

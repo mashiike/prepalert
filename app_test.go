@@ -189,7 +189,7 @@ func TestAppLoadConfig__WithQuery(t *testing.T) {
 				}, nil
 			},
 		).Times(1)
-		client.EXPECT().FindGraphAnnotations(gomock.Any(), gomock.Any(), gomock.Any()).Return([]mackerel.GraphAnnotation{}, nil).Times(1)
+		client.EXPECT().FindGraphAnnotations(gomock.Any(), gomock.Any(), gomock.Any()).Return([]*mackerel.GraphAnnotation{}, nil).Times(1)
 		client.EXPECT().CreateGraphAnnotation(gomock.Any()).DoAndReturn(
 			func(param *mackerel.GraphAnnotation) (*mackerel.GraphAnnotation, error) {
 				g.AssertJson(t, "with_query_as_worker__created_graph_annotation", param)

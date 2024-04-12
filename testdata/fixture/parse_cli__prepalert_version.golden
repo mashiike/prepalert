@@ -1,4 +1,4 @@
-Usage: prepalert version
+Usage: prepalert version [flags]
 
 Show version
 

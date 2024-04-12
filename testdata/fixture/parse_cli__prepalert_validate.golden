@@ -1,4 +1,4 @@
-Usage: prepalert validate
+Usage: prepalert validate [flags]
 
 validate the configuration
 

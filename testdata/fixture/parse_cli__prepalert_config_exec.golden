@@ -1,4 +1,4 @@
-Usage: prepalert exec <alert-id>
+Usage: prepalert exec <alert-id> [flags]
 
 Generate a virtual webhook from past alert to execute the rule
 
