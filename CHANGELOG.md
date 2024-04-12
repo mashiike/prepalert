@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.0.2](https://github.com/mashiike/prepalert/compare/v1.0.1...v1.0.2) - 2024-04-12
+- Bump golang.org/x/net from 0.15.0 to 0.17.0 by @dependabot in https://github.com/mashiike/prepalert/pull/177
+- Bump github.com/aws/aws-sdk-go-v2 from 1.21.0 to 1.21.1 by @dependabot in https://github.com/mashiike/prepalert/pull/176
+- Bump github.com/zclconf/go-cty from 1.14.0 to 1.14.1 by @dependabot in https://github.com/mashiike/prepalert/pull/172
+- Bump github.com/hashicorp/hcl/v2 from 2.18.0 to 2.18.1 by @dependabot in https://github.com/mashiike/prepalert/pull/173
+- Bump github.com/aws/aws-sdk-go-v2/service/sqs from 1.24.5 to 1.24.6 by @dependabot in https://github.com/mashiike/prepalert/pull/175
+- Bump github.com/aws/aws-sdk-go-v2/config from 1.18.43 to 1.22.1 by @dependabot in https://github.com/mashiike/prepalert/pull/191
+- Fix CI/CD by @mashiike in https://github.com/mashiike/prepalert/pull/215
+- Bump actions/setup-go from 4 to 5 by @dependabot in https://github.com/mashiike/prepalert/pull/204
+- add CREADITS on tagpr by @mashiike in https://github.com/mashiike/prepalert/pull/216
+- dependabot config change for aws-sdk-go-v2 grouping by @mashiike in https://github.com/mashiike/prepalert/pull/217
+- Bump the aws-sdk-go-v2 group with 2 updates by @dependabot in https://github.com/mashiike/prepalert/pull/218
+
 ## [v1.0.1](https://github.com/mashiike/prepalert/compare/v1.0.0...v1.0.1) - 2023-10-03
 - bypass s3 select sql driver logger by @mashiike in https://github.com/mashiike/prepalert/pull/167
 - fix MackerelUpdater by @mashiike in https://github.com/mashiike/prepalert/pull/169
