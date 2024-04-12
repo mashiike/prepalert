@@ -1,6 +1,6 @@
 module github.com/mashiike/prepalert
 
-go 1.21.0
+go 1.21.9
 
 require (
 	github.com/Songmu/flextime v0.1.0
@@ -23,14 +23,14 @@ require (
 	github.com/mashiike/canyon v0.7.1
 	github.com/mashiike/cloudwatch-logs-insights-driver v0.1.5
 	github.com/mashiike/hclutil v0.5.3
-	github.com/mashiike/ls3viewer v0.2.0
+	github.com/mashiike/ls3viewer v0.3.0
 	github.com/mashiike/redshift-data-sql-driver v0.2.0
 	github.com/mashiike/s3-select-sql-driver v0.3.0
 	github.com/mashiike/slogutils v0.4.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/samber/lo v1.39.0
 	github.com/sebdah/goldie/v2 v2.5.3
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/zclconf/go-cty v1.14.4
 	go.uber.org/mock v0.3.0
 	google.golang.org/grpc v1.63.2
@@ -66,7 +66,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fujiwara/ridge v0.9.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
@@ -105,7 +104,6 @@ require (
 	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.20.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
