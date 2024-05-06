@@ -34,7 +34,7 @@ require (
 	github.com/zclconf/go-cty v1.14.4
 	go.uber.org/mock v0.3.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.1
 )
 
 require (
