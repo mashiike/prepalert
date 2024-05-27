@@ -1,5 +1,9 @@
 # Changelog
 
+## [v1.0.3](https://github.com/mashiike/prepalert/compare/v1.0.2...v1.0.3) - 2024-05-27
+- Bump google.golang.org/protobuf from 1.33.0 to 1.34.1 by @dependabot in https://github.com/mashiike/prepalert/pull/220
+- Bump the aws-sdk-go-v2 group across 1 directory with 6 updates by @dependabot in https://github.com/mashiike/prepalert/pull/227
+
 ## [v1.0.2](https://github.com/mashiike/prepalert/compare/v1.0.1...v1.0.2) - 2024-04-12
 - Bump golang.org/x/net from 0.15.0 to 0.17.0 by @dependabot in https://github.com/mashiike/prepalert/pull/177
 - Bump github.com/aws/aws-sdk-go-v2 from 1.21.0 to 1.21.1 by @dependabot in https://github.com/mashiike/prepalert/pull/176
