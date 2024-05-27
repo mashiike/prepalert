@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.25.8
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.54.3
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.32.3
-	github.com/fatih/color v1.16.0
+	github.com/fatih/color v1.17.0
 	github.com/handlename/ssmwrap v1.2.1
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.6.0
