@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.0.3](https://github.com/mashiike/prepalert/compare/v1.0.2...v1.0.3) - 2025-04-08
+- Bump google.golang.org/protobuf from 1.33.0 to 1.34.1 by @dependabot in https://github.com/mashiike/prepalert/pull/220
+- Bump the aws-sdk-go-v2 group across 1 directory with 6 updates by @dependabot in https://github.com/mashiike/prepalert/pull/227
+- Bump goreleaser/goreleaser-action from 5 to 6 by @dependabot in https://github.com/mashiike/prepalert/pull/229
+- Bump go.uber.org/mock from 0.3.0 to 0.4.0 by @dependabot in https://github.com/mashiike/prepalert/pull/219
+- Bump golang.org/x/crypto from 0.22.0 to 0.31.0 by @dependabot in https://github.com/mashiike/prepalert/pull/242
+- Bump github.com/go-jose/go-jose/v4 from 4.0.1 to 4.0.5 by @dependabot in https://github.com/mashiike/prepalert/pull/251
+- Bump github.com/hashicorp/go-plugin from 1.6.0 to 1.6.3 by @dependabot in https://github.com/mashiike/prepalert/pull/244
+
 ## [v1.0.2](https://github.com/mashiike/prepalert/compare/v1.0.1...v1.0.2) - 2024-04-12
 - Bump golang.org/x/net from 0.15.0 to 0.17.0 by @dependabot in https://github.com/mashiike/prepalert/pull/177
 - Bump github.com/aws/aws-sdk-go-v2 from 1.21.0 to 1.21.1 by @dependabot in https://github.com/mashiike/prepalert/pull/176
