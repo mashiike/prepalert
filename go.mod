@@ -1,6 +1,7 @@
 module github.com/mashiike/prepalert
 
 go 1.21.9
+toolchain go1.24.1
 
 require (
 	github.com/Songmu/flextime v0.1.0
@@ -34,7 +35,7 @@ require (
 	github.com/zclconf/go-cty v1.14.4
 	go.uber.org/mock v0.4.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.36.1
+	google.golang.org/protobuf v1.36.6
 )
 
 require (
