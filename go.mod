@@ -1,6 +1,6 @@
 module github.com/mashiike/prepalert
 
-go 1.21.9
+go 1.23
 
 require (
 	github.com/Songmu/flextime v0.1.0
@@ -34,7 +34,7 @@ require (
 	github.com/zclconf/go-cty v1.14.4
 	go.uber.org/mock v0.4.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.36.1
+	google.golang.org/protobuf v1.36.10
 )
 
 require (
@@ -68,7 +68,7 @@ require (
 	github.com/fujiwara/ridge v0.9.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
